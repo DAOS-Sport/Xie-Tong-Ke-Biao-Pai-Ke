@@ -97,7 +97,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
     );
     if (!schedule) return '';
     return schedule.className && schedule.coachName 
-      ? `${schedule.className} ${schedule.coachName}`
+      ? `${schedule.className}-${schedule.coachName}`
       : schedule.className || schedule.coachName || '';
   };
 
@@ -124,18 +124,18 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
           coachName: '',
         });
       } else {
-        // Parse the input - last word is coach, rest is class name
-        const parts = trimmedValue.split(' ').filter(p => p.length > 0);
+        // Parse the input - format: 班級-教練名
         let className = '';
         let coachName = '';
         
-        if (parts.length === 1) {
-          // Only one word - treat as class name
-          className = parts[0];
+        if (trimmedValue.includes('-')) {
+          // Split by dash
+          const parts = trimmedValue.split('-');
+          className = parts[0].trim();
+          coachName = parts.slice(1).join('-').trim(); // In case there are multiple dashes
         } else {
-          // Multiple words - last is coach, rest is class
-          coachName = parts[parts.length - 1];
-          className = parts.slice(0, -1).join(' ');
+          // No dash - treat as class name only
+          className = trimmedValue;
         }
 
         saveMutation.mutate({
