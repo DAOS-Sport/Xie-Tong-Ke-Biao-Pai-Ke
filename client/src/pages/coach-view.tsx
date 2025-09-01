@@ -181,22 +181,23 @@ export default function CoachView() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <h2 className="text-lg font-semibold" data-testid="text-coach-name">
-                {selectedCoach || '教練'} - 本週課表
+                教練課表查詢
               </h2>
-              {coaches && coaches.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">選擇教練：</span>
                 <Select value={selectedCoach} onValueChange={setSelectedCoach}>
                   <SelectTrigger className="w-40" data-testid="select-coach">
                     <SelectValue placeholder="選擇教練" />
                   </SelectTrigger>
                   <SelectContent>
-                    {coaches.map((coach) => (
+                    {coaches?.map((coach) => (
                       <SelectItem key={coach} value={coach} data-testid={`option-${coach}`}>
                         {coach}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              )}
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               <Button
