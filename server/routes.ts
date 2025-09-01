@@ -66,13 +66,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/schedules', isAuthenticated, async (req: any, res) => {
+  app.post('/api/schedules', async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
       const validatedData = insertScheduleSchema.parse(req.body);
       const schedule = await storage.upsertSchedule(validatedData);
       res.json(schedule);
@@ -81,13 +76,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/schedules/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/schedules/:id', async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
       await storage.deleteSchedule(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -128,13 +118,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Statistics
-  app.get('/api/statistics', isAuthenticated, async (req: any, res) => {
+  app.get('/api/statistics', async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      if (user?.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
       const { startDate, endDate, coachName } = req.query as {
         startDate: string;
         endDate: string;
