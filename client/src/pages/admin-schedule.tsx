@@ -7,6 +7,7 @@ import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks } from "date-
 import { zhTW } from "date-fns/locale";
 import WeekScheduleGrid from "@/components/week-schedule-grid";
 import WeekConflictAlert from "@/components/week-conflict-alert";
+import PasswordProtect from "@/components/password-protect";
 import { Button } from "@/components/ui/button";
 
 export default function AdminSchedule() {
@@ -15,41 +16,9 @@ export default function AdminSchedule() {
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "未授權",
-        description: "您已登出，正在重新登入...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
+  // Remove Replit authentication requirement for public access
 
-    if (!isLoading && user && user.role !== 'admin') {
-      toast({
-        title: "權限不足",
-        description: "此功能僅限管理員使用",
-        variant: "destructive",
-      });
-      setLocation('/');
-      return;
-    }
-  }, [isAuthenticated, isLoading, user, toast, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-primary">載入中...</div>
-      </div>
-    );
-  }
-
-  if (!user || user.role !== 'admin') {
-    return null;
-  }
+  // Allow public access to admin interface
 
   const navigateToPrevWeek = () => {
     setCurrentWeek(prev => subWeeks(prev, 1));
@@ -76,20 +45,24 @@ export default function AdminSchedule() {
               <span className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded-full">
                 管理員模式
               </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <i className="fas fa-user text-primary-foreground text-sm"></i>
-                </div>
-                <span className="text-sm font-medium">{user.firstName || user.email || '管理員'}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                data-testid="button-logout"
-              >
-                登出
-              </Button>
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <i className="fas fa-user text-primary-foreground text-sm"></i>
+                    </div>
+                    <span className="text-sm font-medium">{user.firstName || user.email || '管理員'}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/logout'}
+                    data-testid="button-logout"
+                  >
+                    登出
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -178,7 +151,9 @@ export default function AdminSchedule() {
             </div>
           </div>
 
-          <WeekScheduleGrid weekStart={currentWeek} />
+          <PasswordProtect>
+            <WeekScheduleGrid weekStart={currentWeek} />
+          </PasswordProtect>
         </div>
       </main>
     </div>

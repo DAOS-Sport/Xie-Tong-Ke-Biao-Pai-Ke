@@ -38,14 +38,14 @@ function Router() {
   return (
     <Switch>
       {/* Public pages - no authentication required */}
-      <Route path="/" component={VenueSchedule} />
+      <Route path="/" component={AdminSchedule} />
+      <Route path="/admin/schedule" component={AdminSchedule} />
       <Route path="/coach" component={CoachView} />
       <Route path="/venue-schedule" component={VenueSchedule} />
       
-      {/* Admin pages - require authentication or password protection */}
-      <Route path="/admin/schedule" component={ProtectedAdminSchedule} />
+      {/* Password protected admin functions */}
       <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
-      <Route path="/statistics" component={ProtectedStatistics} />
+      <Route path="/statistics" component={Statistics} />
       
       {/* Auth pages */}
       <Route path="/home" component={Home} />

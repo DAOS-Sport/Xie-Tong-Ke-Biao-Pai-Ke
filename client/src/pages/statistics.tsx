@@ -8,6 +8,7 @@ import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PasswordProtect from "@/components/password-protect";
 
 export default function Statistics() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -16,29 +17,7 @@ export default function Statistics() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [searchCoach, setSearchCoach] = useState("");
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "未授權",
-        description: "您已登出，正在重新登入...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-
-    if (!isLoading && user && user.role !== 'admin') {
-      toast({
-        title: "權限不足",
-        description: "此功能僅限管理員使用",
-        variant: "destructive",
-      });
-      setLocation('/');
-      return;
-    }
-  }, [isAuthenticated, isLoading, user, toast, setLocation]);
+  // Remove Replit authentication requirement for public access
 
   // Calculate statistics period (14th to 15th of next month)
   const getStatisticsPeriod = (baseDate: Date) => {
@@ -68,16 +47,12 @@ export default function Statistics() {
     enabled: !!user && user.role === 'admin',
   });
 
-  if (isLoading || statsLoading) {
+  if (statsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-primary">載入中...</div>
       </div>
     );
-  }
-
-  if (!user || user.role !== 'admin') {
-    return null;
   }
 
   const getVenueColorClass = (color: string) => {
@@ -108,20 +83,24 @@ export default function Statistics() {
               <span className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded-full">
                 管理員模式
               </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <i className="fas fa-user text-primary-foreground text-sm"></i>
-                </div>
-                <span className="text-sm font-medium">{user.firstName || user.email || '管理員'}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                data-testid="button-logout"
-              >
-                登出
-              </Button>
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <i className="fas fa-user text-primary-foreground text-sm"></i>
+                    </div>
+                    <span className="text-sm font-medium">{user.firstName || user.email || '管理員'}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/logout'}
+                    data-testid="button-logout"
+                  >
+                    登出
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -167,9 +146,10 @@ export default function Statistics() {
           </nav>
         </div>
 
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">堂數統計</h2>
+        <PasswordProtect>
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold">堂數統計</h2>
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
@@ -246,8 +226,9 @@ export default function Statistics() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
+        </PasswordProtect>
       </main>
     </div>
   );
