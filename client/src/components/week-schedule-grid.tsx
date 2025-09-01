@@ -19,6 +19,12 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
     timeSlotId: string; 
   } | null>(null);
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
+  const [editingSchedule, setEditingSchedule] = useState<{
+    scheduleId: string;
+    date: string;
+    venueId: string;
+    timeSlotId: string;
+  } | null>(null);
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
   const weekEnd = addDays(weekStart, 4);
@@ -112,6 +118,39 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
     onError: (error) => {
       toast({
         title: "刪除失敗",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: {
+      id: string;
+      className: string;
+      coachName: string;
+    }) => {
+      const response = await apiRequest('PUT', `/api/schedules/${data.id}`, {
+        className: data.className,
+        coachName: data.coachName,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/schedules', format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')]
+      });
+      weekDays.forEach(day => {
+        queryClient.invalidateQueries({ queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')] });
+      });
+      toast({
+        title: "更新成功",
+        description: "課表已更新",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "更新失敗",
         description: error.message,
         variant: "destructive",
       });
@@ -220,29 +259,92 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                             style={{ minHeight: '60px', verticalAlign: 'top' }}
                           >
                             <div className="space-y-1 min-h-full">
-                              {cellSchedules.map((schedule, index) => (
-                                <div 
-                                  key={schedule.id} 
-                                  className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group"
-                                  data-testid={`schedule-item-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
-                                >
-                                  <span className="flex-1 truncate">
-                                    {schedule.className && schedule.coachName 
-                                      ? `${schedule.className}-${schedule.coachName}`
-                                      : schedule.className || schedule.coachName || '未命名'}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteClass(schedule.id);
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
-                                    data-testid={`button-delete-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                              {cellSchedules.map((schedule, index) => {
+                                const isEditing = editingSchedule?.scheduleId === schedule.id;
+                                
+                                if (isEditing) {
+                                  const editKey = `edit-${schedule.id}`;
+                                  return (
+                                    <div 
+                                      key={schedule.id} 
+                                      className="bg-background/50 rounded px-1 py-0.5 text-xs"
+                                      data-testid={`schedule-item-editing-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                    >
+                                      <input
+                                        type="text"
+                                        className="w-full bg-transparent border-b border-primary text-xs outline-none"
+                                        placeholder="班級-教練"
+                                        defaultValue={schedule.className && schedule.coachName 
+                                          ? `${schedule.className}-${schedule.coachName}`
+                                          : schedule.className || schedule.coachName || ''}
+                                        onBlur={(e) => {
+                                          const value = e.target.value.trim();
+                                          if (value) {
+                                            // Parse the input
+                                            let className = '';
+                                            let coachName = '';
+                                            
+                                            if (value.includes('-')) {
+                                              const parts = value.split('-');
+                                              className = parts[0].trim();
+                                              coachName = parts.slice(1).join('-').trim();
+                                            } else {
+                                              className = value;
+                                            }
+                                            
+                                            // Update the schedule
+                                            updateMutation.mutate({
+                                              id: schedule.id,
+                                              className,
+                                              coachName,
+                                            });
+                                          }
+                                          setEditingSchedule(null);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.currentTarget.blur();
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSchedule(null);
+                                          }
+                                        }}
+                                        autoFocus
+                                        data-testid={`input-edit-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                      />
+                                    </div>
+                                  );
+                                }
+                                
+                                return (
+                                  <div 
+                                    key={schedule.id} 
+                                    className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group hover:bg-accent/30 cursor-pointer"
+                                    data-testid={`schedule-item-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                    onClick={() => setEditingSchedule({
+                                      scheduleId: schedule.id,
+                                      date: dateStr,
+                                      venueId: venue.id,
+                                      timeSlotId: timeSlot.id,
+                                    })}
                                   >
-                                    <i className="fas fa-times text-xs"></i>
-                                  </button>
-                                </div>
-                              ))}
+                                    <span className="flex-1 truncate">
+                                      {schedule.className && schedule.coachName 
+                                        ? `${schedule.className}-${schedule.coachName}`
+                                        : schedule.className || schedule.coachName || '未命名'}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteClass(schedule.id);
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
+                                      data-testid={`button-delete-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                    >
+                                      <i className="fas fa-times text-xs"></i>
+                                    </button>
+                                  </div>
+                                );
+                              })}
                               <input
                                 type="text"
                                 className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"

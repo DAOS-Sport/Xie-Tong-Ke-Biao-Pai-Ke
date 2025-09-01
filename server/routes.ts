@@ -81,6 +81,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/schedules/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { className, coachName } = req.body;
+      const schedule = await storage.updateSchedule(req.params.id, { className, coachName });
+      res.json(schedule);
+    } catch (error) {
+      res.status(400).json({ message: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.delete('/api/schedules/:id', isAuthenticated, async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
