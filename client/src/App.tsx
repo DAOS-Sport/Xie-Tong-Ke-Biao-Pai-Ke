@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import AdminSchedule from "@/pages/admin-schedule";
 import CoachView from "@/pages/coach-view";
 import Statistics from "@/pages/statistics";
+import VenueSchedule from "@/pages/venue-schedule";
 import PasswordProtect from "@/components/password-protect";
 
 // Protected AdminSchedule component
@@ -43,6 +44,7 @@ function Router() {
           <Route path="/home" component={Home} />
           <Route path="/admin/schedule" component={ProtectedAdminSchedule} />
           <Route path="/coach" component={CoachView} />
+          <Route path="/venue-schedule" component={VenueSchedule} />
           <Route path="/statistics" component={ProtectedStatistics} />
         </>
       )}

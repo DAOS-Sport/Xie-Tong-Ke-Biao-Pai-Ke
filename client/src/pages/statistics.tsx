@@ -145,6 +145,13 @@ export default function Statistics() {
               <i className="fas fa-user-clock mr-2"></i>教練視圖
             </button>
             <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/venue-schedule')}
+              data-testid="tab-venue-schedule"
+            >
+              <i className="fas fa-building mr-2"></i>場館課表
+            </button>
+            <button 
               className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
               data-testid="tab-statistics"
             >
