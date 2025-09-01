@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface PasswordProtectProps {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ export default function PasswordProtect({ children, requiredPassword = "dream285
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     // Check if already authorized in this session
@@ -69,13 +71,24 @@ export default function PasswordProtect({ children, requiredPassword = "dream285
                   data-testid="input-password"
                 />
               </div>
-              <Button 
-                type="submit" 
-                className="w-full"
-                data-testid="button-submit"
-              >
-                驗證
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  data-testid="button-submit"
+                >
+                  驗證
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setLocation('/coach')}
+                  data-testid="button-back-to-coach"
+                >
+                  返回教練視圖
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

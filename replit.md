@@ -65,7 +65,10 @@ Preferred communication style: Simple, everyday language.
 - **Fonts**: Google Fonts (Noto Sans TC, DM Sans, Fira Code, Geist Mono)
 
 ## Backend Infrastructure
-- **Database**: Neon PostgreSQL with serverless connection pooling
+- **Database**: **Persistent PostgreSQL Database** - Dedicated production-ready database instance
+  - **Data Persistence**: All data is permanently stored and survives application updates/modifications
+  - **Connection**: Managed via Replit's PostgreSQL integration with automatic connection pooling
+  - **Security**: Environment variables (DATABASE_URL, PGUSER, PGPASSWORD, etc.) handled securely
 - **ORM**: Drizzle ORM with Zod schema validation
 - **Authentication**: Replit Auth with passport.js integration
 - **Session Management**: connect-pg-simple for PostgreSQL session storage
@@ -80,3 +83,15 @@ Preferred communication style: Simple, everyday language.
 - **Environment**: Replit hosting platform with integrated development tools
 - **Error Handling**: Runtime error overlay for development debugging
 - **Code Quality**: TypeScript strict mode with comprehensive type checking
+
+# Security & Access Control
+
+## Password Protection
+- **Admin Functions**: Course schedule editing and statistics require password authentication
+- **Password**: `dream28559983` (stored in component, session-based authentication)
+- **Session Management**: Authorization stored in browser sessionStorage, cleared on browser close
+- **User Experience**: "Return to Coach View" button available from password screens
+
+## Default Access
+- **Default Landing Page**: Coach view (public access)
+- **Navigation**: Password-protected functions clearly separated from public coach view
