@@ -8,6 +8,7 @@ import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Schedule, Venue, TimeSlot } from "@shared/schema";
 
 export default function CoachView() {
@@ -15,6 +16,7 @@ export default function CoachView() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [selectedCoach, setSelectedCoach] = useState<string>('');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -33,9 +35,40 @@ export default function CoachView() {
   const weekStart = format(currentWeek, 'yyyy-MM-dd');
   const weekEnd = format(addDays(currentWeek, 4), 'yyyy-MM-dd');
 
+  // Get list of all coaches for admin users
+  const { data: coaches } = useQuery<string[]>({
+    queryKey: ['/api/coaches'],
+    enabled: !!user && user.role === 'admin',
+  });
+
+  // Set default coach when data loads
+  useEffect(() => {
+    if (user && !selectedCoach) {
+      if (user.role === 'admin' && coaches && coaches.length > 0) {
+        setSelectedCoach(coaches[0]);
+      } else if (user.coachName) {
+        setSelectedCoach(user.coachName);
+      }
+    }
+  }, [user, coaches, selectedCoach]);
+
   const { data: schedules, isLoading: schedulesLoading } = useQuery<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>({
-    queryKey: ['/api/coach-schedules', { startDate: weekStart, endDate: weekEnd }],
-    enabled: !!user && (user.role === 'coach' || user.role === 'admin'),
+    queryKey: ['/api/coach-schedules', { startDate: weekStart, endDate: weekEnd, coachName: selectedCoach }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: weekStart,
+        endDate: weekEnd,
+      });
+      
+      if (user?.role === 'admin' && selectedCoach) {
+        params.append('coachName', selectedCoach);
+      }
+      
+      const response = await fetch(`/api/coach-schedules?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch schedules');
+      return response.json();
+    },
+    enabled: !!user && (user.role === 'coach' || user.role === 'admin') && !!selectedCoach,
   });
 
   if (isLoading || schedulesLoading) {
@@ -64,6 +97,7 @@ export default function CoachView() {
       case 'purple': return 'venue-purple';
       case 'yellow': return 'venue-yellow';
       case 'pink': return 'venue-pink';
+      case 'orange': return 'venue-orange';
       default: return 'bg-muted';
     }
   };
@@ -132,9 +166,25 @@ export default function CoachView() {
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold" data-testid="text-coach-name">
-              {user.coachName || user.firstName || '教練'} - 本週課表
-            </h2>
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold" data-testid="text-coach-name">
+                {selectedCoach || '教練'} - 本週課表
+              </h2>
+              {user?.role === 'admin' && coaches && coaches.length > 0 && (
+                <Select value={selectedCoach} onValueChange={setSelectedCoach}>
+                  <SelectTrigger className="w-40" data-testid="select-coach">
+                    <SelectValue placeholder="選擇教練" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coaches.map((coach) => (
+                      <SelectItem key={coach} value={coach} data-testid={`option-${coach}`}>
+                        {coach}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
