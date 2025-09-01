@@ -90,13 +90,13 @@ export class DatabaseStorage implements IStorage {
     const existingSlots = await this.getTimeSlots();
     if (existingSlots.length === 0) {
       const defaultTimeSlots = [
-        { period: "第1節", startTime: "08:20", endTime: "09:10", order: 1 },
-        { period: "第2節", startTime: "09:20", endTime: "10:10", order: 2 },
-        { period: "第3節", startTime: "10:20", endTime: "11:10", order: 3 },
-        { period: "第4節", startTime: "11:20", endTime: "12:10", order: 4 },
-        { period: "第5節", startTime: "13:20", endTime: "14:10", order: 5 },
-        { period: "第6節", startTime: "14:20", endTime: "15:10", order: 6 },
-        { period: "第7節", startTime: "15:20", endTime: "16:10", order: 7 },
+        { period: "第1節", startTime: "08", endTime: "09", order: 1 },
+        { period: "第2節", startTime: "09", endTime: "10", order: 2 },
+        { period: "第3節", startTime: "10", endTime: "11", order: 3 },
+        { period: "第4節", startTime: "11", endTime: "12", order: 4 },
+        { period: "第5節", startTime: "13", endTime: "14", order: 5 },
+        { period: "第6節", startTime: "14", endTime: "15", order: 6 },
+        { period: "第7節", startTime: "15", endTime: "16", order: 7 },
       ];
       
       await db.insert(timeSlots).values(defaultTimeSlots);
