@@ -76,6 +76,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/schedules/:id', async (req: any, res) => {
+    try {
+      const { className, coachName } = req.body;
+      const schedule = await storage.updateSchedule(req.params.id, { className, coachName });
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update schedule" });
+    }
+  });
+
   app.delete('/api/schedules/:id', async (req: any, res) => {
     try {
       await storage.deleteSchedule(req.params.id);

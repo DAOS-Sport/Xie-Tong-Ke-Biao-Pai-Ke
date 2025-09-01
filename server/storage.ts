@@ -156,6 +156,19 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async updateSchedule(id: string, updateData: { className: string; coachName: string }): Promise<Schedule> {
+    const [result] = await db
+      .update(schedules)
+      .set({
+        className: updateData.className,
+        coachName: updateData.coachName,
+        updatedAt: new Date(),
+      })
+      .where(eq(schedules.id, id))
+      .returning();
+    return result;
+  }
+
   async deleteSchedule(id: string): Promise<void> {
     await db.delete(schedules).where(eq(schedules.id, id));
   }
