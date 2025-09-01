@@ -157,7 +157,14 @@ export default function CoachView() {
               onClick={() => setLocation('/venue-schedule')}
               data-testid="tab-venue-schedule"
             >
-              <i className="fas fa-building mr-2"></i>場館課表
+              <i className="fas fa-building mr-2"></i>場館課表顯示
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/venue-schedule-edit')}
+              data-testid="tab-venue-schedule-edit"
+            >
+              <i className="fas fa-edit mr-2"></i>場館課表編輯
             </button>
             {user.role === 'admin' && (
               <button 
