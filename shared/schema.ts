@@ -8,6 +8,7 @@ import {
   text,
   date,
   integer,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -64,7 +65,9 @@ export const schedules = pgTable("schedules", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  uniqueDateVenueTimeSlot: unique().on(table.date, table.venueId, table.timeSlotId),
+}));
 
 export const schedulesRelations = relations(schedules, ({ one }) => ({
   venue: one(venues, {
