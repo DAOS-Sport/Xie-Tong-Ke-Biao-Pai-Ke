@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PasswordProtect from "@/components/password-protect";
 
 export default function Statistics() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -44,7 +44,7 @@ export default function Statistics() {
       endDate: currentPeriod.endDate,
       ...(searchCoach && { coachName: searchCoach })
     }],
-    enabled: !!user && user.role === 'admin',
+    // Allow public access to statistics, no role check required
   });
 
   if (statsLoading) {

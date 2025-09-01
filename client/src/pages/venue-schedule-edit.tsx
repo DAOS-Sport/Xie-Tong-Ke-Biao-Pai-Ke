@@ -24,7 +24,7 @@ const WEEKDAYS = [
 ];
 
 function VenueScheduleEditContent() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -38,19 +38,7 @@ function VenueScheduleEditContent() {
     timeSlotId: string; 
   } | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "未授權",
-        description: "您已登出，正在重新登入...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Remove Replit authentication requirement for public access
 
   // 獲取場館列表
   const { data: venues } = useQuery<Venue[]>({
@@ -198,16 +186,12 @@ function VenueScheduleEditContent() {
 
   const selectedVenueData = venues?.find(v => v.id === selectedVenue);
 
-  if (isLoading || !venues || !timeSlots) {
+  if (!venues || !timeSlots) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-primary">載入中...</div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
@@ -223,20 +207,24 @@ function VenueScheduleEditContent() {
               <span className="text-sm bg-red-500 text-white px-3 py-1 rounded-full">
                 場館課表編輯
               </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <i className="fas fa-user text-primary-foreground text-sm"></i>
-                </div>
-                <span className="text-sm font-medium">{user.firstName || user.email}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                data-testid="button-logout"
-              >
-                登出
-              </Button>
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <i className="fas fa-user text-primary-foreground text-sm"></i>
+                    </div>
+                    <span className="text-sm font-medium">{user.firstName || user.email}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/logout'}
+                    data-testid="button-logout"
+                  >
+                    登出
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -245,15 +233,13 @@ function VenueScheduleEditContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <nav className="flex space-x-8" aria-label="Tabs">
-            {user.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/admin/schedule')}
-                data-testid="tab-schedule-edit"
-              >
-                <i className="fas fa-calendar-alt mr-2"></i>課表編輯
-              </button>
-            )}
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/admin/schedule')}
+              data-testid="tab-schedule-edit"
+            >
+              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+            </button>
             <button 
               className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
               onClick={() => setLocation('/coach')}
@@ -274,15 +260,13 @@ function VenueScheduleEditContent() {
             >
               <i className="fas fa-edit mr-2"></i>場館課表編輯
             </button>
-            {user.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/statistics')}
-                data-testid="tab-statistics"
-              >
-                <i className="fas fa-chart-bar mr-2"></i>堂數統計
-              </button>
-            )}
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/statistics')}
+              data-testid="tab-statistics"
+            >
+              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+            </button>
           </nav>
         </div>
 

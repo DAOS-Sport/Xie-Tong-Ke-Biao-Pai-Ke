@@ -21,7 +21,7 @@ const WEEKDAYS = [
 ];
 
 export default function VenueSchedule() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [selectedVenue, setSelectedVenue] = useState<string>("");
@@ -132,15 +132,13 @@ export default function VenueSchedule() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <nav className="flex space-x-8" aria-label="Tabs">
-            {user?.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/admin/schedule')}
-                data-testid="tab-schedule-edit"
-              >
-                <i className="fas fa-calendar-alt mr-2"></i>課表編輯
-              </button>
-            )}
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/admin/schedule')}
+              data-testid="tab-schedule-edit"
+            >
+              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+            </button>
             <button 
               className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
               onClick={() => setLocation('/coach')}
@@ -161,15 +159,13 @@ export default function VenueSchedule() {
             >
               <i className="fas fa-edit mr-2"></i>場館課表編輯
             </button>
-            {user?.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/statistics')}
-                data-testid="tab-statistics"
-              >
-                <i className="fas fa-chart-bar mr-2"></i>堂數統計
-              </button>
-            )}
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/statistics')}
+              data-testid="tab-statistics"
+            >
+              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+            </button>
           </nav>
         </div>
 

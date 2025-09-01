@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Schedule, Venue, TimeSlot } from "@shared/schema";
 
 export default function CoachView() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));

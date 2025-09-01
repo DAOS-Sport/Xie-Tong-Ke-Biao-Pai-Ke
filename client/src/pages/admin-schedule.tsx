@@ -11,7 +11,7 @@ import PasswordProtect from "@/components/password-protect";
 import { Button } from "@/components/ui/button";
 
 export default function AdminSchedule() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
