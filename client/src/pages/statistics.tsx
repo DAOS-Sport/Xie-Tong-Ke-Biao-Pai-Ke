@@ -74,10 +74,10 @@ export default function Statistics() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 gap-4">
             <div className="flex items-center space-x-4">
-              <i className="fas fa-swimming-pool text-primary text-2xl"></i>
-              <h1 className="text-xl font-bold text-primary">五泳池課表整合系統</h1>
+              <i className="fas fa-swimming-pool text-primary text-xl sm:text-2xl"></i>
+              <h1 className="text-lg sm:text-xl font-bold text-primary">五泳池課表整合系統</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded-full">
@@ -108,70 +108,74 @@ export default function Statistics() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
+          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/admin/schedule')}
               data-testid="tab-schedule-edit"
             >
-              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/coach')}
               data-testid="tab-coach-view"
             >
-              <i className="fas fa-user-clock mr-2"></i>教練視圖
+              <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule')}
               data-testid="tab-venue-schedule"
             >
-              <i className="fas fa-building mr-2"></i>場館課表顯示
+              <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule-edit')}
               data-testid="tab-venue-schedule-edit"
             >
-              <i className="fas fa-edit mr-2"></i>場館課表編輯
+              <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
               data-testid="tab-statistics"
             >
-              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+              <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
           </nav>
         </div>
 
         <PasswordProtect>
           <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">堂數統計</h2>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedMonth(prev => subMonths(prev, 1))}
-                data-testid="button-prev-month"
-              >
-                <i className="fas fa-chevron-left"></i>
-              </Button>
-              <span className="text-sm font-medium min-w-48 text-center" data-testid="text-period">
-                {currentPeriod.label}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedMonth(prev => addMonths(prev, 1))}
-                data-testid="button-next-month"
-              >
-                <i className="fas fa-chevron-right"></i>
-              </Button>
-              <Button size="sm" data-testid="button-export-excel">
-                <i className="fas fa-download mr-2"></i>匯出 Excel
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+              <h2 className="text-base sm:text-lg font-semibold">堂數統計</h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedMonth(prev => subMonths(prev, 1))}
+                  data-testid="button-prev-month"
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+                >
+                  <i className="fas fa-chevron-left text-xs sm:text-sm"></i>
+                </Button>
+                <span className="text-xs sm:text-sm font-medium text-center flex-1 sm:min-w-48" data-testid="text-period">
+                  {currentPeriod.label}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedMonth(prev => addMonths(prev, 1))}
+                  data-testid="button-next-month"
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+                >
+                  <i className="fas fa-chevron-right text-xs sm:text-sm"></i>
+                </Button>
+              </div>
+              <Button size="sm" data-testid="button-export-excel" className="w-full sm:w-auto text-xs sm:text-sm">
+                <i className="fas fa-download mr-1 sm:mr-2"></i>匯出 Excel
               </Button>
             </div>
           </div>
@@ -182,13 +186,13 @@ export default function Statistics() {
               placeholder="搜尋教練姓名..."
               value={searchCoach}
               onChange={(e) => setSearchCoach(e.target.value)}
-              className="w-full max-w-md"
+              className="w-full sm:max-w-md text-sm"
               data-testid="input-coach-search"
             />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto mobile-table-container">
+            <table className="w-full min-w-[500px]">
               <thead>
                 <tr className="bg-muted">
                   <th className="text-left p-3 text-sm font-medium text-muted-foreground">教練姓名</th>

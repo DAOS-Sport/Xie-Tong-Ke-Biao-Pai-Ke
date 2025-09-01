@@ -87,10 +87,10 @@ export default function VenueSchedule() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 gap-4">
             <div className="flex items-center space-x-4">
-              <i className="fas fa-swimming-pool text-primary text-2xl"></i>
-              <h1 className="text-xl font-bold text-primary">五泳池課表整合系統</h1>
+              <i className="fas fa-swimming-pool text-primary text-xl sm:text-2xl"></i>
+              <h1 className="text-lg sm:text-xl font-bold text-primary">五泳池課表整合系統</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
@@ -131,40 +131,40 @@ export default function VenueSchedule() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
+          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/admin/schedule')}
               data-testid="tab-schedule-edit"
             >
-              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/coach')}
               data-testid="tab-coach-view"
             >
-              <i className="fas fa-user-clock mr-2"></i>教練視圖
+              <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
               data-testid="tab-venue-schedule"
             >
-              <i className="fas fa-building mr-2"></i>場館課表顯示
+              <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule-edit')}
               data-testid="tab-venue-schedule-edit"
             >
-              <i className="fas fa-edit mr-2"></i>場館課表編輯
+              <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/statistics')}
               data-testid="tab-statistics"
             >
-              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+              <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
           </nav>
         </div>
@@ -190,18 +190,19 @@ export default function VenueSchedule() {
           </div>
 
           {/* 週次導航 */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setCurrentWeek(prev => subWeeks(prev, 1))}
                 data-testid="button-prev-week"
+                className="h-8 w-8 sm:h-10 sm:w-10"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-sm sm:text-xl font-semibold text-center flex-1 sm:flex-none">
                 {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} - {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
               </h2>
               
@@ -210,8 +211,9 @@ export default function VenueSchedule() {
                 size="icon"
                 onClick={() => setCurrentWeek(prev => addWeeks(prev, 1))}
                 data-testid="button-next-week"
+                className="h-8 w-8 sm:h-10 sm:w-10"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
             
@@ -219,6 +221,7 @@ export default function VenueSchedule() {
               variant="outline"
               onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
               data-testid="button-current-week"
+              className="text-xs sm:text-sm px-3 sm:px-4 w-full sm:w-auto"
             >
               本週
             </Button>
@@ -242,8 +245,8 @@ export default function VenueSchedule() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto mobile-table-container">
+                <table className="w-full border-collapse min-w-[600px]">
                   <thead>
                     <tr>
                       <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>

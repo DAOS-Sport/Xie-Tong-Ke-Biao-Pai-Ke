@@ -36,10 +36,10 @@ export default function AdminSchedule() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 gap-4">
             <div className="flex items-center space-x-4">
-              <i className="fas fa-swimming-pool text-primary text-2xl"></i>
-              <h1 className="text-xl font-bold text-primary">五泳池課表整合系統</h1>
+              <i className="fas fa-swimming-pool text-primary text-xl sm:text-2xl"></i>
+              <h1 className="text-lg sm:text-xl font-bold text-primary">五泳池課表整合系統</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded-full">
@@ -70,40 +70,40 @@ export default function AdminSchedule() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
+          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
               data-testid="tab-schedule-edit"
             >
-              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/coach')}
               data-testid="tab-coach-view"
             >
-              <i className="fas fa-user-clock mr-2"></i>教練視圖
+              <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule')}
               data-testid="tab-venue-schedule"
             >
-              <i className="fas fa-building mr-2"></i>場館課表顯示
+              <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule-edit')}
               data-testid="tab-venue-schedule-edit"
             >
-              <i className="fas fa-edit mr-2"></i>場館課表編輯
+              <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/statistics')}
               data-testid="tab-statistics"
             >
-              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+              <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
           </nav>
         </div>
@@ -111,17 +111,18 @@ export default function AdminSchedule() {
         <WeekConflictAlert weekStart={currentWeek} />
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={navigateToPrevWeek}
                 data-testid="button-prev-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <i className="fas fa-chevron-left"></i>
+                <i className="fas fa-chevron-left text-xs sm:text-sm"></i>
               </Button>
-              <h2 className="text-lg font-semibold" data-testid="text-current-week">
+              <h2 className="text-sm sm:text-lg font-semibold text-center flex-1 sm:flex-none" data-testid="text-current-week">
                 {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(addDays(currentWeek, 4), 'M月d日', { locale: zhTW })}
               </h2>
               <Button
@@ -129,24 +130,26 @@ export default function AdminSchedule() {
                 size="sm"
                 onClick={navigateToNextWeek}
                 data-testid="button-next-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <i className="fas fa-chevron-right"></i>
+                <i className="fas fa-chevron-right text-xs sm:text-sm"></i>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={navigateToThisWeek}
                 data-testid="button-this-week"
+                className="text-xs sm:text-sm px-2 sm:px-3"
               >
                 本週
               </Button>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="secondary" size="sm" data-testid="button-copy-week">
-                <i className="fas fa-copy mr-2"></i>複製週課表
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <Button variant="secondary" size="sm" data-testid="button-copy-week" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <i className="fas fa-copy mr-1 sm:mr-2"></i>複製週課表
               </Button>
-              <Button size="sm" data-testid="button-save">
-                <i className="fas fa-save mr-2"></i>儲存
+              <Button size="sm" data-testid="button-save" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <i className="fas fa-save mr-1 sm:mr-2"></i>儲存
               </Button>
             </div>
           </div>

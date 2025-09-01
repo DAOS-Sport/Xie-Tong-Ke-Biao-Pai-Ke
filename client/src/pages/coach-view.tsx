@@ -91,10 +91,10 @@ export default function CoachView() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 gap-4">
             <div className="flex items-center space-x-4">
-              <i className="fas fa-swimming-pool text-primary text-2xl"></i>
-              <h1 className="text-xl font-bold text-primary">五泳池課表整合系統</h1>
+              <i className="fas fa-swimming-pool text-primary text-xl sm:text-2xl"></i>
+              <h1 className="text-lg sm:text-xl font-bold text-primary">五泳池課表整合系統</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
@@ -135,58 +135,54 @@ export default function CoachView() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
-            {user?.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/admin/schedule')}
-                data-testid="tab-schedule-edit"
-              >
-                <i className="fas fa-calendar-alt mr-2"></i>課表編輯
-              </button>
-            )}
+          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
-              data-testid="tab-coach-view"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/admin/schedule')}
+              data-testid="tab-schedule-edit"
             >
-              <i className="fas fa-user-clock mr-2"></i>教練視圖
+              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
+              data-testid="tab-coach-view"
+            >
+              <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule')}
               data-testid="tab-venue-schedule"
             >
-              <i className="fas fa-building mr-2"></i>場館課表顯示
+              <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
             <button 
-              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/venue-schedule-edit')}
               data-testid="tab-venue-schedule-edit"
             >
-              <i className="fas fa-edit mr-2"></i>場館課表編輯
+              <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
             </button>
-            {user?.role === 'admin' && (
-              <button 
-                className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
-                onClick={() => setLocation('/statistics')}
-                data-testid="tab-statistics"
-              >
-                <i className="fas fa-chart-bar mr-2"></i>堂數統計
-              </button>
-            )}
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/statistics')}
+              data-testid="tab-statistics"
+            >
+              <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
+            </button>
           </nav>
         </div>
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-lg font-semibold" data-testid="text-coach-name">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+              <h2 className="text-base sm:text-lg font-semibold" data-testid="text-coach-name">
                 教練課表查詢
               </h2>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <span className="text-sm font-medium">選擇教練：</span>
                 <Select value={selectedCoach} onValueChange={setSelectedCoach}>
-                  <SelectTrigger className="w-40" data-testid="select-coach">
+                  <SelectTrigger className="w-full sm:w-40" data-testid="select-coach">
                     <SelectValue placeholder="選擇教練" />
                   </SelectTrigger>
                   <SelectContent>
@@ -199,16 +195,17 @@ export default function CoachView() {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCurrentWeek(prev => subWeeks(prev, 1))}
                 data-testid="button-prev-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <i className="fas fa-chevron-left"></i>
+                <i className="fas fa-chevron-left text-xs sm:text-sm"></i>
               </Button>
-              <span className="text-sm font-medium" data-testid="text-week-range">
+              <span className="text-xs sm:text-sm font-medium text-center flex-1 sm:flex-none" data-testid="text-week-range">
                 {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(addDays(currentWeek, 4), 'M月d日', { locale: zhTW })}
               </span>
               <Button
@@ -216,8 +213,9 @@ export default function CoachView() {
                 size="sm"
                 onClick={() => setCurrentWeek(prev => addWeeks(prev, 1))}
                 data-testid="button-next-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <i className="fas fa-chevron-right"></i>
+                <i className="fas fa-chevron-right text-xs sm:text-sm"></i>
               </Button>
             </div>
           </div>
