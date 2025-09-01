@@ -86,74 +86,67 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
     },
   });
 
-  const getScheduleValue = (date: string, venueId: string, timeSlotId: string) => {
-    const cellKey = `${date}-${venueId}-${timeSlotId}`;
-    if (editingValues[cellKey] !== undefined) {
-      return editingValues[cellKey];
-    }
-    
-    const schedule = schedules?.find(s => 
+  const getCellSchedules = (date: string, venueId: string, timeSlotId: string) => {
+    return schedules?.filter(s => 
       s.date === date && s.venueId === venueId && s.timeSlotId === timeSlotId
-    );
-    if (!schedule) return '';
-    return schedule.className && schedule.coachName 
-      ? `${schedule.className}-${schedule.coachName}`
-      : schedule.className || schedule.coachName || '';
+    ) || [];
   };
 
-  const handleCellChange = (date: string, venueId: string, timeSlotId: string, value: string) => {
-    const cellKey = `${date}-${venueId}-${timeSlotId}`;
-    setEditingValues(prev => ({ ...prev, [cellKey]: value }));
-  };
-
-  const handleCellBlur = (date: string, venueId: string, timeSlotId: string) => {
-    const cellKey = `${date}-${venueId}-${timeSlotId}`;
-    const value = editingValues[cellKey];
-    
-    // Only save if there was a change
-    if (value !== undefined) {
-      const trimmedValue = value.trim();
-      
-      if (trimmedValue === '') {
-        // Delete if empty
-        saveMutation.mutate({
-          date,
-          venueId,
-          timeSlotId,
-          className: '',
-          coachName: '',
-        });
-      } else {
-        // Parse the input - format: 班級-教練名
-        let className = '';
-        let coachName = '';
-        
-        if (trimmedValue.includes('-')) {
-          // Split by dash
-          const parts = trimmedValue.split('-');
-          className = parts[0].trim();
-          coachName = parts.slice(1).join('-').trim(); // In case there are multiple dashes
-        } else {
-          // No dash - treat as class name only
-          className = trimmedValue;
-        }
-
-        saveMutation.mutate({
-          date,
-          venueId,
-          timeSlotId,
-          className,
-          coachName,
-        });
-      }
-      
-      // Clear editing value
-      setEditingValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        return newValues;
+  const deleteMutation = useMutation({
+    mutationFn: async (scheduleId: string) => {
+      const response = await apiRequest('DELETE', `/api/schedules/${scheduleId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/schedules', format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')]
       });
+      weekDays.forEach(day => {
+        queryClient.invalidateQueries({ queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')] });
+      });
+      toast({
+        title: "刪除成功",
+        description: "課表已刪除",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "刪除失敗",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddClass = (date: string, venueId: string, timeSlotId: string, value: string) => {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return;
+    
+    // Parse the input - format: 班級-教練名
+    let className = '';
+    let coachName = '';
+    
+    if (trimmedValue.includes('-')) {
+      // Split by dash
+      const parts = trimmedValue.split('-');
+      className = parts[0].trim();
+      coachName = parts.slice(1).join('-').trim(); // In case there are multiple dashes
+    } else {
+      // No dash - treat as class name only
+      className = trimmedValue;
     }
+
+    saveMutation.mutate({
+      date,
+      venueId,
+      timeSlotId,
+      className,
+      coachName,
+    });
+  };
+
+  const handleDeleteClass = (scheduleId: string) => {
+    deleteMutation.mutate(scheduleId);
   };
 
   const getVenueHeaderClass = (color: string) => {
@@ -162,6 +155,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       case 'green': return 'bg-green-500';
       case 'purple': return 'bg-purple-500';
       case 'yellow': return 'bg-yellow-500';
+      case 'orange': return 'bg-orange-500';
       case 'pink': return 'bg-pink-500';
       default: return 'bg-gray-500';
     }
@@ -213,7 +207,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                       </td>
                       {venues.map((venue) => {
                         const cellKey = `${dateStr}-${venue.id}-${timeSlot.id}`;
-                        const value = getScheduleValue(dateStr, venue.id, timeSlot.id);
+                        const cellSchedules = getCellSchedules(dateStr, venue.id, timeSlot.id);
                         const isActive = activeCell?.date === dateStr && 
                                         activeCell?.venueId === venue.id && 
                                         activeCell?.timeSlotId === timeSlot.id;
@@ -221,35 +215,69 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                         return (
                           <td
                             key={cellKey}
-                            className="schedule-cell p-2 border border-border hover:bg-accent/50 cursor-pointer relative"
+                            className="schedule-cell p-2 border border-border hover:bg-accent/50 cursor-pointer relative align-top"
                             data-testid={`cell-${dayIndex}-${venue.name}-${timeSlot.period}`}
+                            style={{ minHeight: '60px', verticalAlign: 'top' }}
                           >
-                            <input
-                              type="text"
-                              className="w-full h-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none resize-none"
-                              placeholder="班級+教練"
-                              value={value}
-                              onFocus={() => setActiveCell({ date: dateStr, venueId: venue.id, timeSlotId: timeSlot.id })}
-                              onBlur={() => {
-                                setActiveCell(null);
-                                handleCellBlur(dateStr, venue.id, timeSlot.id);
-                              }}
-                              onChange={(e) => handleCellChange(dateStr, venue.id, timeSlot.id, e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                              data-testid={`input-${dayIndex}-${venue.name}-${timeSlot.period}`}
-                            />
+                            <div className="space-y-1 min-h-full">
+                              {cellSchedules.map((schedule, index) => (
+                                <div 
+                                  key={schedule.id} 
+                                  className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group"
+                                  data-testid={`schedule-item-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                >
+                                  <span className="flex-1 truncate">
+                                    {schedule.className && schedule.coachName 
+                                      ? `${schedule.className}-${schedule.coachName}`
+                                      : schedule.className || schedule.coachName || '未命名'}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteClass(schedule.id);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
+                                    data-testid={`button-delete-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                  >
+                                    <i className="fas fa-times text-xs"></i>
+                                  </button>
+                                </div>
+                              ))}
+                              <input
+                                type="text"
+                                className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
+                                placeholder={cellSchedules.length === 0 ? "班級-教練" : "新增課程"}
+                                onFocus={() => setActiveCell({ date: dateStr, venueId: venue.id, timeSlotId: timeSlot.id })}
+                                onBlur={(e) => {
+                                  const value = e.target.value.trim();
+                                  if (value) {
+                                    handleAddClass(dateStr, venue.id, timeSlot.id, value);
+                                    e.target.value = '';
+                                  }
+                                  setActiveCell(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const value = e.currentTarget.value.trim();
+                                    if (value) {
+                                      handleAddClass(dateStr, venue.id, timeSlot.id, value);
+                                      e.currentTarget.value = '';
+                                    }
+                                    e.currentTarget.blur();
+                                  }
+                                }}
+                                data-testid={`input-${dayIndex}-${venue.name}-${timeSlot.period}`}
+                              />
+                            </div>
                             {isActive && (
                               <CoachAutocomplete
                                 onSelect={(coachName: string) => {
-                                  const currentValue = value;
-                                  const parts = currentValue.split(' ');
-                                  const className = parts.slice(0, -1).join(' ') || parts[0] || '';
-                                  const newValue = className ? `${className} ${coachName}` : coachName;
-                                  handleCellChange(dateStr, venue.id, timeSlot.id, newValue);
+                                  const input = document.querySelector(`[data-testid="input-${dayIndex}-${venue.name}-${timeSlot.period}"]`) as HTMLInputElement;
+                                  if (input) {
+                                    const currentValue = input.value;
+                                    const newValue = currentValue ? `${currentValue}-${coachName}` : coachName;
+                                    input.value = newValue;
+                                  }
                                   setActiveCell(null);
                                 }}
                               />

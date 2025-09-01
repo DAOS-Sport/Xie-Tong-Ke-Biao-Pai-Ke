@@ -112,12 +112,16 @@
 .venue-pink { 
   background-color: hsl(330, 81%, 60%) !important; 
 }
+.venue-orange { 
+  background-color: hsl(25, 95%, 53%) !important; 
+}
 
 .schedule-cell {
   width: 160px;
-  height: 60px;
+  min-height: 80px;
   min-width: 160px;
   max-width: 160px;
+  vertical-align: top;
 }
 
 .time-cell {

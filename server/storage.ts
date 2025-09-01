@@ -74,7 +74,8 @@ export class DatabaseStorage implements IStorage {
         { name: "三重商工", color: "green", order: 2 },
         { name: "三民高中", color: "purple", order: 3 },
         { name: "福林國小", color: "yellow", order: 4 },
-        { name: "士東國小", color: "pink", order: 5 },
+        { name: "新莊國中", color: "orange", order: 5 },
+        { name: "士東國小", color: "pink", order: 6 },
       ];
       
       await db.insert(venues).values(defaultVenues);
@@ -150,15 +151,6 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...schedule,
         updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [schedules.date, schedules.venueId, schedules.timeSlotId],
-        set: {
-          className: schedule.className,
-          coachName: schedule.coachName,
-          notes: schedule.notes,
-          updatedAt: new Date(),
-        },
       })
       .returning();
     return result;
