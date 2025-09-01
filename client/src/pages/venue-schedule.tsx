@@ -118,10 +118,10 @@ export default function VenueSchedule() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => window.location.href = '/api/login'}
-                  data-testid="button-login"
+                  onClick={() => setLocation('/admin/schedule')}
+                  data-testid="button-admin-access"
                 >
-                  管理員登入
+                  管理員功能
                 </Button>
               )}
             </div>
