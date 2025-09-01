@@ -10,6 +10,25 @@ import Home from "@/pages/home";
 import AdminSchedule from "@/pages/admin-schedule";
 import CoachView from "@/pages/coach-view";
 import Statistics from "@/pages/statistics";
+import PasswordProtect from "@/components/password-protect";
+
+// Protected AdminSchedule component
+function ProtectedAdminSchedule() {
+  return (
+    <PasswordProtect>
+      <AdminSchedule />
+    </PasswordProtect>
+  );
+}
+
+// Protected Statistics component
+function ProtectedStatistics() {
+  return (
+    <PasswordProtect>
+      <Statistics />
+    </PasswordProtect>
+  );
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -20,10 +39,11 @@ function Router() {
         <Route path="/" component={Landing} />
       ) : (
         <>
-          <Route path="/" component={Home} />
-          <Route path="/admin/schedule" component={AdminSchedule} />
+          <Route path="/" component={CoachView} />
+          <Route path="/home" component={Home} />
+          <Route path="/admin/schedule" component={ProtectedAdminSchedule} />
           <Route path="/coach" component={CoachView} />
-          <Route path="/statistics" component={Statistics} />
+          <Route path="/statistics" component={ProtectedStatistics} />
         </>
       )}
       <Route component={NotFound} />
