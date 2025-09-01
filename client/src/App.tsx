@@ -38,7 +38,7 @@ function Router() {
   return (
     <Switch>
       {/* Public pages - no authentication required */}
-      <Route path="/" component={CoachView} />
+      <Route path="/" component={VenueSchedule} />
       <Route path="/coach" component={CoachView} />
       <Route path="/venue-schedule" component={VenueSchedule} />
       
