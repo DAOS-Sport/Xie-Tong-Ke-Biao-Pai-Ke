@@ -3,17 +3,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { format, addDays, subDays } from "date-fns";
+import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import ScheduleGrid from "@/components/schedule-grid";
-import ConflictAlert from "@/components/conflict-alert";
+import WeekScheduleGrid from "@/components/week-schedule-grid";
+import WeekConflictAlert from "@/components/week-conflict-alert";
 import { Button } from "@/components/ui/button";
 
 export default function AdminSchedule() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -51,16 +51,16 @@ export default function AdminSchedule() {
     return null;
   }
 
-  const navigateToPrevDay = () => {
-    setCurrentDate(prev => subDays(prev, 1));
+  const navigateToPrevWeek = () => {
+    setCurrentWeek(prev => subWeeks(prev, 1));
   };
 
-  const navigateToNextDay = () => {
-    setCurrentDate(prev => addDays(prev, 1));
+  const navigateToNextWeek = () => {
+    setCurrentWeek(prev => addWeeks(prev, 1));
   };
 
-  const navigateToToday = () => {
-    setCurrentDate(new Date());
+  const navigateToThisWeek = () => {
+    setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
 
   return (
@@ -121,7 +121,7 @@ export default function AdminSchedule() {
           </nav>
         </div>
 
-        <ConflictAlert date={format(currentDate, 'yyyy-MM-dd')} />
+        <WeekConflictAlert weekStart={currentWeek} />
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex items-center justify-between mb-6">
@@ -129,29 +129,29 @@ export default function AdminSchedule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={navigateToPrevDay}
-                data-testid="button-prev-day"
+                onClick={navigateToPrevWeek}
+                data-testid="button-prev-week"
               >
                 <i className="fas fa-chevron-left"></i>
               </Button>
-              <h2 className="text-lg font-semibold" data-testid="text-current-date">
-                {format(currentDate, 'yyyy年M月d日 EEEE', { locale: zhTW })}
+              <h2 className="text-lg font-semibold" data-testid="text-current-week">
+                {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(addDays(currentWeek, 4), 'M月d日', { locale: zhTW })}
               </h2>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={navigateToNextDay}
-                data-testid="button-next-day"
+                onClick={navigateToNextWeek}
+                data-testid="button-next-week"
               >
                 <i className="fas fa-chevron-right"></i>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={navigateToToday}
-                data-testid="button-today"
+                onClick={navigateToThisWeek}
+                data-testid="button-this-week"
               >
-                今日
+                本週
               </Button>
             </div>
             <div className="flex items-center space-x-2">
@@ -164,7 +164,7 @@ export default function AdminSchedule() {
             </div>
           </div>
 
-          <ScheduleGrid date={format(currentDate, 'yyyy-MM-dd')} />
+          <WeekScheduleGrid weekStart={currentWeek} />
         </div>
       </main>
     </div>
