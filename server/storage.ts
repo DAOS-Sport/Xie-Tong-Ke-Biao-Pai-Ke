@@ -90,13 +90,13 @@ export class DatabaseStorage implements IStorage {
     const existingSlots = await this.getTimeSlots();
     if (existingSlots.length === 0) {
       const defaultTimeSlots = [
-        { period: "第1節", startTime: "08-09", endTime: "08-09", order: 1 },
-        { period: "第2節", startTime: "09-10", endTime: "09-10", order: 2 },
-        { period: "第3節", startTime: "10-11", endTime: "10-11", order: 3 },
-        { period: "第4節", startTime: "11-12", endTime: "11-12", order: 4 },
-        { period: "第5節", startTime: "13-14", endTime: "13-14", order: 5 },
-        { period: "第6節", startTime: "14-15", endTime: "14-15", order: 6 },
-        { period: "第7節", startTime: "15-16", endTime: "15-16", order: 7 },
+        { period: "第1節", startTime: "08:20", endTime: "09:10", order: 1 },
+        { period: "第2節", startTime: "09:20", endTime: "10:10", order: 2 },
+        { period: "第3節", startTime: "10:20", endTime: "11:10", order: 3 },
+        { period: "第4節", startTime: "11:20", endTime: "12:10", order: 4 },
+        { period: "第5節", startTime: "13:20", endTime: "14:10", order: 5 },
+        { period: "第6節", startTime: "14:20", endTime: "15:10", order: 6 },
+        { period: "第7節", startTime: "15:20", endTime: "16:10", order: 7 },
       ];
       
       await db.insert(timeSlots).values(defaultTimeSlots);
@@ -152,18 +152,6 @@ export class DatabaseStorage implements IStorage {
         ...schedule,
         updatedAt: new Date(),
       })
-      .returning();
-    return result;
-  }
-
-  async updateSchedule(id: string, updates: { className?: string; coachName?: string }): Promise<Schedule> {
-    const [result] = await db
-      .update(schedules)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
-      .where(eq(schedules.id, id))
       .returning();
     return result;
   }
