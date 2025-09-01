@@ -37,19 +37,20 @@ function Router() {
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={CoachView} />
-          <Route path="/home" component={Home} />
-          <Route path="/admin/schedule" component={ProtectedAdminSchedule} />
-          <Route path="/coach" component={CoachView} />
-          <Route path="/venue-schedule" component={VenueSchedule} />
-          <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
-          <Route path="/statistics" component={ProtectedStatistics} />
-        </>
-      )}
+      {/* Public pages - no authentication required */}
+      <Route path="/" component={CoachView} />
+      <Route path="/coach" component={CoachView} />
+      <Route path="/venue-schedule" component={VenueSchedule} />
+      
+      {/* Admin pages - require authentication or password protection */}
+      <Route path="/admin/schedule" component={ProtectedAdminSchedule} />
+      <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
+      <Route path="/statistics" component={ProtectedStatistics} />
+      
+      {/* Auth pages */}
+      <Route path="/home" component={Home} />
+      <Route path="/landing" component={Landing} />
+      
       <Route component={NotFound} />
     </Switch>
   );

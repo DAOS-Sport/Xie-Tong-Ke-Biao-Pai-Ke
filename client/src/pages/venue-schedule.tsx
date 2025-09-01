@@ -30,19 +30,7 @@ export default function VenueSchedule() {
     return startOfWeek(now, { weekStartsOn: 1 }); // 週一開始
   });
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "未授權",
-        description: "您已登出，正在重新登入...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Remove authentication requirement for public access
 
   // 獲取場館列表
   const { data: venues } = useQuery<Venue[]>({
@@ -87,16 +75,12 @@ export default function VenueSchedule() {
 
   const selectedVenueData = venues?.find(v => v.id === selectedVenue);
 
-  if (isLoading || !venues || !timeSlots) {
+  if (!venues || !timeSlots) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-primary">載入中...</div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
@@ -112,20 +96,34 @@ export default function VenueSchedule() {
               <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
                 場館課表顯示
               </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <i className="fas fa-user text-primary-foreground text-sm"></i>
-                </div>
-                <span className="text-sm font-medium">{user.firstName || user.email}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                data-testid="button-logout"
-              >
-                登出
-              </Button>
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <i className="fas fa-user text-primary-foreground text-sm"></i>
+                    </div>
+                    <span className="text-sm font-medium">{user.firstName || user.email}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/logout'}
+                    data-testid="button-logout"
+                  >
+                    登出
+                  </Button>
+                </>
+              )}
+              {!user && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/api/login'}
+                  data-testid="button-login"
+                >
+                  管理員登入
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -134,7 +132,7 @@ export default function VenueSchedule() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <nav className="flex space-x-8" aria-label="Tabs">
-            {user.role === 'admin' && (
+            {user?.role === 'admin' && (
               <button 
                 className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
                 onClick={() => setLocation('/admin/schedule')}
@@ -163,7 +161,7 @@ export default function VenueSchedule() {
             >
               <i className="fas fa-edit mr-2"></i>場館課表編輯
             </button>
-            {user.role === 'admin' && (
+            {user?.role === 'admin' && (
               <button 
                 className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
                 onClick={() => setLocation('/statistics')}

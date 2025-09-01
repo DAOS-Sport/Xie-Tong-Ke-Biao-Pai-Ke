@@ -18,36 +18,25 @@ export default function CoachView() {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [selectedCoach, setSelectedCoach] = useState<string>('');
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "未授權",
-        description: "您已登出，正在重新登入...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
+  // Remove authentication requirement for public access
 
   const weekStart = format(currentWeek, 'yyyy-MM-dd');
   const weekEnd = format(addDays(currentWeek, 4), 'yyyy-MM-dd');
 
-  // Get list of all coaches for admin users
+  // Get list of all coaches
   const { data: coaches } = useQuery<string[]>({
     queryKey: ['/api/coaches'],
-    enabled: !!user && user.role === 'admin',
   });
 
   // Set default coach when data loads
   useEffect(() => {
-    if (user && !selectedCoach) {
-      if (user.role === 'admin' && coaches && coaches.length > 0) {
+    if (!selectedCoach && coaches && coaches.length > 0) {
+      if (user?.role === 'admin') {
         setSelectedCoach(coaches[0]);
-      } else if (user.coachName) {
+      } else if (user?.coachName) {
         setSelectedCoach(user.coachName);
+      } else {
+        setSelectedCoach(coaches[0]); // Default to first coach for public access
       }
     }
   }, [user, coaches, selectedCoach]);
@@ -60,7 +49,7 @@ export default function CoachView() {
         endDate: weekEnd,
       });
       
-      if (user?.role === 'admin' && selectedCoach) {
+      if (selectedCoach) {
         params.append('coachName', selectedCoach);
       }
       
@@ -68,19 +57,15 @@ export default function CoachView() {
       if (!response.ok) throw new Error('Failed to fetch schedules');
       return response.json();
     },
-    enabled: !!user && (user.role === 'coach' || user.role === 'admin') && !!selectedCoach,
+    enabled: !!selectedCoach,
   });
 
-  if (isLoading || schedulesLoading) {
+  if (schedulesLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-primary">載入中...</div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
@@ -115,20 +100,34 @@ export default function CoachView() {
               <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
                 教練模式
               </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <i className="fas fa-user text-primary-foreground text-sm"></i>
-                </div>
-                <span className="text-sm font-medium">{user.coachName || user.firstName || user.email || '教練'}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.location.href = '/api/logout'}
-                data-testid="button-logout"
-              >
-                登出
-              </Button>
+              {user && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <i className="fas fa-user text-primary-foreground text-sm"></i>
+                    </div>
+                    <span className="text-sm font-medium">{user.coachName || user.firstName || user.email || '教練'}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = '/api/logout'}
+                    data-testid="button-logout"
+                  >
+                    登出
+                  </Button>
+                </>
+              )}
+              {!user && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/api/login'}
+                  data-testid="button-login"
+                >
+                  管理員登入
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -137,7 +136,7 @@ export default function CoachView() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <nav className="flex space-x-8" aria-label="Tabs">
-            {user.role === 'admin' && (
+            {user?.role === 'admin' && (
               <button 
                 className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
                 onClick={() => setLocation('/admin/schedule')}
@@ -166,7 +165,7 @@ export default function CoachView() {
             >
               <i className="fas fa-edit mr-2"></i>場館課表編輯
             </button>
-            {user.role === 'admin' && (
+            {user?.role === 'admin' && (
               <button 
                 className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
                 onClick={() => setLocation('/statistics')}
@@ -184,7 +183,7 @@ export default function CoachView() {
               <h2 className="text-lg font-semibold" data-testid="text-coach-name">
                 {selectedCoach || '教練'} - 本週課表
               </h2>
-              {user?.role === 'admin' && coaches && coaches.length > 0 && (
+              {coaches && coaches.length > 0 && (
                 <Select value={selectedCoach} onValueChange={setSelectedCoach}>
                   <SelectTrigger className="w-40" data-testid="select-coach">
                     <SelectValue placeholder="選擇教練" />

@@ -96,18 +96,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Coach-specific routes
-  app.get('/api/coach-schedules', isAuthenticated, async (req: any, res) => {
+  app.get('/api/coach-schedules', async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.claims.sub);
-      const { startDate, endDate } = req.query as { startDate: string; endDate: string };
+      const { startDate, endDate, coachName } = req.query as { 
+        startDate: string; 
+        endDate: string; 
+        coachName?: string;
+      };
       
-      let coachName = user?.coachName;
-      if (user?.role === 'admin' && req.query.coachName) {
-        coachName = req.query.coachName as string;
-      }
-      
+      // Allow public access with coach name parameter
       if (!coachName) {
-        return res.status(400).json({ message: "Coach name not found" });
+        return res.status(400).json({ message: "Coach name is required" });
       }
 
       const schedules = await storage.getCoachSchedules(coachName, startDate, endDate);
