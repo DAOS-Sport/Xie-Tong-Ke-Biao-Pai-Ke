@@ -1,0 +1,172 @@
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { format, addDays, subDays } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import ScheduleGrid from "@/components/schedule-grid";
+import ConflictAlert from "@/components/conflict-alert";
+import { Button } from "@/components/ui/button";
+
+export default function AdminSchedule() {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "未授權",
+        description: "您已登出，正在重新登入...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+
+    if (!isLoading && user && user.role !== 'admin') {
+      toast({
+        title: "權限不足",
+        description: "此功能僅限管理員使用",
+        variant: "destructive",
+      });
+      setLocation('/');
+      return;
+    }
+  }, [isAuthenticated, isLoading, user, toast, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-primary">載入中...</div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'admin') {
+    return null;
+  }
+
+  const navigateToPrevDay = () => {
+    setCurrentDate(prev => subDays(prev, 1));
+  };
+
+  const navigateToNextDay = () => {
+    setCurrentDate(prev => addDays(prev, 1));
+  };
+
+  const navigateToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b border-border shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <i className="fas fa-swimming-pool text-primary text-2xl"></i>
+              <h1 className="text-xl font-bold text-primary">五泳池課表整合系統</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm bg-primary text-primary-foreground px-3 py-1 rounded-full">
+                管理員模式
+              </span>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                  <i className="fas fa-user text-primary-foreground text-sm"></i>
+                </div>
+                <span className="text-sm font-medium">{user.firstName || user.email || '管理員'}</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.location.href = '/api/logout'}
+                data-testid="button-logout"
+              >
+                登出
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-6">
+          <nav className="flex space-x-8" aria-label="Tabs">
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-primary text-primary font-medium text-sm"
+              data-testid="tab-schedule-edit"
+            >
+              <i className="fas fa-calendar-alt mr-2"></i>課表編輯
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/coach')}
+              data-testid="tab-coach-view"
+            >
+              <i className="fas fa-user-clock mr-2"></i>教練視圖
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-sm"
+              onClick={() => setLocation('/statistics')}
+              data-testid="tab-statistics"
+            >
+              <i className="fas fa-chart-bar mr-2"></i>堂數統計
+            </button>
+          </nav>
+        </div>
+
+        <ConflictAlert date={format(currentDate, 'yyyy-MM-dd')} />
+
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToPrevDay}
+                data-testid="button-prev-day"
+              >
+                <i className="fas fa-chevron-left"></i>
+              </Button>
+              <h2 className="text-lg font-semibold" data-testid="text-current-date">
+                {format(currentDate, 'yyyy年M月d日 EEEE', { locale: zhTW })}
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToNextDay}
+                data-testid="button-next-day"
+              >
+                <i className="fas fa-chevron-right"></i>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={navigateToToday}
+                data-testid="button-today"
+              >
+                今日
+              </Button>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="secondary" size="sm" data-testid="button-copy-week">
+                <i className="fas fa-copy mr-2"></i>複製週課表
+              </Button>
+              <Button size="sm" data-testid="button-save">
+                <i className="fas fa-save mr-2"></i>儲存
+              </Button>
+            </div>
+          </div>
+
+          <ScheduleGrid date={format(currentDate, 'yyyy-MM-dd')} />
+        </div>
+      </main>
+    </div>
+  );
+}
