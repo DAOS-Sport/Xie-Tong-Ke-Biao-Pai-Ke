@@ -67,7 +67,15 @@ export const schedules = pgTable("schedules", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const schedulesRelations = relations(schedules, ({ one }) => ({
+// 教練登記表 - 存儲對沒有教練課程的登記
+export const coachRegistrations = pgTable("coach_registrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduleId: varchar("schedule_id").notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  coachName: varchar("coach_name").notNull(),
+  registeredAt: timestamp("registered_at").defaultNow(),
+});
+
+export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],
     references: [venues.id],
@@ -75,6 +83,14 @@ export const schedulesRelations = relations(schedules, ({ one }) => ({
   timeSlot: one(timeSlots, {
     fields: [schedules.timeSlotId],
     references: [timeSlots.id],
+  }),
+  coachRegistrations: many(coachRegistrations),
+}));
+
+export const coachRegistrationsRelations = relations(coachRegistrations, ({ one }) => ({
+  schedule: one(schedules, {
+    fields: [coachRegistrations.scheduleId],
+    references: [schedules.id],
   }),
 }));
 
@@ -94,6 +110,8 @@ export type InsertTimeSlot = typeof timeSlots.$inferInsert;
 export type TimeSlot = typeof timeSlots.$inferSelect;
 export type InsertSchedule = typeof schedules.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
+export type InsertCoachRegistration = typeof coachRegistrations.$inferInsert;
+export type CoachRegistration = typeof coachRegistrations.$inferSelect;
 
 export const insertScheduleSchema = createInsertSchema(schedules).omit({
   id: true,
@@ -107,5 +125,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertCoachRegistrationSchema = createInsertSchema(coachRegistrations).omit({
+  id: true,
+  registeredAt: true,
+});
+
 export type InsertScheduleType = z.infer<typeof insertScheduleSchema>;
 export type InsertUserType = z.infer<typeof insertUserSchema>;
+export type InsertCoachRegistrationType = z.infer<typeof insertCoachRegistrationSchema>;

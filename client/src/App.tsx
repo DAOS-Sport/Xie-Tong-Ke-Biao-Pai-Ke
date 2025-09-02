@@ -11,6 +11,7 @@ import CoachView from "@/pages/coach-view";
 import Statistics from "@/pages/statistics";
 import VenueSchedule from "@/pages/venue-schedule";
 import VenueScheduleEdit from "@/pages/venue-schedule-edit";
+import FindCoach from "@/pages/find-coach";
 import PasswordProtect from "@/components/password-protect";
 
 // Protected AdminSchedule component
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/admin/schedule" component={AdminSchedule} />
       <Route path="/coach" component={CoachView} />
       <Route path="/venue-schedule" component={VenueSchedule} />
+      <Route path="/find-coach" component={FindCoach} />
       
       {/* Password protected admin functions */}
       <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />

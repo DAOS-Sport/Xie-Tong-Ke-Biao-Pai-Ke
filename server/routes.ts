@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertScheduleSchema } from "@shared/schema";
+import { insertScheduleSchema, insertCoachRegistrationSchema } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -150,6 +150,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(coaches);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  // 尋找教練 - 獲取沒有教練的課程
+  app.get('/api/schedules-without-coach', async (req, res) => {
+    try {
+      const schedules = await storage.getSchedulesWithoutCoach();
+      res.json(schedules);
+    } catch (error) {
+      console.error('Error fetching schedules without coach:', error);
+      res.status(500).json({ message: "Failed to fetch schedules without coach" });
+    }
+  });
+
+  // 教練登記功能
+  app.post('/api/coach-registrations', async (req, res) => {
+    try {
+      const validation = insertCoachRegistrationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid registration data", errors: validation.error.issues });
+      }
+
+      const registration = await storage.registerCoachForSchedule(validation.data);
+      res.json(registration);
+    } catch (error) {
+      console.error('Error registering coach:', error);
+      res.status(500).json({ message: "Failed to register coach" });
+    }
+  });
+
+  // 獲取特定課程的教練登記列表
+  app.get('/api/coach-registrations/:scheduleId', async (req, res) => {
+    try {
+      const { scheduleId } = req.params;
+      const registrations = await storage.getCoachRegistrations(scheduleId);
+      res.json(registrations);
+    } catch (error) {
+      console.error('Error fetching coach registrations:', error);
+      res.status(500).json({ message: "Failed to fetch coach registrations" });
     }
   });
 

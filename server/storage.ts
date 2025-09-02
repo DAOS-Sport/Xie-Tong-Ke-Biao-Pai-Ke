@@ -3,12 +3,15 @@ import {
   venues,
   timeSlots,
   schedules,
+  coachRegistrations,
   type User,
   type UpsertUser,
   type Venue,
   type TimeSlot,
   type Schedule,
   type InsertScheduleType,
+  type CoachRegistration,
+  type InsertCoachRegistrationType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, between, desc, sql, like, or } from "drizzle-orm";
@@ -33,6 +36,11 @@ export interface IStorage {
   deleteSchedule(id: string): Promise<void>;
   getCoachSchedules(coachName: string, startDate: string, endDate: string): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>;
   getConflicts(date: string): Promise<{ coachName: string; timeSlotId: string; venues: string[] }[]>;
+  
+  // Coach registration operations
+  getSchedulesWithoutCoach(): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot; registrations: CoachRegistration[] })[]>;
+  registerCoachForSchedule(registration: InsertCoachRegistrationType): Promise<CoachRegistration>;
+  getCoachRegistrations(scheduleId: string): Promise<CoachRegistration[]>;
   getCoachStatistics(startDate: string, endDate: string, coachName?: string): Promise<{
     coachName: string;
     totalClasses: number;
@@ -299,6 +307,67 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${schedules.coachName} IS NOT NULL AND ${schedules.coachName} != ''`);
     
     return results.map(r => r.coachName).filter(Boolean) as string[];
+  }
+
+  // 獲取沒有教練的課程（並包含登記訊息）
+  async getSchedulesWithoutCoach(): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot; registrations: CoachRegistration[] })[]> {
+    const schedulesWithoutCoach = await db
+      .select({
+        id: schedules.id,
+        date: schedules.date,
+        venueId: schedules.venueId,
+        timeSlotId: schedules.timeSlotId,
+        className: schedules.className,
+        coachName: schedules.coachName,
+        notes: schedules.notes,
+        createdAt: schedules.createdAt,
+        updatedAt: schedules.updatedAt,
+        venue: venues,
+        timeSlot: timeSlots,
+      })
+      .from(schedules)
+      .innerJoin(venues, eq(schedules.venueId, venues.id))
+      .innerJoin(timeSlots, eq(schedules.timeSlotId, timeSlots.id))
+      .where(
+        and(
+          sql`${schedules.className} IS NOT NULL AND ${schedules.className} != ''`,
+          or(
+            sql`${schedules.coachName} IS NULL`,
+            sql`${schedules.coachName} = ''`
+          )
+        )
+      )
+      .orderBy(schedules.date, timeSlots.order);
+
+    // 為每個課程獲取登記訊息
+    const result = [];
+    for (const schedule of schedulesWithoutCoach) {
+      const registrations = await this.getCoachRegistrations(schedule.id);
+      result.push({
+        ...schedule,
+        registrations,
+      });
+    }
+
+    return result;
+  }
+
+  // 教練登記功能
+  async registerCoachForSchedule(registration: InsertCoachRegistrationType): Promise<CoachRegistration> {
+    const [result] = await db
+      .insert(coachRegistrations)
+      .values(registration)
+      .returning();
+    return result;
+  }
+
+  // 獲取特定課程的教練登記列表
+  async getCoachRegistrations(scheduleId: string): Promise<CoachRegistration[]> {
+    return await db
+      .select()
+      .from(coachRegistrations)
+      .where(eq(coachRegistrations.scheduleId, scheduleId))
+      .orderBy(coachRegistrations.registeredAt);
   }
 }
 
