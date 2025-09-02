@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
 
 interface Schedule {
   id: string;
@@ -131,16 +132,54 @@ export default function FindCoach() {
               <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
                 尋找教練
               </span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setLocation('/admin/schedule')}
-                data-testid="button-back-admin"
-              >
-                返回管理員
-              </Button>
             </div>
           </div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/admin/schedule')}
+              data-testid="tab-schedule-edit"
+            >
+              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/coach')}
+              data-testid="tab-coach-view"
+            >
+              <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/venue-schedule')}
+              data-testid="tab-venue-schedule"
+            >
+              <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/venue-schedule-edit')}
+              data-testid="tab-venue-schedule-edit"
+            >
+              <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/statistics')}
+              data-testid="tab-statistics"
+            >
+              <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
+            </button>
+            <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
+              data-testid="tab-find-coach"
+            >
+              <i className="fas fa-search mr-1 sm:mr-2"></i>尋找教練
+            </button>
+          </nav>
         </div>
       </header>
 
@@ -177,7 +216,7 @@ export default function FindCoach() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <i className="fas fa-calendar"></i>
-                          {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: require('date-fns/locale/zh-TW') })}
+                          {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: zhTW })}
                         </span>
                         <span className="flex items-center gap-1">
                           <i className="fas fa-clock"></i>
@@ -230,7 +269,7 @@ export default function FindCoach() {
                                 ({schedule.timeSlot.startTime}-{schedule.timeSlot.endTime})
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: require('date-fns/locale/zh-TW') })}
+                                {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: zhTW })}
                               </p>
                             </div>
                             
