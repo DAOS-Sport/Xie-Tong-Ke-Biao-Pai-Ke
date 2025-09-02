@@ -127,6 +127,45 @@ export default function FindCoach() {
     }
   };
 
+  // 解析多教練名稱的函數
+  const parseCoachNames = (coachName: string): string[] => {
+    if (!coachName) return [];
+    
+    // 移除班級名稱部分（如果存在）
+    // 假設格式是 "班級-教練1-教練2" 或 "教練1-教練2"
+    const parts = coachName.split('-');
+    
+    // 如果只有一個部分，直接返回
+    if (parts.length <= 1) {
+      return [coachName];
+    }
+    
+    // 如果有多個部分，嘗試識別哪些是教練名稱
+    // 通常班級名稱包含數字或特定關鍵字，教練名稱是人名
+    const coaches: string[] = [];
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      
+      // 跳過明顯是班級名稱的部分
+      if (part.match(/^[A-Z0-9]+$/) || // 全大寫字母或數字
+          part.includes('班') ||
+          part.includes('級') ||
+          part.includes('課') ||
+          part.length <= 2) { // 太短的部分通常是班級代碼
+        continue;
+      }
+      
+      // 識別教練名稱（通常是人名）
+      if (part.length >= 2 && part.match(/[\u4e00-\u9fff]/)) { // 包含中文字符
+        coaches.push(part);
+      }
+    }
+    
+    // 如果沒有識別出教練，返回原始字符串
+    return coaches.length > 0 ? coaches : [coachName];
+  };
+
   // 獲取特定日期和時段的課程
   const getScheduleForSlot = (date: Date, venueId: string, timeSlotId: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -316,8 +355,25 @@ export default function FindCoach() {
                                       ) : hasCoachButMissing ? (
                                         <div className="mb-2">
                                           <div className="text-xs font-medium mb-1 opacity-70">目前教練：</div>
-                                          <div className="text-xs font-medium bg-orange-50 px-2 py-1 rounded border border-orange-200 text-orange-800">{schedule.coachName}</div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {parseCoachNames(schedule.coachName).map((coach, index) => (
+                                              <div key={index} className="text-xs font-medium bg-orange-50 px-2 py-1 rounded border border-orange-200 text-orange-800">
+                                                {coach}
+                                              </div>
+                                            ))}
+                                          </div>
                                           <div className="text-xs text-red-700 font-bold mt-1 bg-red-50 px-2 py-1 rounded border border-red-200">還需要更多教練</div>
+                                        </div>
+                                      ) : schedule.coachName ? (
+                                        <div className="mb-2">
+                                          <div className="text-xs font-medium mb-1 opacity-70">目前教練：</div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {parseCoachNames(schedule.coachName).map((coach, index) => (
+                                              <div key={index} className="text-xs font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200 text-blue-800">
+                                                {coach}
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       ) : null}
                                       
