@@ -20,6 +20,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
   } | null>(null);
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
   const weekEnd = addDays(weekStart, 4);
@@ -73,15 +74,13 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       weekDays.forEach(day => {
         queryClient.invalidateQueries({ queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')] });
       });
-      toast({
-        title: "儲存成功",
-        description: "課表已更新",
-      });
+      // 只在發生錯誤時才顯示通知，成功時静默儲存
     },
     onError: (error) => {
+      console.error('Save error:', error);
       toast({
         title: "儲存失敗",
-        description: error.message,
+        description: error.message || '網路連線問題，請稍後再試',
         variant: "destructive",
       });
     },
@@ -105,15 +104,13 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       weekDays.forEach(day => {
         queryClient.invalidateQueries({ queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')] });
       });
-      toast({
-        title: "刪除成功",
-        description: "課表已刪除",
-      });
+      // 只在發生錯誤時才顯示通知
     },
     onError: (error) => {
+      console.error('Delete error:', error);
       toast({
         title: "刪除失敗",
-        description: error.message,
+        description: error.message || '網路連線問題，請稍後再試',
         variant: "destructive",
       });
     },
@@ -122,6 +119,12 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
   const handleAddClass = (date: string, venueId: string, timeSlotId: string, value: string) => {
     const trimmedValue = value.trim();
     if (!trimmedValue) return;
+    
+    // 防止重複提交
+    const cellKey = `${date}-${venueId}-${timeSlotId}`;
+    if (saveMutation.isPending || savingStates[cellKey]) return;
+    
+    setSavingStates(prev => ({ ...prev, [cellKey]: true }));
     
     // Parse the input - format: 班級-教練名
     let className = '';
@@ -143,11 +146,30 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       timeSlotId,
       className,
       coachName,
+    }, {
+      onSettled: () => {
+        setSavingStates(prev => {
+          const { [cellKey]: _, ...rest } = prev;
+          return rest;
+        });
+      }
     });
   };
 
   const handleDeleteClass = (scheduleId: string) => {
-    deleteMutation.mutate(scheduleId);
+    // 防止重複提交
+    if (deleteMutation.isPending || savingStates[scheduleId]) return;
+    
+    setSavingStates(prev => ({ ...prev, [scheduleId]: true }));
+    
+    deleteMutation.mutate(scheduleId, {
+      onSettled: () => {
+        setSavingStates(prev => {
+          const { [scheduleId]: _, ...rest } = prev;
+          return rest;
+        });
+      }
+    });
   };
   
   const updateMutation = useMutation({
@@ -169,16 +191,14 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       weekDays.forEach(day => {
         queryClient.invalidateQueries({ queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')] });
       });
-      toast({
-        title: "更新成功",
-        description: "課表已更新",
-      });
       setEditingSchedule(null);
+      // 成功時静默儲存，不顯示通知
     },
     onError: (error) => {
+      console.error('Update error:', error);
       toast({
         title: "更新失敗",
-        description: error.message,
+        description: error.message || '網路連線問題，請稍後再試',
         variant: "destructive",
       });
     },
@@ -194,9 +214,22 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
   
   const handleUpdateSchedule = (scheduleId: string, value: string) => {
     const trimmedValue = value.trim();
+    
+    // 防止重複提交
+    if (updateMutation.isPending || deleteMutation.isPending || savingStates[scheduleId]) return;
+    
+    setSavingStates(prev => ({ ...prev, [scheduleId]: true }));
+    
     if (!trimmedValue) {
       // If empty, delete the schedule
-      deleteMutation.mutate(scheduleId);
+      deleteMutation.mutate(scheduleId, {
+        onSettled: () => {
+          setSavingStates(prev => {
+            const { [scheduleId]: _, ...rest } = prev;
+            return rest;
+          });
+        }
+      });
       return;
     }
     
@@ -216,6 +249,13 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       scheduleId,
       className,
       coachName,
+    }, {
+      onSettled: () => {
+        setSavingStates(prev => {
+          const { [scheduleId]: _, ...rest } = prev;
+          return rest;
+        });
+      }
     });
   };
 
@@ -281,6 +321,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                         const isActive = activeCell?.date === dateStr && 
                                         activeCell?.venueId === venue.id && 
                                         activeCell?.timeSlotId === timeSlot.id;
+                        const isCellSaving = savingStates[cellKey];
                         
                         return (
                           <td
@@ -289,15 +330,26 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                             data-testid={`cell-${dayIndex}-${venue.name}-${timeSlot.period}`}
                             style={{ minHeight: '60px', verticalAlign: 'top' }}
                           >
-                            <div className="space-y-1 min-h-full">
+                            <div className="space-y-1 min-h-full relative">
+                              {isCellSaving && (
+                                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                                </div>
+                              )}
                               {cellSchedules.map((schedule, index) => {
                                 const isEditing = editingSchedule === schedule.id;
+                                const isScheduleSaving = savingStates[schedule.id];
                                 return (
                                   <div 
                                     key={schedule.id} 
-                                    className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group"
+                                    className={`flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group relative ${isScheduleSaving ? 'opacity-60' : ''}`}
                                     data-testid={`schedule-item-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
                                   >
+                                    {isScheduleSaving && (
+                                      <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded">
+                                        <div className="animate-spin rounded-full h-3 w-3 border border-primary border-t-transparent"></div>
+                                      </div>
+                                    )}
                                     {isEditing ? (
                                       <input
                                         type="text"
@@ -336,7 +388,10 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                                         e.stopPropagation();
                                         handleDeleteClass(schedule.id);
                                       }}
-                                      className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
+                                      disabled={isScheduleSaving || deleteMutation.isPending}
+                                      className={`opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity ${
+                                        isScheduleSaving || deleteMutation.isPending ? 'cursor-not-allowed opacity-30' : ''
+                                      }`}
                                       data-testid={`button-delete-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
                                     >
                                       <i className="fas fa-times text-xs"></i>
@@ -346,12 +401,13 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                               })}
                               <input
                                 type="text"
-                                className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
+                                className={`w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1 ${isCellSaving ? 'pointer-events-none opacity-50' : ''}`}
                                 placeholder={cellSchedules.length === 0 ? "班級-教練" : "新增課程"}
+                                disabled={isCellSaving || saveMutation.isPending}
                                 onFocus={() => setActiveCell({ date: dateStr, venueId: venue.id, timeSlotId: timeSlot.id })}
                                 onBlur={(e) => {
                                   const value = e.target.value.trim();
-                                  if (value) {
+                                  if (value && !isCellSaving && !saveMutation.isPending) {
                                     handleAddClass(dateStr, venue.id, timeSlot.id, value);
                                     e.target.value = '';
                                   }
@@ -360,7 +416,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     const value = e.currentTarget.value.trim();
-                                    if (value) {
+                                    if (value && !isCellSaving && !saveMutation.isPending) {
                                       handleAddClass(dateStr, venue.id, timeSlot.id, value);
                                       e.currentTarget.value = '';
                                     }
