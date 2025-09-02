@@ -322,7 +322,8 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                                     ) : (
                                       <span 
                                         className="flex-1 truncate cursor-pointer hover:bg-accent/30 rounded px-1"
-                                        onClick={() => handleEditSchedule(schedule)}
+                                        onDoubleClick={() => handleEditSchedule(schedule)}
+                                        title="雙擊編輯課程"
                                         data-testid={`span-edit-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
                                       >
                                         {schedule.className && schedule.coachName 
