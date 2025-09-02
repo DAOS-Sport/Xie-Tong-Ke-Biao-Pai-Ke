@@ -2,31 +2,19 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { queryClient } from "@/lib/queryClient";
+import { format, addDays, startOfWeek } from "date-fns";
 import { zhTW } from "date-fns/locale";
+import type { Venue, TimeSlot, Schedule } from "@shared/schema";
 
-interface Schedule {
-  id: string;
-  date: string;
-  className: string;
-  venue: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  timeSlot: {
-    id: string;
-    period: string;
-    startTime: string;
-    endTime: string;
-  };
+interface ScheduleWithRegistrations extends Schedule {
+  venue: Venue;
+  timeSlot: TimeSlot;
   registrations: Array<{
     id: string;
     coachName: string;
@@ -36,18 +24,36 @@ interface Schedule {
 
 export default function FindCoach() {
   const [, setLocation] = useLocation();
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleWithRegistrations | null>(null);
   const [coachName, setCoachName] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const { toast } = useToast();
 
-  // 獲取沒有教練的課程
-  const { data: schedules, isLoading } = useQuery<Schedule[]>({
-    queryKey: ['/api/schedules-without-coach'],
+  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
+  const weekEnd = addDays(currentWeek, 4);
+
+  // 獲取場館和時段
+  const { data: venues } = useQuery<Venue[]>({
+    queryKey: ['/api/venues'],
+  });
+
+  const { data: timeSlots } = useQuery<TimeSlot[]>({
+    queryKey: ['/api/time-slots'],
+  });
+
+  // 獲取沒有教練的課程（週為單位）
+  const { data: schedulesWithoutCoach, isLoading } = useQuery<ScheduleWithRegistrations[]>({
+    queryKey: ['/api/schedules-without-coach', format(currentWeek, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')],
     queryFn: async () => {
       const response = await fetch('/api/schedules-without-coach');
       if (!response.ok) throw new Error('Failed to fetch schedules');
-      return response.json();
+      const allSchedules = await response.json();
+      // 過濾出當週的課程
+      return allSchedules.filter((schedule: ScheduleWithRegistrations) => {
+        const scheduleDate = new Date(schedule.date);
+        return scheduleDate >= currentWeek && scheduleDate <= weekEnd;
+      });
     },
   });
 
@@ -99,16 +105,38 @@ export default function FindCoach() {
     });
   };
 
+  const navigateToPrevWeek = () => {
+    setCurrentWeek(prev => addDays(prev, -7));
+  };
+
+  const navigateToNextWeek = () => {
+    setCurrentWeek(prev => addDays(prev, 7));
+  };
+
+  const navigateToThisWeek = () => {
+    setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  };
+
   const getVenueColorClass = (color: string) => {
     switch (color) {
-      case 'blue': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'green': return 'bg-green-100 text-green-800 border-green-200';
-      case 'purple': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'yellow': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'pink': return 'bg-pink-100 text-pink-800 border-pink-200';
-      case 'orange': return 'bg-orange-100 text-orange-800 border-orange-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'blue': return 'venue-blue';
+      case 'green': return 'venue-green';
+      case 'purple': return 'venue-purple';
+      case 'yellow': return 'venue-yellow';
+      case 'pink': return 'venue-pink';
+      case 'orange': return 'venue-orange';
+      default: return 'bg-muted';
     }
+  };
+
+  // 獲取特定日期和時段的課程
+  const getScheduleForSlot = (date: Date, venueId: string, timeSlotId: string) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return schedulesWithoutCoach?.find(s => 
+      s.date === dateStr && 
+      s.venueId === venueId && 
+      s.timeSlotId === timeSlotId
+    );
   };
 
   if (isLoading) {
@@ -184,136 +212,190 @@ export default function FindCoach() {
       </header>
 
       <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-2">尋找教練</h2>
-          <p className="text-muted-foreground">以下課程目前沒有指派教練，點擊「我可以教」按鈕進行登記</p>
-        </div>
-
-        {!schedules || schedules.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <i className="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
-              <h3 className="text-lg font-semibold mb-2">太好了！</h3>
-              <p className="text-muted-foreground">目前所有課程都已安排教練</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {schedules.map((schedule) => (
-              <Card key={schedule.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold text-foreground">
-                          {schedule.className}
-                        </h3>
-                        <Badge variant="outline" className={getVenueColorClass(schedule.venue.color)}>
-                          {schedule.venue.name}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <i className="fas fa-calendar"></i>
-                          {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: zhTW })}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <i className="fas fa-clock"></i>
-                          {schedule.timeSlot.period} ({schedule.timeSlot.startTime}-{schedule.timeSlot.endTime})
-                        </span>
-                      </div>
-
-                      {schedule.registrations.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm text-muted-foreground mb-2">已登記教練：</p>
-                          <div className="flex flex-wrap gap-2">
-                            {schedule.registrations.map((reg) => (
-                              <Badge key={reg.id} variant="secondary">
-                                {reg.coachName}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-shrink-0">
-                      <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} 
-                             onOpenChange={(open) => {
-                               setDialogOpen(open);
-                               if (!open) {
-                                 setSelectedSchedule(null);
-                                 setCoachName("");
-                               }
-                             }}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            onClick={() => setSelectedSchedule(schedule)}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            data-testid={`button-register-${schedule.id}`}
-                          >
-                            我可以教
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>教練登記</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-sm text-muted-foreground mb-2">課程資訊：</p>
-                              <p className="font-medium">{schedule.className}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {schedule.venue.name} - {schedule.timeSlot.period} 
-                                ({schedule.timeSlot.startTime}-{schedule.timeSlot.endTime})
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: zhTW })}
-                              </p>
-                            </div>
-                            
-                            <div>
-                              <Label htmlFor="coachName">教練姓名</Label>
-                              <Input
-                                id="coachName"
-                                value={coachName}
-                                onChange={(e) => setCoachName(e.target.value)}
-                                placeholder="請輸入您的姓名"
-                                data-testid="input-coach-name"
-                              />
-                            </div>
-
-                            <div className="flex justify-end space-x-2">
-                              <Button 
-                                variant="outline" 
-                                onClick={() => {
-                                  setDialogOpen(false);
-                                  setSelectedSchedule(null);
-                                  setCoachName("");
-                                }}
-                                data-testid="button-cancel"
-                              >
-                                取消
-                              </Button>
-                              <Button 
-                                onClick={handleRegister}
-                                disabled={registerMutation.isPending || !coachName.trim()}
-                                data-testid="button-confirm-register"
-                              >
-                                {registerMutation.isPending ? '登記中...' : '確認登記'}
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToPrevWeek}
+                data-testid="button-prev-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <i className="fas fa-chevron-left text-xs sm:text-sm"></i>
+              </Button>
+              <h2 className="text-sm sm:text-lg font-semibold text-center flex-1 sm:flex-none" data-testid="text-current-week">
+                {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(addDays(currentWeek, 4), 'M月d日', { locale: zhTW })}
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToNextWeek}
+                data-testid="button-next-week"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
+              >
+                <i className="fas fa-chevron-right text-xs sm:text-sm"></i>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={navigateToThisWeek}
+                data-testid="button-this-week"
+                className="text-xs sm:text-sm px-2 sm:px-3"
+              >
+                本週
+              </Button>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              灰色虛線邊框代表缺教練課程，點擊「我可以教」進行登記
+            </div>
           </div>
-        )}
+
+          {!venues || !timeSlots ? (
+            <div className="text-center py-8">
+              <div className="text-muted-foreground">載入中...</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border border-border p-2 bg-muted text-center text-sm font-medium min-w-20">
+                      節次/時間
+                    </th>
+                    {weekDays.map((day) => (
+                      <th key={format(day, 'yyyy-MM-dd')} className="border border-border p-2 bg-muted text-center text-sm font-medium min-w-32">
+                        <div>{format(day, 'M月d日', { locale: zhTW })}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(day, 'EEE', { locale: zhTW })}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeSlots?.map((timeSlot) => (
+                    <tr key={timeSlot.id}>
+                      <td className="border border-border p-2 bg-muted text-center text-sm font-medium">
+                        <div>{timeSlot.period}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {timeSlot.startTime}-{timeSlot.endTime}
+                        </div>
+                      </td>
+                      {weekDays.map((day) => {
+                        const dateStr = format(day, 'yyyy-MM-dd');
+                        return (
+                          <td key={`${dateStr}-${timeSlot.id}`} className="border border-border p-1">
+                            <div className="grid gap-1">
+                              {venues?.map((venue) => {
+                                const schedule = getScheduleForSlot(day, venue.id, timeSlot.id);
+                                if (!schedule) return null;
+                                
+                                return (
+                                  <div key={venue.id} className="relative">
+                                    <div className={`p-2 rounded text-xs ${getVenueColorClass(venue.color)} bg-gray-100 border-2 border-dashed border-gray-400`}>
+                                      <div className="font-medium mb-1">{schedule.className}</div>
+                                      <div className="text-xs text-gray-600 mb-2">{venue.name}</div>
+                                      
+                                      {schedule.registrations.length > 0 ? (
+                                        <div className="mb-2">
+                                          <div className="text-xs text-gray-600 mb-1">登記教練：</div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {schedule.registrations.map((reg) => (
+                                              <Badge key={reg.id} variant="secondary" className="text-xs px-1 py-0">
+                                                {reg.coachName}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="text-xs text-red-600 mb-2">缺教練</div>
+                                      )}
+                                      
+                                      <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} 
+                                             onOpenChange={(open) => {
+                                               setDialogOpen(open);
+                                               if (!open) {
+                                                 setSelectedSchedule(null);
+                                                 setCoachName("");
+                                               }
+                                             }}>
+                                        <DialogTrigger asChild>
+                                          <Button 
+                                            size="sm"
+                                            onClick={() => setSelectedSchedule(schedule)}
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-6"
+                                            data-testid={`button-register-${schedule.id}`}
+                                          >
+                                            我可以教
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                          <DialogHeader>
+                                            <DialogTitle>教練登記</DialogTitle>
+                                          </DialogHeader>
+                                          <div className="space-y-4">
+                                            <div>
+                                              <p className="text-sm text-muted-foreground mb-2">課程資訊：</p>
+                                              <p className="font-medium">{schedule.className}</p>
+                                              <p className="text-sm text-muted-foreground">
+                                                {schedule.venue.name} - {schedule.timeSlot.period} 
+                                                ({schedule.timeSlot.startTime}-{schedule.timeSlot.endTime})
+                                              </p>
+                                              <p className="text-sm text-muted-foreground">
+                                                {format(new Date(schedule.date), 'yyyy/MM/dd (EEE)', { locale: zhTW })}
+                                              </p>
+                                            </div>
+                                            
+                                            <div>
+                                              <Label htmlFor="coachName">教練姓名</Label>
+                                              <Input
+                                                id="coachName"
+                                                value={coachName}
+                                                onChange={(e) => setCoachName(e.target.value)}
+                                                placeholder="請輸入您的姓名"
+                                                data-testid="input-coach-name"
+                                              />
+                                            </div>
+
+                                            <div className="flex justify-end space-x-2">
+                                              <Button 
+                                                variant="outline" 
+                                                onClick={() => {
+                                                  setDialogOpen(false);
+                                                  setSelectedSchedule(null);
+                                                  setCoachName("");
+                                                }}
+                                                data-testid="button-cancel"
+                                              >
+                                                取消
+                                              </Button>
+                                              <Button 
+                                                onClick={handleRegister}
+                                                disabled={registerMutation.isPending || !coachName.trim()}
+                                                data-testid="button-confirm-register"
+                                              >
+                                                {registerMutation.isPending ? '登記中...' : '確認登記'}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
