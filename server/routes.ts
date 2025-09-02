@@ -153,10 +153,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 尋找教練 - 獲取沒有教練的課程
+  // 尋找教練 - 獲取沒有教練的課程（支援日期範圍）
   app.get('/api/schedules-without-coach', async (req, res) => {
     try {
-      const schedules = await storage.getSchedulesWithoutCoach();
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      
+      let schedules;
+      if (startDate && endDate) {
+        // 如果提供日期範圍，使用優化版本查詢
+        schedules = await storage.getSchedulesWithoutCoachByDateRange(startDate, endDate);
+      } else {
+        // 否則查詢所有
+        schedules = await storage.getSchedulesWithoutCoach();
+      }
+      
       res.json(schedules);
     } catch (error) {
       console.error('Error fetching schedules without coach:', error);

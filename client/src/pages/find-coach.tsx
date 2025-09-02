@@ -42,19 +42,17 @@ export default function FindCoach() {
     queryKey: ['/api/time-slots'],
   });
 
-  // 獲取沒有教練的課程（週為單位）
+  // 獲取沒有教練的課程（週為單位，優化版本）
   const { data: schedulesWithoutCoach, isLoading } = useQuery<ScheduleWithRegistrations[]>({
     queryKey: ['/api/schedules-without-coach', format(currentWeek, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')],
     queryFn: async () => {
-      const response = await fetch('/api/schedules-without-coach');
+      const startDate = format(currentWeek, 'yyyy-MM-dd');
+      const endDate = format(weekEnd, 'yyyy-MM-dd');
+      const response = await fetch(`/api/schedules-without-coach?startDate=${startDate}&endDate=${endDate}`);
       if (!response.ok) throw new Error('Failed to fetch schedules');
-      const allSchedules = await response.json();
-      // 過濾出當週的課程
-      return allSchedules.filter((schedule: ScheduleWithRegistrations) => {
-        const scheduleDate = new Date(schedule.date);
-        return scheduleDate >= currentWeek && scheduleDate <= weekEnd;
-      });
+      return response.json();
     },
+    staleTime: 1000 * 60 * 5, // 5分鐘內不重新查詢
   });
 
   // 教練登記 mutation
@@ -247,7 +245,13 @@ export default function FindCoach() {
               </Button>
             </div>
             <div className="text-sm text-muted-foreground">
-              灰色虛線邊框代表缺教練課程，點擊「我可以教」進行登記
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-50 border border-dashed border-red-400 rounded"></div>
+                  紅色虛線：缺教練課程
+                </span>
+                <span>點擊「我可以教」進行登記</span>
+              </div>
             </div>
           </div>
 
@@ -291,13 +295,34 @@ export default function FindCoach() {
                                 const schedule = getScheduleForSlot(day, venue.id, timeSlot.id);
                                 if (!schedule) return null;
                                 
+                                // 判斷缺教練的情況
+                                const isNoCoach = !schedule.coachName || schedule.coachName === '';
+                                const hasCoachButMissing = schedule.coachName && schedule.coachName.includes('缺');
+                                const isMissingCoach = isNoCoach || hasCoachButMissing;
+                                
                                 return (
                                   <div key={venue.id} className="relative">
-                                    <div className={`p-2 rounded text-xs ${getVenueColorClass(venue.color)} bg-gray-100 border-2 border-dashed border-gray-400`}>
+                                    <div className={`p-2 rounded text-xs ${getVenueColorClass(venue.color)} ${
+                                      isMissingCoach 
+                                        ? 'bg-red-50 border-2 border-dashed border-red-400' 
+                                        : 'bg-gray-100 border-2 border-dashed border-gray-400'
+                                    }`}>
                                       <div className="font-medium mb-1">{schedule.className}</div>
                                       <div className="text-xs text-gray-600 mb-2">{venue.name}</div>
                                       
-                                      {schedule.registrations.length > 0 ? (
+                                      {/* 顯示教練狀態 */}
+                                      {isNoCoach ? (
+                                        <div className="text-xs text-red-600 font-medium mb-2">缺教練</div>
+                                      ) : hasCoachButMissing ? (
+                                        <div className="mb-2">
+                                          <div className="text-xs text-gray-600 mb-1">目前教練：</div>
+                                          <div className="text-xs text-orange-600 font-medium">{schedule.coachName}</div>
+                                          <div className="text-xs text-red-600 font-medium">還需要更多教練</div>
+                                        </div>
+                                      ) : null}
+                                      
+                                      {/* 顯示登記教練 */}
+                                      {schedule.registrations.length > 0 && (
                                         <div className="mb-2">
                                           <div className="text-xs text-gray-600 mb-1">登記教練：</div>
                                           <div className="flex flex-wrap gap-1">
@@ -308,8 +333,6 @@ export default function FindCoach() {
                                             ))}
                                           </div>
                                         </div>
-                                      ) : (
-                                        <div className="text-xs text-red-600 mb-2">缺教練</div>
                                       )}
                                       
                                       <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} 
