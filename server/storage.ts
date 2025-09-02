@@ -222,16 +222,32 @@ export class DatabaseStorage implements IStorage {
     daySchedules.forEach(schedule => {
       if (!schedule.coachName) return;
       
-      if (!coachTimeSlotMap.has(schedule.coachName)) {
-        coachTimeSlotMap.set(schedule.coachName, new Map());
+      // 分析多教練格式：班級-教練1-教練2
+      const coaches: string[] = [];
+      if (schedule.coachName.includes('-')) {
+        const parts = schedule.coachName.split('-');
+        // 跳過第一部分（班級名稱），其他部分是教練
+        for (let i = 1; i < parts.length; i++) {
+          const coach = parts[i].trim();
+          if (coach && coach !== '缺') {
+            coaches.push(coach);
+          }
+        }
       }
       
-      const timeSlotMap = coachTimeSlotMap.get(schedule.coachName)!;
-      if (!timeSlotMap.has(schedule.timeSlotId)) {
-        timeSlotMap.set(schedule.timeSlotId, []);
-      }
-      
-      timeSlotMap.get(schedule.timeSlotId)!.push(schedule.venue.name);
+      // 為每個教練檢查時間衝突
+      coaches.forEach(coachName => {
+        if (!coachTimeSlotMap.has(coachName)) {
+          coachTimeSlotMap.set(coachName, new Map());
+        }
+        
+        const timeSlotMap = coachTimeSlotMap.get(coachName)!;
+        if (!timeSlotMap.has(schedule.timeSlotId)) {
+          timeSlotMap.set(schedule.timeSlotId, []);
+        }
+        
+        timeSlotMap.get(schedule.timeSlotId)!.push(schedule.venue.name);
+      });
     });
     
     coachTimeSlotMap.forEach((timeSlotMap, coachName) => {
@@ -278,19 +294,37 @@ export class DatabaseStorage implements IStorage {
     results.forEach(result => {
       if (!result.coachName) return;
       
-      if (!coachStats.has(result.coachName)) {
-        coachStats.set(result.coachName, {
-          totalClasses: 0,
-          venueBreakdown: []
-        });
+      // 分析多教練格式：班級-教練1-教練2
+      const coaches: string[] = [];
+      if (result.coachName.includes('-')) {
+        const parts = result.coachName.split('-');
+        // 跳過第一部分（班級名稱），其他部分是教練
+        for (let i = 1; i < parts.length; i++) {
+          const coach = parts[i].trim();
+          if (coach && coach !== '缺') {
+            coaches.push(coach);
+          }
+        }
       }
+      
+      // 為每個教練分別計算統計
+      coaches.forEach(coachName => {
+        if (!coachStats.has(coachName)) {
+          coachStats.set(coachName, {
+            totalClasses: 0,
+            venueBreakdown: []
+          });
+        }
 
-      const stats = coachStats.get(result.coachName)!;
-      stats.totalClasses += result.count;
-      stats.venueBreakdown.push({
-        venueName: result.venueName,
-        count: result.count,
-        color: result.venueColor
+        const stats = coachStats.get(coachName)!;
+        // 如果是多教練課程，每個教練分攤課程數
+        const sharePerCoach = result.count / coaches.length;
+        stats.totalClasses += sharePerCoach;
+        stats.venueBreakdown.push({
+          venueName: result.venueName,
+          count: sharePerCoach,
+          color: result.venueColor
+        });
       });
     });
 
@@ -305,9 +339,29 @@ export class DatabaseStorage implements IStorage {
     const results = await db
       .selectDistinct({ coachName: schedules.coachName })
       .from(schedules)
-      .where(sql`${schedules.coachName} IS NOT NULL AND ${schedules.coachName} != ''`);
+      .where(sql`${schedules.coachName} IS NOT NULL AND ${schedules.coachName} != '' AND ${schedules.coachName} NOT LIKE '%缺%'`);
     
-    return results.map(r => r.coachName).filter(Boolean) as string[];
+    // 分析教練名稱，支援多教練格式：班級-教練1-教練2
+    const uniqueCoaches = new Set<string>();
+    
+    results.forEach(result => {
+      if (!result.coachName) return;
+      
+      // 如果教練名稱包含連字符，表示可能是多個教練
+      if (result.coachName.includes('-')) {
+        // 分割教練名稱，第一部分通常是班級名稱，其他部分是教練
+        const parts = result.coachName.split('-');
+        // 跳過第一部分（班級名稱），處理其他部分作為教練名稱
+        for (let i = 1; i < parts.length; i++) {
+          const coach = parts[i].trim();
+          if (coach && coach !== '缺') {
+            uniqueCoaches.add(coach);
+          }
+        }
+      }
+    });
+    
+    return Array.from(uniqueCoaches).sort();
   }
 
   // 按日期範圍獲取沒有教練的課程（優化版本）
