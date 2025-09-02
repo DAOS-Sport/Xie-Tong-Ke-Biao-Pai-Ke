@@ -11,7 +11,7 @@ import {
   type InsertScheduleType,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, between, desc, sql } from "drizzle-orm";
+import { eq, and, between, desc, sql, like, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -193,7 +193,12 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(timeSlots, eq(schedules.timeSlotId, timeSlots.id))
       .where(
         and(
-          eq(schedules.coachName, coachName),
+          or(
+            eq(schedules.coachName, coachName),
+            like(schedules.coachName, `${coachName}-%`),
+            like(schedules.coachName, `%-${coachName}`),
+            like(schedules.coachName, `%-${coachName}-%`)
+          ),
           between(schedules.date, startDate, endDate)
         )
       );
