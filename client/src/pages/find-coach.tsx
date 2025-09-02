@@ -131,39 +131,45 @@ export default function FindCoach() {
   const parseCoachNames = (coachName: string): string[] => {
     if (!coachName) return [];
     
-    // 移除班級名稱部分（如果存在）
-    // 假設格式是 "班級-教練1-教練2" 或 "教練1-教練2"
-    const parts = coachName.split('-');
+    // 直接以破折號分割教練名稱
+    // 支持格式: "教練1-教練2" 或 "班級-教練1-教練2"
+    const parts = coachName.split('-').map(p => p.trim()).filter(p => p.length > 0);
     
     // 如果只有一個部分，直接返回
     if (parts.length <= 1) {
       return [coachName];
     }
     
-    // 如果有多個部分，嘗試識別哪些是教練名稱
-    // 通常班級名稱包含數字或特定關鍵字，教練名稱是人名
+    // 識別哪些部分是教練名稱（人名）
     const coaches: string[] = [];
     
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i].trim();
-      
-      // 跳過明顯是班級名稱的部分
-      if (part.match(/^[A-Z0-9]+$/) || // 全大寫字母或數字
-          part.includes('班') ||
-          part.includes('級') ||
-          part.includes('課') ||
-          part.length <= 2) { // 太短的部分通常是班級代碼
+    for (const part of parts) {
+      // 跳過明顯是班級/課程名稱的部分
+      if (
+        part.match(/^[A-Z]+\d+$/) || // 如 "ABC123"
+        part.match(/^\d+$/) || // 純數字
+        part.includes('班') ||
+        part.includes('級') ||
+        part.includes('課') ||
+        part.includes('泳') ||
+        part.includes('游') ||
+        part.length <= 2 // 太短的代碼
+      ) {
         continue;
       }
       
-      // 識別教練名稱（通常是人名）
-      if (part.length >= 2 && part.match(/[\u4e00-\u9fff]/)) { // 包含中文字符
+      // 如果看起來像人名（包含中文且長度合適）
+      if (part.length >= 2 && part.match(/[\u4e00-\u9fff]/)) {
         coaches.push(part);
       }
     }
     
-    // 如果沒有識別出教練，返回原始字符串
-    return coaches.length > 0 ? coaches : [coachName];
+    // 如果沒有識別出教練，返回所有部分（除了第一個，因為通常是班級名）
+    if (coaches.length === 0) {
+      return parts.length > 1 ? parts.slice(1) : [coachName];
+    }
+    
+    return coaches;
   };
 
   // 獲取特定日期和時段的課程
@@ -356,7 +362,7 @@ export default function FindCoach() {
                                         <div className="mb-2">
                                           <div className="text-xs font-medium mb-1 opacity-70">目前教練：</div>
                                           <div className="flex flex-wrap gap-1">
-                                            {parseCoachNames(schedule.coachName).map((coach, index) => (
+                                            {parseCoachNames(schedule.coachName || '').map((coach, index) => (
                                               <div key={index} className="text-xs font-medium bg-orange-50 px-2 py-1 rounded border border-orange-200 text-orange-800">
                                                 {coach}
                                               </div>
@@ -368,7 +374,7 @@ export default function FindCoach() {
                                         <div className="mb-2">
                                           <div className="text-xs font-medium mb-1 opacity-70">目前教練：</div>
                                           <div className="flex flex-wrap gap-1">
-                                            {parseCoachNames(schedule.coachName).map((coach, index) => (
+                                            {parseCoachNames(schedule.coachName || '').map((coach, index) => (
                                               <div key={index} className="text-xs font-medium bg-blue-50 px-2 py-1 rounded border border-blue-200 text-blue-800">
                                                 {coach}
                                               </div>
