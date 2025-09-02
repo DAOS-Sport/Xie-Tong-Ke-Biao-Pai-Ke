@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
@@ -28,19 +28,6 @@ export default function CoachView() {
     queryKey: ['/api/coaches'],
   });
 
-  // Set default coach when data loads
-  useEffect(() => {
-    if (!selectedCoach && coaches && coaches.length > 0) {
-      if (user?.role === 'admin') {
-        setSelectedCoach(coaches[0]);
-      } else if (user?.coachName) {
-        setSelectedCoach(user.coachName);
-      } else {
-        setSelectedCoach(coaches[0]); // Default to first coach for public access
-      }
-    }
-  }, [user, coaches, selectedCoach]);
-
   const { data: schedules, isLoading: schedulesLoading } = useQuery<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>({
     queryKey: ['/api/coach-schedules', { startDate: weekStart, endDate: weekEnd, coachName: selectedCoach }],
     queryFn: async () => {
@@ -60,6 +47,57 @@ export default function CoachView() {
     enabled: !!selectedCoach,
   });
 
+  // (A) 課表字串解析工具函式
+  const splitScheduleRow = (row: string): string[] => {
+    const parts = row.split("-");
+    if (parts.length < 2) return [row]; 
+
+    const classCode = parts[0];           // 鷺江601
+    const coaches = parts.slice(1);       // ["潘思蒓", "陳沛衡"]
+
+    return coaches.map(c => `${classCode}-${c}`);
+  };
+
+  // 從課表名稱中提取教練名字
+  const extractCoachName = (scheduleRow: string): string => {
+    const parts = scheduleRow.split("-");
+    if (parts.length === 2) {
+      return parts[1];  // 回傳教練名
+    }
+    return scheduleRow; // 如果格式不符，回傳原始字串
+  };
+
+  // (B) 自動補齊教練名單
+  const derivedCoaches = useMemo(() => {
+    const set = new Set(coaches ?? []); // 先加主檔
+
+    (schedules ?? []).forEach(s => {
+      // 解析課表名稱，提取所有教練
+      const rows = splitScheduleRow(s.className || '');
+      rows.forEach(row => {
+        const coachName = extractCoachName(row);
+        if (coachName && coachName !== row) { // 確保有成功提取到教練名
+          set.add(coachName);
+        }
+      });
+    });
+
+    return Array.from(set).sort(); // 排序方便查找
+  }, [coaches, schedules]);
+
+  // Set default coach when data loads (使用完整的教練列表)
+  useEffect(() => {
+    if (!selectedCoach && derivedCoaches && derivedCoaches.length > 0) {
+      if (user?.role === 'admin') {
+        setSelectedCoach(derivedCoaches[0]);
+      } else if (user?.coachName) {
+        setSelectedCoach(user.coachName);
+      } else {
+        setSelectedCoach(derivedCoaches[0]); // Default to first coach for public access
+      }
+    }
+  }, [user, derivedCoaches, selectedCoach]);
+
   if (schedulesLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -70,9 +108,20 @@ export default function CoachView() {
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
 
+  // (C) 修正課表篩選邏輯
   const getSchedulesForDay = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return schedules?.filter(s => s.date === dateStr) || [];
+    const todays = schedules?.filter(s => s.date === dateStr) || [];
+
+    if (!selectedCoach) return todays;
+
+    return todays.filter(s => {
+      const rows = splitScheduleRow(s.className || '');
+      return rows.some(row => {
+        const coachName = extractCoachName(row);
+        return coachName === selectedCoach;
+      });
+    });
   };
 
   const getVenueColorClass = (color: string) => {
@@ -131,10 +180,8 @@ export default function CoachView() {
             </div>
           </div>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6">
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
@@ -179,7 +226,9 @@ export default function CoachView() {
             </button>
           </nav>
         </div>
+      </header>
 
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
@@ -193,7 +242,7 @@ export default function CoachView() {
                     <SelectValue placeholder="選擇教練" />
                   </SelectTrigger>
                   <SelectContent>
-                    {coaches?.map((coach) => (
+                    {derivedCoaches?.map((coach) => (
                       <SelectItem key={coach} value={coach} data-testid={`option-${coach}`}>
                         {coach}
                       </SelectItem>
