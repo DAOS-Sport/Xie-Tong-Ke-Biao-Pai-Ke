@@ -148,18 +148,22 @@ export default function FindCoach() {
       if (
         part.match(/^[A-Z]+\d+$/) || // 如 "ABC123"
         part.match(/^\d+$/) || // 純數字
+        part.match(/[\u4e00-\u9fff]+\d+$/) || // 中文+數字，如 "新北160"
         part.includes('班') ||
         part.includes('級') ||
         part.includes('課') ||
         part.includes('泳') ||
         part.includes('游') ||
+        part.includes('高中') ||
+        part.includes('國中') ||
+        part.includes('小學') ||
         part.length <= 2 // 太短的代碼
       ) {
         continue;
       }
       
-      // 如果看起來像人名（包含中文且長度合適）
-      if (part.length >= 2 && part.match(/[\u4e00-\u9fff]/)) {
+      // 如果看起來像人名（包含中文且長度合適，且不包含數字）
+      if (part.length >= 2 && part.match(/^[\u4e00-\u9fff]+$/) && !part.match(/\d/)) {
         coaches.push(part);
       }
     }
