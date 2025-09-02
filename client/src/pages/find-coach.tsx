@@ -117,13 +117,13 @@ export default function FindCoach() {
 
   const getVenueColorClass = (color: string) => {
     switch (color) {
-      case 'blue': return 'venue-blue';
-      case 'green': return 'venue-green';
-      case 'purple': return 'venue-purple';
-      case 'yellow': return 'venue-yellow';
-      case 'pink': return 'venue-pink';
-      case 'orange': return 'venue-orange';
-      default: return 'bg-muted';
+      case 'blue': return 'bg-blue-100 text-blue-900 border-blue-300';
+      case 'green': return 'bg-green-100 text-green-900 border-green-300';
+      case 'purple': return 'bg-purple-100 text-purple-900 border-purple-300';
+      case 'yellow': return 'bg-yellow-100 text-yellow-900 border-yellow-300';
+      case 'pink': return 'bg-pink-100 text-pink-900 border-pink-300';
+      case 'orange': return 'bg-orange-100 text-orange-900 border-orange-300';
+      default: return 'bg-gray-100 text-gray-900 border-gray-300';
     }
   };
 
@@ -302,32 +302,32 @@ export default function FindCoach() {
                                 
                                 return (
                                   <div key={venue.id} className="relative">
-                                    <div className={`p-2 rounded text-xs ${getVenueColorClass(venue.color)} ${
+                                    <div className={`p-3 rounded-lg text-xs ${getVenueColorClass(venue.color)} ${
                                       isMissingCoach 
-                                        ? 'bg-red-50 border-2 border-dashed border-red-400' 
-                                        : 'bg-gray-100 border-2 border-dashed border-gray-400'
+                                        ? 'border-2 border-dashed border-red-500 shadow-sm' 
+                                        : 'border border-solid shadow-sm'
                                     }`}>
-                                      <div className="font-medium mb-1">{schedule.className}</div>
-                                      <div className="text-xs text-gray-600 mb-2">{venue.name}</div>
+                                      <div className="font-bold mb-1 text-sm">{schedule.className}</div>
+                                      <div className="text-xs font-medium mb-2 opacity-80">{venue.name}</div>
                                       
                                       {/* 顯示教練狀態 */}
                                       {isNoCoach ? (
-                                        <div className="text-xs text-red-600 font-medium mb-2">缺教練</div>
+                                        <div className="text-xs text-red-700 font-bold mb-2 bg-red-50 px-2 py-1 rounded border border-red-200">缺教練</div>
                                       ) : hasCoachButMissing ? (
                                         <div className="mb-2">
-                                          <div className="text-xs text-gray-600 mb-1">目前教練：</div>
-                                          <div className="text-xs text-orange-600 font-medium">{schedule.coachName}</div>
-                                          <div className="text-xs text-red-600 font-medium">還需要更多教練</div>
+                                          <div className="text-xs font-medium mb-1 opacity-70">目前教練：</div>
+                                          <div className="text-xs font-medium bg-orange-50 px-2 py-1 rounded border border-orange-200 text-orange-800">{schedule.coachName}</div>
+                                          <div className="text-xs text-red-700 font-bold mt-1 bg-red-50 px-2 py-1 rounded border border-red-200">還需要更多教練</div>
                                         </div>
                                       ) : null}
                                       
                                       {/* 顯示登記教練 */}
                                       {schedule.registrations.length > 0 && (
                                         <div className="mb-2">
-                                          <div className="text-xs text-gray-600 mb-1">登記教練：</div>
+                                          <div className="text-xs font-medium mb-1 opacity-70">登記教練：</div>
                                           <div className="flex flex-wrap gap-1">
                                             {schedule.registrations.map((reg) => (
-                                              <Badge key={reg.id} variant="secondary" className="text-xs px-1 py-0">
+                                              <Badge key={reg.id} className="text-xs px-2 py-1 bg-green-100 text-green-800 border border-green-300 font-medium">
                                                 {reg.coachName}
                                               </Badge>
                                             ))}
@@ -347,7 +347,7 @@ export default function FindCoach() {
                                           <Button 
                                             size="sm"
                                             onClick={() => setSelectedSchedule(schedule)}
-                                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-6"
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-7 font-medium shadow-sm"
                                             data-testid={`button-register-${schedule.id}`}
                                           >
                                             我可以教
