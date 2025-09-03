@@ -11,6 +11,7 @@ import { queryClient } from "@/lib/queryClient";
 import { format, addDays, startOfWeek } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
+import { getExtendedWeekDays, getExtendedWeekEnd } from "@/utils/special-workdays";
 
 interface ScheduleWithRegistrations extends Schedule {
   venue: Venue;
@@ -30,8 +31,8 @@ export default function FindCoach() {
   const [currentWeek, setCurrentWeek] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const { toast } = useToast();
 
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
-  const weekEnd = addDays(currentWeek, 4);
+  const weekDays = getExtendedWeekDays(currentWeek); // 支援特殊工作日
+  const weekEnd = getExtendedWeekEnd(currentWeek);
 
   // 獲取場館和時段
   const { data: venues } = useQuery<Venue[]>({

@@ -13,15 +13,7 @@ import { zhTW } from "date-fns/locale";
 import CoachAutocomplete from "@/components/coach-autocomplete";
 import PasswordProtect from "@/components/password-protect";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
-
-// 工作日和對應的中文名稱
-const WEEKDAYS = [
-  { day: 1, name: "週一" },
-  { day: 2, name: "週二" },
-  { day: 3, name: "週三" },
-  { day: 4, name: "週四" },
-  { day: 5, name: "週五" },
-];
+import { getExtendedWeekDays, getExtendedWeekdayNames, getExtendedWeekEnd } from "@/utils/special-workdays";
 
 function VenueScheduleEditContent() {
   const { user } = useAuth();
@@ -50,9 +42,9 @@ function VenueScheduleEditContent() {
     queryKey: ["/api/time-slots"],
   });
 
-  // 獲取週課表資料
+  // 獲取週課表資料（包含特殊工作日）
   const weekStart = format(currentWeek, "yyyy-MM-dd");
-  const weekEnd = format(addDays(currentWeek, 4), "yyyy-MM-dd"); // 只到週五
+  const weekEnd = format(getExtendedWeekEnd(currentWeek), "yyyy-MM-dd"); // 支援週六補班
 
   const { data: schedules = [] } = useQuery<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>({
     queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`],
@@ -358,12 +350,12 @@ function VenueScheduleEditContent() {
                   <thead>
                     <tr>
                       <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>
-                      {WEEKDAYS.map((weekday) => {
-                        const date = addDays(currentWeek, weekday.day - 1);
+                      {getExtendedWeekDays(currentWeek).map((date, index) => {
+                        const weekDayNames = getExtendedWeekdayNames(currentWeek);
                         return (
-                          <th key={weekday.day} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                          <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
                             <div className="text-center">
-                              <div className="font-semibold">{weekday.name}</div>
+                              <div className="font-semibold">{weekDayNames[index]}</div>
                               <div className="text-sm text-gray-600">
                                 {format(date, "MM/dd")}
                               </div>
@@ -382,16 +374,16 @@ function VenueScheduleEditContent() {
                             {timeSlot.startTime}-{timeSlot.endTime}
                           </div>
                         </td>
-                        {WEEKDAYS.map((weekday) => {
-                          const date = format(addDays(currentWeek, weekday.day - 1), "yyyy-MM-dd");
-                          const daySchedules = schedulesByDateAndTime[date]?.[timeSlot.id] || [];
+                        {getExtendedWeekDays(currentWeek).map((date, index) => {
+                          const dateStr = format(date, "yyyy-MM-dd");
+                          const daySchedules = schedulesByDateAndTime[dateStr]?.[timeSlot.id] || [];
                           
-                          const isActive = activeCell?.date === date && 
+                          const isActive = activeCell?.date === dateStr && 
                                            activeCell?.timeSlotId === timeSlot.id;
                           
                           return (
                             <td 
-                              key={`${timeSlot.id}-${weekday.day}`} 
+                              key={`${timeSlot.id}-${index}`} 
                               className="border border-gray-300 p-1 align-top hover:bg-accent/50 cursor-pointer relative"
                               style={{ minHeight: '60px', verticalAlign: 'top' }}
                             >
@@ -422,11 +414,11 @@ function VenueScheduleEditContent() {
                                   type="text"
                                   className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
                                   placeholder={daySchedules.length === 0 ? "班級-教練" : "新增課程"}
-                                  onFocus={() => setActiveCell({ date, timeSlotId: timeSlot.id })}
+                                  onFocus={() => setActiveCell({ date: dateStr, timeSlotId: timeSlot.id })}
                                   onBlur={(e) => {
                                     const value = e.target.value.trim();
                                     if (value) {
-                                      handleAddClass(date, timeSlot.id, value);
+                                      handleAddClass(dateStr, timeSlot.id, value);
                                       e.target.value = '';
                                     }
                                     setActiveCell(null);
@@ -435,19 +427,19 @@ function VenueScheduleEditContent() {
                                     if (e.key === 'Enter') {
                                       const value = e.currentTarget.value.trim();
                                       if (value) {
-                                        handleAddClass(date, timeSlot.id, value);
+                                        handleAddClass(dateStr, timeSlot.id, value);
                                         e.currentTarget.value = '';
                                       }
                                       e.currentTarget.blur();
                                     }
                                   }}
-                                  data-testid={`input-${date}-${timeSlot.id}`}
+                                  data-testid={`input-${dateStr}-${timeSlot.id}`}
                                 />
                               </div>
                               {isActive && (
                                 <CoachAutocomplete
                                   onSelect={(coachName: string) => {
-                                    const input = document.querySelector(`[data-testid="input-${date}-${timeSlot.id}"]`) as HTMLInputElement;
+                                    const input = document.querySelector(`[data-testid="input-${dateStr}-${timeSlot.id}"]`) as HTMLInputElement;
                                     if (input) {
                                       const currentValue = input.value;
                                       const newValue = currentValue ? `${currentValue}-${coachName}` : coachName;

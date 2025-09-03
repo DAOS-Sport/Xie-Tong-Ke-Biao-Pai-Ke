@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Schedule, Venue, TimeSlot } from "@shared/schema";
+import { getExtendedWeekDays, getExtendedWeekdayNames, getExtendedWeekEnd } from "@/utils/special-workdays";
 
 export default function CoachView() {
   const { user } = useAuth();
@@ -21,7 +22,7 @@ export default function CoachView() {
   // Remove authentication requirement for public access
 
   const weekStart = format(currentWeek, 'yyyy-MM-dd');
-  const weekEnd = format(addDays(currentWeek, 4), 'yyyy-MM-dd');
+  const weekEnd = format(getExtendedWeekEnd(currentWeek), 'yyyy-MM-dd'); // 支援特殊工作日
 
   // Get list of all coaches
   const { data: coaches } = useQuery<string[]>({
@@ -106,7 +107,7 @@ export default function CoachView() {
     );
   }
 
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
+  const weekDays = getExtendedWeekDays(currentWeek); // 支援特殊工作日
 
   // (C) 修正課表篩選邏輯
   const getSchedulesForDay = (date: Date) => {
@@ -262,7 +263,7 @@ export default function CoachView() {
                 <i className="fas fa-chevron-left text-xs sm:text-sm"></i>
               </Button>
               <span className="text-xs sm:text-sm font-medium text-center flex-1 sm:flex-none" data-testid="text-week-range">
-                {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(addDays(currentWeek, 4), 'M月d日', { locale: zhTW })}
+                {format(currentWeek, 'yyyy年M月d日', { locale: zhTW })} - {format(getExtendedWeekEnd(currentWeek), 'M月d日', { locale: zhTW })}
               </span>
               <Button
                 variant="ghost"
@@ -276,10 +277,10 @@ export default function CoachView() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${weekDays.length === 6 ? 'md:grid-cols-6' : 'md:grid-cols-5'}`}>
             {weekDays.map((day, index) => {
               const daySchedules = getSchedulesForDay(day);
-              const weekDayNames = ['星期一', '星期二', '星期三', '星期四', '星期五'];
+              const weekDayNames = getExtendedWeekdayNames(currentWeek);
               
               return (
                 <div key={index} className="text-center">

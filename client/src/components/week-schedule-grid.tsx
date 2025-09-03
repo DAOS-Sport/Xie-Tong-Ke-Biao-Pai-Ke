@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import CoachAutocomplete from "./coach-autocomplete";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
+import { getExtendedWeekDays, getExtendedWeekEnd, getExtendedWeekdayNames } from "@/utils/special-workdays";
 
 interface WeekScheduleGridProps {
   weekStart: Date;
@@ -22,8 +23,8 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
 
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
-  const weekEnd = addDays(weekStart, 4);
+  const weekDays = getExtendedWeekDays(weekStart); // 支援特殊工作日
+  const weekEnd = getExtendedWeekEnd(weekStart);
 
   const { data: venues } = useQuery<Venue[]>({
     queryKey: ['/api/venues'],
@@ -275,7 +276,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
     return <div className="text-center py-8">載入中...</div>;
   }
 
-  const weekDayNames = ['星期一', '星期二', '星期三', '星期四', '星期五'];
+  const weekDayNames = getExtendedWeekdayNames(weekStart);
 
   return (
     <div className="space-y-8">

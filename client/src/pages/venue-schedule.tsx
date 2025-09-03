@@ -10,15 +10,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
-
-// 工作日和對應的中文名稱
-const WEEKDAYS = [
-  { day: 1, name: "週一" },
-  { day: 2, name: "週二" },
-  { day: 3, name: "週三" },
-  { day: 4, name: "週四" },
-  { day: 5, name: "週五" },
-];
+import { getExtendedWeekDays, getExtendedWeekdayNames, getExtendedWeekEnd } from "@/utils/special-workdays";
 
 export default function VenueSchedule() {
   const { user } = useAuth();
@@ -42,9 +34,9 @@ export default function VenueSchedule() {
     queryKey: ["/api/time-slots"],
   });
 
-  // 獲取週課表資料
+  // 獲取週課表資料（包含特殊工作日）
   const weekStart = format(currentWeek, "yyyy-MM-dd");
-  const weekEnd = format(addDays(currentWeek, 4), "yyyy-MM-dd"); // 只到週五
+  const weekEnd = format(getExtendedWeekEnd(currentWeek), "yyyy-MM-dd"); // 支援週六補班
 
   const { data: schedules = [] } = useQuery<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>({
     queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`],
@@ -257,12 +249,12 @@ export default function VenueSchedule() {
                   <thead>
                     <tr>
                       <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>
-                      {WEEKDAYS.map((weekday) => {
-                        const date = addDays(currentWeek, weekday.day - 1);
+                      {getExtendedWeekDays(currentWeek).map((date, index) => {
+                        const weekDayNames = getExtendedWeekdayNames(currentWeek);
                         return (
-                          <th key={weekday.day} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                          <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
                             <div className="text-center">
-                              <div className="font-semibold">{weekday.name}</div>
+                              <div className="font-semibold">{weekDayNames[index]}</div>
                               <div className="text-sm text-gray-600">
                                 {format(date, "MM/dd")}
                               </div>
@@ -281,12 +273,12 @@ export default function VenueSchedule() {
                             {timeSlot.startTime}-{timeSlot.endTime}
                           </div>
                         </td>
-                        {WEEKDAYS.map((weekday) => {
-                          const date = format(addDays(currentWeek, weekday.day - 1), "yyyy-MM-dd");
-                          const daySchedules = schedulesByDateAndTime[date]?.[timeSlot.id] || [];
+                        {getExtendedWeekDays(currentWeek).map((date, index) => {
+                          const dateStr = format(date, "yyyy-MM-dd");
+                          const daySchedules = schedulesByDateAndTime[dateStr]?.[timeSlot.id] || [];
                           
                           return (
-                            <td key={`${timeSlot.id}-${weekday.day}`} className="border border-gray-300 p-1 align-top">
+                            <td key={`${timeSlot.id}-${index}`} className="border border-gray-300 p-1 align-top">
                               <div className="space-y-1 min-h-[60px]">
                                 {daySchedules.map((schedule, index) => (
                                   <div
