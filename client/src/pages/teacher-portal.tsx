@@ -31,14 +31,13 @@ export default function TeacherPortal() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 獲取教師列表（從課表中提取）
+  // 獲取教師列表（從該學校專門的教師表格取得）
   const { data: teachers = [] } = useQuery<string[]>({
     queryKey: [`/api/${schoolCode}/teachers`],
     queryFn: async () => {
-      const response = await fetch(`/api/${schoolCode}/schedules`);
-      const schedules: Schedule[] = await response.json();
-      const uniqueTeachers = Array.from(new Set(schedules.map((s: Schedule) => s.coachName))).filter(Boolean) as string[];
-      return uniqueTeachers.sort();
+      const response = await fetch(`/api/${schoolCode}/teachers`);
+      const teachersData: Teacher[] = await response.json();
+      return teachersData.map(t => t.teacherName).sort();
     },
   });
 

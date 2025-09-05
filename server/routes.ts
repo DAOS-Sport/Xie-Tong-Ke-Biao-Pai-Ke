@@ -257,8 +257,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { schoolCode } = req.params;
       const db = await getSchoolDb(schoolCode);
       
-      const teacherList = await db.select().from(teachers);
-      res.json(teacherList);
+      // 使用原生 SQL 查詢確保正確的 schema
+      const teacherList = await db.execute(sql.raw(`
+        SELECT teacher_name, subject, created_at
+        FROM school_${schoolCode}.teachers 
+        ORDER BY teacher_name
+      `));
+      
+      // 轉換為前端需要的格式
+      const formattedTeachers = teacherList.rows.map((row: any) => ({
+        teacherName: row.teacher_name,
+        subject: row.subject,
+        createdAt: row.created_at
+      }));
+      
+      console.log(`✅ Fetched ${formattedTeachers.length} teachers for school ${schoolCode}`);
+      res.json(formattedTeachers);
     } catch (error) {
       console.error('Error fetching teachers:', error);
       res.status(500).json({ message: "Failed to fetch teachers" });
