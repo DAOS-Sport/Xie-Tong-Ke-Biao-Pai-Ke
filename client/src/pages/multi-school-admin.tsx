@@ -71,7 +71,7 @@ export default function MultiSchoolAdmin() {
   });
 
   // 獲取老師回覆狀態
-  const { data: feedbacks = [] } = useQuery<TeacherFeedback[]>({
+  const { data: feedbacks = [] } = useQuery<any[]>({
     queryKey: [`/api/${selectedSchool}/feedbacks`, 'all'],
     queryFn: async () => {
       const response = await fetch(`/api/${selectedSchool}/feedbacks`);
@@ -101,7 +101,7 @@ export default function MultiSchoolAdmin() {
 
   // 獲取課程的回覆狀態
   const getFeedbackForSchedule = (scheduleId: string) => {
-    return feedbacks.find(f => f.scheduleId === scheduleId);
+    return feedbacks.find(f => f.schedule_id === scheduleId);
   };
 
   // 新增課表
@@ -361,9 +361,9 @@ export default function MultiSchoolAdmin() {
                                   </div>
                                   
                                   {/* 顯示調課資訊 */}
-                                  {feedback?.status === 'reschedule' && feedback.rescheduleDate && (
+                                  {feedback?.status === 'reschedule' && feedback.reschedule_date && (
                                     <div className="text-xs text-gray-500">
-                                      調至: {feedback.rescheduleDate} {feedback.reschedulePeriod}
+                                      調至: {feedback.reschedule_date} {feedback.reschedule_period}
                                     </div>
                                   )}
                                 </div>
