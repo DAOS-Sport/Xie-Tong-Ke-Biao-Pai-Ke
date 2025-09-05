@@ -122,13 +122,26 @@ export default function TeacherPortal() {
         console.log('📡 收到回應:', response.status, response.statusText);
         
         if (!response.ok) {
-          let detail = await response.text();
-          console.log('❌ 錯誤回應內容:', detail);
+          const contentType = response.headers.get('content-type');
+          console.log('❌ 錯誤狀態:', response.status, response.statusText);
+          console.log('❌ Content-Type:', contentType);
+          
+          let detail = '';
           try {
-            const jsonError = JSON.parse(detail);
-            detail = jsonError.message || jsonError.error || detail;
-          } catch {}
-          throw new Error(`儲存失敗：${detail}`);
+            if (contentType && contentType.includes('application/json')) {
+              const jsonError = await response.json();
+              detail = jsonError.message || jsonError.error || `HTTP ${response.status}`;
+              console.log('❌ JSON錯誤:', jsonError);
+            } else {
+              detail = await response.text();
+              console.log('❌ 文本錯誤:', detail);
+            }
+          } catch (parseError) {
+            console.log('❌ 解析錯誤失敗:', parseError);
+            detail = `HTTP ${response.status} ${response.statusText}`;
+          }
+          
+          throw new Error(`儲存失敗：${detail || '伺服器錯誤'}`);
         }
         
         const result = await response.json();
