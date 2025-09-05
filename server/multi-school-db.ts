@@ -70,6 +70,10 @@ export async function initializeSchoolSchema(schoolCode: string) {
   const schemaName = `school_${schoolCode}`;
   
   try {
+    // ✅ 關鍵修復：啟用 pgcrypto 擴展以支援 gen_random_uuid()
+    await mainDb.execute(sql.raw(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`));
+    console.log('✅ pgcrypto extension enabled');
+    
     // 創建 schema
     await mainDb.execute(sql.raw(`CREATE SCHEMA IF NOT EXISTS ${schemaName};`));
     

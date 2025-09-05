@@ -423,15 +423,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 使用原生SQL插入，處理更新或插入
-      const insertQuery = `
-        INSERT INTO school_${schoolCode}.teacher_feedbacks 
+      // ✅ 修復：使用正確的 Drizzle SQL 語法
+      const result = await db.execute(sql`
+        INSERT INTO ${sql.raw(`school_${schoolCode}.teacher_feedbacks`)}
         (schedule_id, teacher_name, status, reschedule_date, reschedule_period, comment, updated_at) 
-        VALUES ('${feedbackData.scheduleId}', '${feedbackData.teacherName}', '${feedbackData.status}', 
-                ${feedbackData.rescheduleDate ? `'${feedbackData.rescheduleDate}'` : 'NULL'}, 
-                ${feedbackData.reschedulePeriod ? `'${feedbackData.reschedulePeriod}'` : 'NULL'}, 
-                ${feedbackData.comment ? `'${feedbackData.comment.replace(/'/g, "''")}'` : 'NULL'}, 
-                NOW())
+        VALUES (
+          ${feedbackData.scheduleId},
+          ${feedbackData.teacherName},
+          ${feedbackData.status},
+          ${feedbackData.rescheduleDate || null},
+          ${feedbackData.reschedulePeriod || null},
+          ${feedbackData.comment || null},
+          NOW()
+        )
         ON CONFLICT (schedule_id, teacher_name) 
         DO UPDATE SET 
           status = EXCLUDED.status,
@@ -440,16 +444,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           comment = EXCLUDED.comment,
           updated_at = NOW()
         RETURNING *
-      `;
+      `);
       
       if (isDeployment) {
-        console.log('🔍 PRODUCTION: About to execute query');
-        console.log('🔍 PRODUCTION: Final query:', insertQuery);
-        console.log('🔍 PRODUCTION: Database object type:', typeof db);
-        console.log('🔍 PRODUCTION: Database object keys:', Object.keys(db));
+        console.log('🔍 PRODUCTION: About to execute SQL query');
+        console.log('🔍 PRODUCTION: Parameters:', {
+          scheduleId: feedbackData.scheduleId,
+          teacherName: feedbackData.teacherName,
+          status: feedbackData.status,
+          rescheduleDate: feedbackData.rescheduleDate || null,
+          reschedulePeriod: feedbackData.reschedulePeriod || null,
+          comment: feedbackData.comment || null
+        });
       }
-      
-      const result = await db.execute(sql.raw(insertQuery));
       
       if (isDeployment) {
         console.log('✅ PRODUCTION: Query executed successfully');
@@ -485,9 +492,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(500).json({ 
         message: "Failed to save feedback",
-        error: isDeployment ? (error instanceof Error ? error.message : 'Unknown error') : 'Database error',
-        timestamp: new Date().toISOString(),
-        schoolCode: req.params.schoolCode
+        error: process.env.REPLIT_DEPLOYMENT === '1'
+          ? (error instanceof Error ? error.message : String(error))
+          : 'Database error',
+        schoolCode: req.params.schoolCode,
+        when: new Date().toISOString(),
+        // 在部署環境提供更多調試信息
+        debugInfo: process.env.REPLIT_DEPLOYMENT === '1' ? {
+          errorType: error?.constructor?.name || 'Unknown',
+          hasRows: 'unknown',
+          sqlState: (error as any)?.code || 'unknown'
+        } : undefined
       });
     }
   });

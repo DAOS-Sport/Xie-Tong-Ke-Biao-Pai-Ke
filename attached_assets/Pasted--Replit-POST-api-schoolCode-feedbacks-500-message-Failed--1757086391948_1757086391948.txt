@@ -1,0 +1,110 @@
+先鎖定「為什麼在 Replit 部署（生產）時 POST /api/:schoolCode/feedbacks 會 500」這件事。你前端的錯誤訊息是我方後端回傳的 message: "Failed to save feedback"（伺服器 500 分支），代表請求有到達後端，但資料庫寫入失敗。
+
+下面是最可能的 5 個根因（依發生機率高→低排序），以及直接可貼的修補方式：
+
+✅ 最可能根因 & 立即修補
+1) 資料庫沒有啟用 pgcrypto，導致 gen_random_uuid() 失敗
+
+症狀：讀取 API 都 OK，但第一次做「寫入」到那些 id DEFAULT gen_random_uuid() 的表（例如 teacher_feedbacks、schedules）就噴 500。開發用的 DB 啟用過 extension，所以本機 OK；部屬用的是新資料庫，沒裝就會失敗。
+
+修補：在初始化時執行一次
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+
+建議放法（一次到位，包含學校 schema 建表前）：
+
+// server/multi-school-db.ts 或 routes 初始化前
+await db.execute(sql.raw(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`));
+
+
+若 extension 沒裝，所有依賴 DEFAULT gen_random_uuid() 的 insert 都會失敗；你 seedDemoData 雖會失敗但 catch 住不拋出，導致後面看似啟動成功，直到第一次實際 insert（送回覆）時才出錯，跟你現象完全吻合。
+
+2) POST /feedbacks 存在 Raw SQL 字串插值，生產資料 hit 到「特殊字元」而報錯
+
+症狀：某些老師名字／備註包含單引號或特殊字，dev 環境沒出現（資料不同），prod 第一手就中。你目前只有對 comment 做 ' 轉義，其它欄位沒處理。
+
+修補（改參數化，完全移除注入／字串拼接風險）：
+
+// server/routes.ts 內的 POST /api/:schoolCode/feedbacks
+const q = sql`
+  INSERT INTO school_${sql.raw(schoolCode)}.teacher_feedbacks 
+    (schedule_id, teacher_name, status, reschedule_date, reschedule_period, comment, updated_at)
+  VALUES (
+    ${feedbackData.scheduleId},
+    ${feedbackData.teacherName},
+    ${feedbackData.status},
+    ${feedbackData.rescheduleDate ?? null},
+    ${feedbackData.reschedulePeriod ?? null},
+    ${feedbackData.comment ?? null},
+    NOW()
+  )
+  ON CONFLICT (schedule_id, teacher_name) DO UPDATE SET
+    status = EXCLUDED.status,
+    reschedule_date = EXCLUDED.reschedule_date,
+    reschedule_period = EXCLUDED.reschedule_period,
+    comment = EXCLUDED.comment,
+    updated_at = NOW()
+  RETURNING *;
+`;
+const result = await db.execute(q);
+
+3) search_path/多 Pool 設計在部署環境碰到 session 行為差異
+
+你對每個學校建立一個 Pool，然後 SET search_path TO school_${code}, public;。一般 OK，但在 serverless 連線重用的情況下，若哪裡漏掉（或運維重啟），偶發會打到錯 schema → 報「relation … does not exist」。
+
+兩個可選修補：
+
+簡單保守（維持你現狀）：
+
+確保 getSchoolDb 只建立一次並重用（你已做 schemaPools 緩存）。
+
+在每次請求都再執行一次保險的 SET LOCAL search_path … 於交易內（最穩，但程式多）。
+
+最佳實務（推薦）：完全不要依賴 search_path，每次都 fully-qualified：
+
+await db.execute(sql`
+  INSERT INTO school_${sql.raw(schoolCode)}.teacher_feedbacks (...)
+`);
+
+
+（你目前其實已在多數查詢這樣做了，保持一致即可。）
+
+4) 學校 schema 的表結構與 drizzle schema 宣告不一致
+
+school_${code}.schedules 的建表 SQL 沒宣告 FK，但 drizzle schema 有 references(() => timeSlots.id) 等，易造成心理落差；最直接影響是若你未來改成 join，要注意 join 的 schema 要寫 public.time_slots 或 school_${code}.time_slots。
+
+這不直接造成 500，但在 prod 會用到不同資料或查詢時，容易讓人誤判。
+
+建議：要嘛把學校表的 FK 實體加上；要嘛把 drizzle 的關聯移除，改用 raw SQL 指名 schema。長期建議「venues/time_slots 共用 public」，學校端只建 schedules/teachers/teacher_feedbacks（避免兩份同名表不同步）。
+
+5) pg WebSocket / Replit Deployments 出站限制（較少見）
+
+你用 @neondatabase/serverless + ws。如果 Replit 的部署環境對 WebSocket 出站有限制，通常讀也會失敗，而你 GET 都成功，所以不是首因。若仍擔心，可嘗試：
+
+import { neonConfig } from '@neondatabase/serverless';
+neonConfig.webSocketConstructor = ws;
+// 也可開啟 fetch-based 連線快取
+// neonConfig.fetchConnectionCache = true;
+
+
+並確認 DATABASE_URL 在「Deployments 環境變數」也有設定（不是只有 Repl 開發環境）。
+
+必加的偵錯訊息（方便你馬上定位）
+
+把 POST /feedbacks 的 catch 區塊再多回傳 error 內容（生產才顯示）：
+
+} catch (error) {
+  console.error('💥 ERROR: Failed to save teacher feedback:', error);
+  res.status(500).json({ 
+    message: "Failed to save feedback",
+    error: process.env.REPLIT_DEPLOYMENT === '1'
+      ? (error instanceof Error ? error.message : String(error))
+      : 'Database error',
+    schoolCode: req.params.schoolCode,
+    when: new Date().toISOString(),
+  });
+}
+
+
+前端 toast 會顯示更具體的 DB 錯誤（例如 function gen_random_uuid() does not exist、relation school_demo.teacher_feedbacks does not exist、或 syntax error at or near ...），你就能立即對應上面 1~3 條的補丁。
