@@ -36,21 +36,21 @@ export async function getSchoolDb(schoolCode: string) {
     await db.execute(sql.raw(`SET search_path TO school_${schoolCode}, public;`));
     console.log(`✅ Set search_path to school_${schoolCode}`);
     
-    // 在部署環境中額外確保連接
-    const isDeployment = process.env.NODE_ENV === 'production' || 
-                        process.env.REPLIT_DEPLOYMENT === '1' ||
-                        process.env.REPL_SLUG !== undefined;
+    // 在部署環境中額外確保連接 - 只有 REPLIT_DEPLOYMENT=1 才是真正的部署
+    const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
     if (isDeployment) {
       console.log(`🚀 Running in deployment mode for school_${schoolCode}`);
+    } else {
+      console.log(`🛠️ Running in development mode for school_${schoolCode}`);
     }
   } catch (error) {
     console.error(`❌ Failed to set search_path for school_${schoolCode}:`, error);
     // 在部署環境出錯時提供更詳細的日誌
-    const isDeployment = process.env.NODE_ENV === 'production' || 
-                        process.env.REPLIT_DEPLOYMENT === '1' ||
-                        process.env.REPL_SLUG !== undefined;
+    const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
     if (isDeployment) {
       console.error('🚨 Deployment environment error:', error);
+    } else {
+      console.error('🛠️ Development environment error:', error);
     }
   }
   
