@@ -17,14 +17,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeTimeSlots();
   
   // 強制初始化多學校系統 - 確保部署環境與開發環境一致
+  const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
+  const environment = isDeployment ? '🚀 PRODUCTION' : '🛠️ DEVELOPMENT';
+  
   try {
-    console.log('🔧 Initializing multi-school system...');
+    console.log(`${environment}: Initializing multi-school system...`);
+    
+    // 檢查資料庫連接
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL not configured - cannot initialize multi-school system');
+    }
+    
+    console.log(`${environment}: Creating schemas...`);
     await initializeSchoolSchema('demo');
+    console.log(`${environment}: ✅ school_demo initialized`);
+    
     await initializeSchoolSchema('school1');
+    console.log(`${environment}: ✅ school_school1 initialized`);
+    
     await initializeSchoolSchema('school2');
-    console.log('✅ Multi-school system initialized successfully');
+    console.log(`${environment}: ✅ school_school2 initialized`);
+    
+    console.log(`${environment}: ✅ Multi-school system initialized successfully`);
   } catch (error) {
-    console.error('⚠️ Multi-school initialization error (continuing anyway):', error);
+    console.error(`${environment}: ❌ Multi-school initialization FAILED:`, error);
+    
+    if (isDeployment) {
+      console.error('🚨 CRITICAL: Production deployment failed to initialize database!');
+      console.error('🔧 Please check:');
+      console.error('   1. DATABASE_URL environment variable is set');
+      console.error('   2. Database is accessible');
+      console.error('   3. Database has necessary permissions');
+      throw error; // 在生產環境中，初始化失敗應該中斷啟動
+    } else {
+      console.error('⚠️ Development initialization error (continuing anyway):', error);
+    }
   }
 
   // Auth routes
