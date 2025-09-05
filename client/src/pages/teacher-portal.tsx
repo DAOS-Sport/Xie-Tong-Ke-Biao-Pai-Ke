@@ -101,20 +101,44 @@ export default function TeacherPortal() {
       reschedulePeriod?: string;
       comment?: string;
     }) => {
-      const response = await fetch(`/api/${schoolCode}/feedbacks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to submit feedback');
-      return response.json();
+      // 設置10秒超時，適合生產環境
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        const response = await fetch(`/api/${schoolCode}/feedbacks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`儲存失敗: ${response.status} - ${errorText}`);
+        }
+        return response.json();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('請求超時，請檢查網路連接');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/${schoolCode}/feedbacks`] });
       toast({ title: "✅ 已儲存", description: "回覆已成功送出" });
     },
-    onError: () => {
-      toast({ title: "❌ 儲存失敗", description: "請稍後再試", variant: "destructive" });
+    onError: (error) => {
+      console.error('提交錯誤:', error);
+      const message = error instanceof Error ? error.message : '請稍後再試';
+      toast({ 
+        title: "❌ 儲存失敗", 
+        description: message, 
+        variant: "destructive" 
+      });
     },
   });
 
