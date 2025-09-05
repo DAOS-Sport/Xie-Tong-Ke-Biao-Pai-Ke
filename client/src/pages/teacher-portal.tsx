@@ -80,6 +80,10 @@ export default function TeacherPortal() {
   // 獲取場館資料
   const { data: venues = [] } = useQuery<Venue[]>({
     queryKey: [`/api/${schoolCode}/venues`],
+    queryFn: async () => {
+      const response = await fetch(`/api/${schoolCode}/venues`);
+      return response.json();
+    },
   });
 
   // 獲取所有回覆狀態
@@ -115,8 +119,12 @@ export default function TeacherPortal() {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`儲存失敗: ${response.status} - ${errorText}`);
+          let detail = await response.text();
+          try {
+            const jsonError = JSON.parse(detail);
+            detail = jsonError.message || detail;
+          } catch {}
+          throw new Error(`儲存失敗：${detail}`);
         }
         return response.json();
       } catch (error) {
@@ -149,7 +157,8 @@ export default function TeacherPortal() {
       console.warn('allFeedbacks is not an array:', allFeedbacks);
       return undefined;
     }
-    return allFeedbacks.find(f => f.schedule_id === scheduleId);
+    // 支援 camelCase 和 snake_case
+    return allFeedbacks.find(f => f.schedule_id === scheduleId || f.scheduleId === scheduleId);
   };
 
   // 生成週內日期（週一到週五）

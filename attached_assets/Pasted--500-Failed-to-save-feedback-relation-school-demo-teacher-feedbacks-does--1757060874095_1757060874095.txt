@@ -1,0 +1,110 @@
+我看到了關鍵錯誤訊息（你截圖右下角的紅框）：
+
+500：Failed to save feedback — relation "school_demo.teacher_feedbacks" does not exist
+schoolCode:"demo"
+
+問題根因
+
+後端把每間學校放在各自的 Postgres schema（school_${schoolCode}）。你現在用的是 schoolCode = 'demo'，但資料庫裡沒有建立 school_demo.teacher_feedbacks 這張表，所以 POST /api/demo/feedbacks 寫入就直接 500。
+
+註：前端傳的 payload 已送到正確端點，才會噴這個錯。不是前端 fetch／timeout 的問題。
+
+你需要做的事
+1) 建立 schema 與資料表
+
+用 SQL（psql / migration 工具都行）先把 schema 跟 table 建起來：
+
+-- 建立 schema（若不存在）
+CREATE SCHEMA IF NOT EXISTS school_demo;
+
+-- 建立教師回覆表
+CREATE TABLE IF NOT EXISTS school_demo.teacher_feedbacks (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_id       TEXT NOT NULL,
+  teacher_name      TEXT NOT NULL,
+  status            TEXT NOT NULL CHECK (status IN ('need_coop','no_coop','reschedule')),
+  reschedule_date   DATE,
+  reschedule_period TEXT,
+  comment           TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 查詢用索引（可選）
+CREATE INDEX IF NOT EXISTS idx_teacher_feedbacks_schedule_id
+  ON school_demo.teacher_feedbacks (schedule_id);
+
+
+如果你的 DB 沒有 gen_random_uuid()，可改用 uuid_generate_v4()（需 uuid-ossp extension），或在應用程式端產生 UUID。
+
+若你用 ORM（例如 Drizzle/Prisma）
+
+Drizzle：請加上對應 schema 名稱的 table 定義（tableName: school_${schoolCode}.teacher_feedbacks），並跑 migration。
+
+Prisma：目前 Prisma 對 schema 的支援需要用 search_path 或多 datasource 拆分；若你是以 raw SQL 建表，走上面的 SQL 最快。
+
+2) 確保後端會在「沒有表」時自動初始化（可選、但很實用）
+
+在 API 啟動時做個「確保 schema/table 存在」的流程，避免日後換 schoolCode 又炸：
+
+// 伪代码/Node
+async function ensureSchoolTables(pool, schoolCode: string) {
+  const schema = `school_${schoolCode}`;
+  await pool.query(`CREATE SCHEMA IF NOT EXISTS ${schema};`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ${schema}.teacher_feedbacks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      schedule_id TEXT NOT NULL,
+      teacher_name TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('need_coop','no_coop','reschedule')),
+      reschedule_date DATE,
+      reschedule_period TEXT,
+      comment TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+}
+
+前端程式的幾個小地方（非致命，但可以順手修）
+
+venues 的 useQuery 沒有 queryFn
+你若沒有在 QueryClient 設定全域 defaultQueryFn，這行會報錯。建議補上：
+
+const { data: venues = [] } = useQuery<Venue[]>({
+  queryKey: [`/api/${schoolCode}/venues`],
+  queryFn: async () => {
+    const res = await fetch(`/api/${schoolCode}/venues`);
+    return res.json();
+  },
+});
+
+
+getFeedbackForSchedule 用 f.schedule_id
+你 POST 時送的是 scheduleId（camelCase），後端大多會轉 snake_case 存 DB、回傳也可能是 snake_case。你現在用 f.schedule_id 去比對，只要後端回傳是 snake_case，就沒問題；若後端回傳 camelCase，就會找不到。
+保險作法：
+
+return allFeedbacks.find(
+  (f) => f.schedule_id === scheduleId || f.scheduleId === scheduleId
+);
+
+
+錯誤訊息顯示可以更友善
+你現在 toast 會顯示整段 raw body。可以嘗試解析 JSON 後把 message 抽出來：
+
+if (!response.ok) {
+  let detail = await response.text();
+  try {
+    const j = JSON.parse(detail);
+    detail = j.message || detail;
+  } catch {}
+  throw new Error(`儲存失敗：${detail}`);
+}
+
+快速驗證清單
+
+ 跑完上面的 SQL 建表。
+
+ POST /api/demo/feedbacks 再測一次（任選狀態送出）。應該會 200/201，並回傳新 feedback。
+
+ GET /api/demo/feedbacks 能看到剛剛新增的資料。表格上的該課程方塊會顯示對應的 Badge。
+
+ 如果你將 schoolCode 改成其他值（例如 xinbei），記得也要有 school_xinbei.teacher_feedbacks 表，或在啟動時自動建立。
