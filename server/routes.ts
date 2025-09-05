@@ -358,10 +358,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/:schoolCode/feedbacks', validateSchoolCode, async (req, res) => {
     try {
       const { schoolCode } = req.params;
+      
+      // 部署環境額外日誌
+      if (process.env.REPLIT_DEPLOYMENT) {
+        console.log('🚀 Deployment: Saving feedback for school:', schoolCode);
+        console.log('🚀 Deployment: Request body:', req.body);
+      }
+      
       const db = await getSchoolDb(schoolCode);
       
       const validation = insertTeacherFeedbackSchema.safeParse(req.body);
       if (!validation.success) {
+        console.error('❌ Validation failed:', validation.error.issues);
         return res.status(400).json({ 
           message: "Invalid feedback data", 
           errors: validation.error.issues 
@@ -400,9 +408,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql.raw(insertQuery));
       
+      if (process.env.REPLIT_DEPLOYMENT) {
+        console.log('✅ Deployment: Feedback saved successfully');
+      }
+      
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error saving teacher feedback:', error);
+      if (process.env.REPLIT_DEPLOYMENT) {
+        console.error('🚨 Deployment: Detailed error:', error);
+      }
       res.status(500).json({ message: "Failed to save feedback" });
     }
   });

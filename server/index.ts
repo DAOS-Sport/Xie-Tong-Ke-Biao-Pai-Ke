@@ -37,6 +37,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // 部署環境日誌
+  if (process.env.REPLIT_DEPLOYMENT) {
+    console.log('🚀 Running in Replit deployment mode');
+    console.log('🔗 Database URL:', process.env.DATABASE_URL ? 'Connected' : 'Missing');
+  } else {
+    console.log('🛠️ Running in development mode');
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
