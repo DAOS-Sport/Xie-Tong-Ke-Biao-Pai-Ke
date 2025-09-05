@@ -356,13 +356,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 提交或更新教師回覆
   app.post('/api/:schoolCode/feedbacks', validateSchoolCode, async (req, res) => {
+    // 部署環境額外日誌  
+    const isDeployment = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
+    
     try {
       const { schoolCode } = req.params;
       
-      // 部署環境額外日誌
-      if (process.env.REPLIT_DEPLOYMENT) {
+      if (isDeployment) {
         console.log('🚀 Deployment: Saving feedback for school:', schoolCode);
         console.log('🚀 Deployment: Request body:', req.body);
+        console.log('🚀 Deployment: DATABASE_URL exists:', !!process.env.DATABASE_URL);
       }
       
       const db = await getSchoolDb(schoolCode);
@@ -408,15 +411,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql.raw(insertQuery));
       
-      if (process.env.REPLIT_DEPLOYMENT) {
+      if (isDeployment) {
         console.log('✅ Deployment: Feedback saved successfully');
       }
       
       res.json(result.rows[0]);
     } catch (error) {
       console.error('Error saving teacher feedback:', error);
-      if (process.env.REPLIT_DEPLOYMENT) {
+      if (isDeployment) {
         console.error('🚨 Deployment: Detailed error:', error);
+        console.error('🚨 Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
       }
       res.status(500).json({ message: "Failed to save feedback" });
     }
