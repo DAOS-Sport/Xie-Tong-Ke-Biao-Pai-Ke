@@ -356,8 +356,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 提交或更新教師回覆
   app.post('/api/:schoolCode/feedbacks', validateSchoolCode, async (req, res) => {
-    // 部署環境額外日誌  
-    const isDeployment = process.env.REPLIT_DEPLOYMENT === '1' || process.env.NODE_ENV === 'production';
+    // 部署環境檢測 - 使用更可靠的方法
+    const isDeployment = process.env.NODE_ENV === 'production' || 
+                        process.env.REPLIT_DEPLOYMENT === '1' ||
+                        process.env.REPL_SLUG !== undefined;
     
     try {
       const { schoolCode } = req.params;
@@ -499,13 +501,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 部署環境診斷端點
   app.get('/api/deployment-test', async (req, res) => {
     try {
-      const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
+      const isDeployment = process.env.NODE_ENV === 'production' || 
+                          process.env.REPLIT_DEPLOYMENT === '1' ||
+                          process.env.REPL_SLUG !== undefined;
       const hasDbUrl = !!process.env.DATABASE_URL;
       
       console.log('🔍 Deployment Diagnostic:');
       console.log('- REPLIT_DEPLOYMENT:', process.env.REPLIT_DEPLOYMENT);
       console.log('- NODE_ENV:', process.env.NODE_ENV);
+      console.log('- REPL_SLUG:', process.env.REPL_SLUG);
       console.log('- Has DATABASE_URL:', hasDbUrl);
+      console.log('- Final isDeployment:', isDeployment);
       
       // 測試資料庫連接
       let dbTestResult = 'failed';
@@ -519,6 +525,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         deployment: isDeployment,
+        replit_deployment: process.env.REPLIT_DEPLOYMENT,
+        node_env: process.env.NODE_ENV,
+        repl_slug: process.env.REPL_SLUG,
         database_url_exists: hasDbUrl,
         database_connection: dbTestResult,
         timestamp: new Date().toISOString(),
