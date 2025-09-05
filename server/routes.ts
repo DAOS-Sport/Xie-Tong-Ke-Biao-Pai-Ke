@@ -232,6 +232,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 匯入課表資料的端點
+  app.post('/api/admin/import-schedule/:schoolCode', async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      if (!isValidSchoolCode(schoolCode)) {
+        return res.status(400).json({ message: "Invalid school code" });
+      }
+      
+      // 動態匯入並執行
+      const { importScheduleData } = await import('./import-schedule');
+      const count = await importScheduleData();
+      
+      res.json({ message: `Successfully imported ${count} schedule records`, count });
+    } catch (error) {
+      console.error('Error importing schedule:', error);
+      res.status(500).json({ message: "Failed to import schedule data" });
+    }
+  });
+
   // 獲取學校的教師列表
   app.get('/api/:schoolCode/teachers', validateSchoolCode, async (req, res) => {
     try {
