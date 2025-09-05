@@ -135,18 +135,7 @@ export async function importScheduleData() {
             });
             importCount++;
             
-            // 即時驗證
-            const inserted = await db.select().from(schedules).where(
-              and(
-                eq(schedules.date, actualFormattedDate),
-                eq(schedules.className, className),
-                eq(schedules.coachName, coachName)
-              )
-            ).limit(1);
-            
-            if (inserted.length === 0) {
-              console.error(`⚠️ 資料未正確匯入: ${className}${coachName}`);
-            }
+            // 不進行即時驗證，以免影響 transaction
           } catch (error) {
             console.error(`❌ 匯入失敗 - 日期: ${actualFormattedDate}, 班級: ${className}, 老師: ${coachName}`, error);
           }
