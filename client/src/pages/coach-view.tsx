@@ -48,43 +48,12 @@ export default function CoachView() {
     enabled: !!selectedCoach,
   });
 
-  // (A) 課表字串解析工具函式
-  const splitScheduleRow = (row: string): string[] => {
-    const parts = row.split("-");
-    if (parts.length < 2) return [row]; 
+  // 移除不再需要的課表字串解析函式，因為教練信息直接從 coachName 欄位獲取
 
-    const classCode = parts[0];           // 鷺江601
-    const coaches = parts.slice(1);       // ["潘思蒓", "陳沛衡"]
-
-    return coaches.map(c => `${classCode}-${c}`);
-  };
-
-  // 從課表名稱中提取教練名字
-  const extractCoachName = (scheduleRow: string): string => {
-    const parts = scheduleRow.split("-");
-    if (parts.length === 2) {
-      return parts[1];  // 回傳教練名
-    }
-    return scheduleRow; // 如果格式不符，回傳原始字串
-  };
-
-  // (B) 自動補齊教練名單
+  // 直接使用後端返回的教練名單，不從課程名稱中提取
   const derivedCoaches = useMemo(() => {
-    const set = new Set(coaches ?? []); // 先加主檔
-
-    (schedules ?? []).forEach(s => {
-      // 解析課表名稱，提取所有教練
-      const rows = splitScheduleRow(s.className || '');
-      rows.forEach(row => {
-        const coachName = extractCoachName(row);
-        if (coachName && coachName !== row) { // 確保有成功提取到教練名
-          set.add(coachName);
-        }
-      });
-    });
-
-    return Array.from(set).sort(); // 排序方便查找
-  }, [coaches, schedules]);
+    return coaches ? [...coaches].sort() : [];
+  }, [coaches]);
 
   // Set default coach when data loads (使用完整的教練列表)
   useEffect(() => {
@@ -109,19 +78,23 @@ export default function CoachView() {
 
   const weekDays = getExtendedWeekDays(currentWeek); // 支援特殊工作日
 
-  // (C) 修正課表篩選邏輯
+  // 課表篩選邏輯：直接使用 coachName 欄位比對
   const getSchedulesForDay = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const todays = schedules?.filter(s => s.date === dateStr) || [];
 
     if (!selectedCoach) return todays;
 
+    // 直接使用 coachName 欄位進行比對，支援多教練格式
     return todays.filter(s => {
-      const rows = splitScheduleRow(s.className || '');
-      return rows.some(row => {
-        const coachName = extractCoachName(row);
-        return coachName === selectedCoach;
-      });
+      if (!s.coachName) return false;
+      
+      // 完全匹配
+      if (s.coachName === selectedCoach) return true;
+      
+      // 多教練格式匹配（如：陳柏榮-張哲瑋）
+      const coaches = s.coachName.split('-').map(c => c.trim());
+      return coaches.includes(selectedCoach);
     });
   };
 
