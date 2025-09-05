@@ -45,6 +45,7 @@ function Router() {
       <Route path="/find-coach" component={FindCoach} />
       
       {/* Multi-school teacher portal */}
+      <Route path="/teacher-portal" component={TeacherPortal} />
       <Route path="/teacher/:schoolCode" component={TeacherPortal} />
       
       {/* Multi-school admin */}
