@@ -387,6 +387,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { schoolCode } = req.params;
       
+      // 檢查資料庫連接
+      if (!process.env.DATABASE_URL) {
+        console.error('❌ 資料庫未配置');
+        return res.status(503).json({
+          message: "Database not configured",
+          error: "Please set up DATABASE_URL environment variable",
+          isDeployment,
+          setupRequired: true
+        });
+      }
+      
       if (isDeployment) {
         console.log('🚀 PRODUCTION: Saving feedback for school:', schoolCode);
         console.log('🚀 PRODUCTION: Request body:', JSON.stringify(req.body, null, 2));
@@ -394,7 +405,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('🚀 PRODUCTION: Current timestamp:', new Date().toISOString());
       }
       
-      const db = await getSchoolDb(schoolCode);
+      let db;
+      try {
+        db = await getSchoolDb(schoolCode);
+      } catch (dbError) {
+        console.error('❌ 資料庫連接失敗:', dbError);
+        return res.status(503).json({
+          message: "Database connection failed",
+          error: isDeployment 
+            ? "請為部署環境配置 DATABASE_URL。部署環境使用獨立資料庫，與開發環境不同。" 
+            : "Database connection error",
+          isDeployment,
+          setupRequired: true,
+          when: new Date().toISOString()
+        });
+      }
       
       // 額外驗證 schedule ID 格式（支援 varchar UUID）
       if (!req.body.scheduleId || req.body.scheduleId.length < 10) {

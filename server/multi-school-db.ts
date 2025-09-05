@@ -24,6 +24,11 @@ export async function getSchoolDb(schoolCode: string) {
     return schemaPools.get(cacheKey)!;
   }
 
+  // 檢查資料庫連接是否可用
+  if (!process.env.DATABASE_URL) {
+    throw new Error(`❌ DATABASE_URL not configured. Please set up database for school: ${schoolCode}`);
+  }
+
   // 創建新的連線池
   const pool = new Pool({ 
     connectionString: process.env.DATABASE_URL
@@ -33,10 +38,13 @@ export async function getSchoolDb(schoolCode: string) {
   
   // 設定 search_path 到指定的 schema
   try {
+    // 先檢查 schema 是否存在，如果不存在則自動創建
+    await ensureSchemaExists(db, schoolCode);
+    
     await db.execute(sql.raw(`SET search_path TO school_${schoolCode}, public;`));
     console.log(`✅ Set search_path to school_${schoolCode}`);
     
-    // 在部署環境中額外確保連接 - 只有 REPLIT_DEPLOYMENT=1 才是真正的部署
+    // 在部署環境中額外確保連接
     const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
     if (isDeployment) {
       console.log(`🚀 Running in deployment mode for school_${schoolCode}`);
@@ -45,18 +53,49 @@ export async function getSchoolDb(schoolCode: string) {
     }
   } catch (error) {
     console.error(`❌ Failed to set search_path for school_${schoolCode}:`, error);
-    // 在部署環境出錯時提供更詳細的日誌
+    
+    // 提供更詳細的錯誤信息
     const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
     if (isDeployment) {
-      console.error('🚨 Deployment environment error:', error);
-    } else {
-      console.error('🛠️ Development environment error:', error);
+      console.error('🚨 部署環境資料庫錯誤 - 請檢查 DATABASE_URL 環境變數是否正確設置');
+      console.error('💡 提示：部署環境需要獨立的資料庫配置');
     }
+    
+    throw new Error(`Database connection failed for school ${schoolCode}. Please check database configuration.`);
   }
   
   schemaPools.set(cacheKey, db);
   
   return db;
+}
+
+/**
+ * 確保學校 schema 存在，如果不存在則自動創建
+ */
+async function ensureSchemaExists(db: any, schoolCode: string) {
+  try {
+    // 檢查 schema 是否存在
+    const result = await db.execute(sql.raw(`
+      SELECT schema_name FROM information_schema.schemata 
+      WHERE schema_name = 'school_${schoolCode}'
+    `));
+    
+    if (result.rows.length === 0) {
+      console.log(`🔧 Schema school_${schoolCode} 不存在，自動創建中...`);
+      await initializeSchoolSchema(schoolCode);
+    } else {
+      console.log(`✅ Schema school_${schoolCode} 已存在`);
+    }
+  } catch (error) {
+    console.log(`⚠️ Schema 檢查失敗，嘗試創建: ${error}`);
+    // 如果檢查失敗，嘗試創建 schema
+    try {
+      await initializeSchoolSchema(schoolCode);
+    } catch (initError) {
+      console.error(`❌ 無法創建 schema school_${schoolCode}:`, initError);
+      throw initError;
+    }
+  }
 }
 
 /**
