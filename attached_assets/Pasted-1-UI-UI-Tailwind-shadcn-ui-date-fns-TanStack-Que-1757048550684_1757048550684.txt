@@ -1,0 +1,165 @@
+1) 架構總覽（保持你現有技術）
+
+前端（老師共用的前台頁）
+
+UI：你現有的 UI 套件（Tailwind/shadcn/ui）、日期處理（date-fns）。
+
+資料存取：TanStack Query 打 API。
+
+邏輯：
+
+下拉選單選「老師姓名」。
+
+週切換、條件篩選（班級/節次/狀態）。
+
+三選一（需要協同/不需要協同/需要調課→日期+節次）。
+
+無帳號登入：入口需帶「學校識別資訊」（見第 3 點），只顯示該校資料。
+
+後端（你現有的 Node/Express）
+
+ORM：Drizzle（你已用）。
+
+儲存：Postgres（Neon）。
+
+新增一組 API：讀課表、寫老師回覆、查回覆彙整。
+
+多資料庫路由：依「學校識別」動態連到對應 DB/Schema（見第 2 點）。
+
+2)「資料庫不要混在一起」的三個方案
+
+依你維運習慣與預算擇一即可（越上面隔離越強）。
+
+A. 每校一個獨立 Database（同一個 Neon 專案下多 DB）
+
+優點：資料完全物理隔離，備份/匯出/刪除最乾淨。
+
+缺點：連線管理較多，但 Neon 建分支或多 DB 都很輕鬆。
+
+技術要點：
+
+「學校識別碼」→ 後端查表取得對應 DATABASE_URL → 動態建立/重用連線池。
+
+可在你後台有個「校務清單」表，存學校代碼與 DB 連線資訊。
+
+B. 每校一個 Schema（同 DB，不同 schema）
+
+優點：連線單純，維護容易；資料仍然邏輯隔離。
+
+缺點：同機資源共用，最壞情況會互相影響。
+
+技術要點：
+
+「學校識別碼」→ 決定要使用的 schema → Drizzle 設定 search_path。
+
+C. 同表加入 tenant_id（不建議，因你說不要混）
+
+你已明確不要混在一起，可以略過這個選項。
+
+建議：A 或 B。如果學校數量不多、要強隔離，選 A；如果偏向節省維運，選 B。
+
+3) 學校識別與入口設計（不做身分管理）
+
+學校入口 URL（例：/school/{schoolCode}/teacher）
+
+前端所有請求都會帶上 schoolCode。
+
+後端依 schoolCode 決定要切到哪一個 DB/Schema。
+
+老師無登入：頁面載入後先選「老師姓名」，再載入該老師當週課表。
+
+簡易防護（可選）：
+
+在該校頁面加「學校 PIN」欄位（4 碼），寫在後端的 schools 表做檢核。
+
+或把 schoolCode 設計成難猜（如 8–10 碼隨機字串）。
+
+4) 資料表（各校獨立的資料結構）
+
+下列表會建在「每所學校自己的 DB/Schema」。
+
+schedules（你已有）
+
+id、date、period（第幾節）、class_name、teacher_name、subject、room…
+
+teacher_feedbacks（老師勾選的紀錄，不直接改課表）
+
+id、schedule_id、teacher_name
+
+status：need_coop / no_coop / reschedule
+
+reschedule_date、reschedule_period
+
+comment（可選）
+
+updated_at
+
+索引：(teacher_name, date)、(schedule_id)
+
+teachers（選單來源）
+
+id、teacher_name、（可選：科別/年級群組）
+
+你後台可以有一個「跨校的控制 DB」（只你看）：schools 表（school_code、db_url 或 schema_name、pin、display_name…），用來對應學校與資料來源。
+
+5) API 設計（抽象合約，無須程式碼）
+
+所有路徑都隱含 schoolCode，後端先據此「切 DB/Schema」，再執行查詢/寫入。
+
+讀取老師清單：GET /api/{schoolCode}/teachers
+
+讀取某老師的週課表：GET /api/{schoolCode}/schedules?teacher=…&weekStart=…&weekEnd=…
+
+讀取某老師的回覆：GET /api/{schoolCode}/feedbacks?teacher=…&range=…
+
+提交/更新回覆：POST /api/{schoolCode}/feedbacks（body 含 schedule_id、status、調課欄位…）
+
+後台彙整（你用）：
+
+GET /api/{schoolCode}/dashboard?filters=…（狀態統計/未填清單/調課清單）
+
+一致性規則：
+
+同一位老師對同一堂課只保留「最後一次回覆」；保留歷史可另開 feedback_audits。
+
+選了 reschedule 必填 reschedule_date + reschedule_period。
+
+後端做即時衝突偵測（撞到同老師另一堂課 → 回傳警示碼給前端提示，但仍可送出，留待你後台審核）。
+
+6) 老師前台的互動 & 體驗（技術點）
+
+周曆顯示：沿用你現有週曆 + 特殊補班週六規則。
+
+篩選：前端做 UI 篩選，API 支援伺服器端篩選（避免取太大）。
+
+狀態標示：格子角標色（綠=不協同、藍=需要協同、橘=調課）。
+
+即時儲存：提交後以 Toast 告知「已儲存」，並在表格做 optimistic update。
+
+可回看/修改：前端載入時一起拉該週回覆，把 UI 銜接為已選狀態。
+
+7) 運維與安全（重點很精簡）
+
+DB/Schema 選擇器：後端要做連線池快取（同一 schoolCode 重用連線）。
+
+速率限制：每 schoolCode/IP 做基本 Rate Limit，避免機器人灌寫。
+
+資料導出：每校 DB/Schema 可以獨立備份與匯出（符合你「不要混」）。
+
+日誌：寫入回覆時記 ip、ua、teacher_name、schedule_id；後台可追蹤異常操作。
+
+健康檢查：後端加 /health 供監控；Neon/PG 用最小權限連線帳號。
+
+8) 導入順序（快速但安全）
+
+在「跨校控制 DB」登記 schoolCode → DB/Schema 對應。
+
+建好「老師前台單一頁」→ 先放「選老師 + 週課表顯示」，不開勾選。
+
+開啟「勾選功能」→ 只收 need_coop/no_coop。
+
+再開「需要調課」+ 日期/節次 + 後端衝突提示。
+
+你後台加一頁「回覆彙整」，先看資料，不自動改課表。
+
+觀察一週後再決定是否要加「調課審核 → 自動產生異動草案」。
