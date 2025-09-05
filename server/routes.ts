@@ -409,13 +409,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING *
       `;
       
+      if (isDeployment) {
+        console.log('🔍 Deployment: About to execute query');
+        console.log('🔍 Deployment: Final query:', insertQuery);
+      }
+      
       const result = await db.execute(sql.raw(insertQuery));
       
       if (isDeployment) {
-        console.log('✅ Deployment: Feedback saved successfully');
+        console.log('✅ Deployment: Query executed successfully');
+        console.log('✅ Deployment: Result object:', result);
+        console.log('✅ Deployment: Result rows:', result.rows);
+        console.log('✅ Deployment: Rows length:', result.rows?.length);
       }
       
-      res.json(result.rows[0]);
+      if (!result.rows || result.rows.length === 0) {
+        console.error('❌ No rows returned from database');
+        throw new Error('Database insert failed - no rows returned');
+      }
+      
+      const savedFeedback = result.rows[0];
+      if (isDeployment) {
+        console.log('✅ Deployment: Returning feedback:', savedFeedback);
+      }
+      
+      res.json(savedFeedback);
     } catch (error) {
       console.error('Error saving teacher feedback:', error);
       if (isDeployment) {
@@ -478,5 +496,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  // 部署環境診斷端點
+  app.get('/api/deployment-test', async (req, res) => {
+    try {
+      const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
+      const hasDbUrl = !!process.env.DATABASE_URL;
+      
+      console.log('🔍 Deployment Diagnostic:');
+      console.log('- REPLIT_DEPLOYMENT:', process.env.REPLIT_DEPLOYMENT);
+      console.log('- NODE_ENV:', process.env.NODE_ENV);
+      console.log('- Has DATABASE_URL:', hasDbUrl);
+      
+      // 測試資料庫連接
+      let dbTestResult = 'failed';
+      try {
+        const db = await getSchoolDb('demo');
+        const testQuery = await db.execute(sql.raw('SELECT 1 as test'));
+        dbTestResult = testQuery.rows.length > 0 ? 'success' : 'failed';
+      } catch (dbError) {
+        console.error('Database test error:', dbError);
+      }
+      
+      res.json({
+        deployment: isDeployment,
+        database_url_exists: hasDbUrl,
+        database_connection: dbTestResult,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } catch (error) {
+      console.error('Deployment test error:', error);
+      res.status(500).json({ error: 'Test failed' });
+    }
+  });
+
   return httpServer;
 }
