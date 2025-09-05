@@ -83,7 +83,7 @@ export default function TeacherPortal() {
   });
 
   // 獲取所有回覆狀態
-  const { data: allFeedbacks = [] } = useQuery<TeacherFeedback[]>({
+  const { data: allFeedbacks = [] } = useQuery<any[]>({
     queryKey: [`/api/${schoolCode}/feedbacks`, 'all'],
     queryFn: async () => {
       const response = await fetch(`/api/${schoolCode}/feedbacks`);
@@ -125,7 +125,7 @@ export default function TeacherPortal() {
       console.warn('allFeedbacks is not an array:', allFeedbacks);
       return undefined;
     }
-    return allFeedbacks.find(f => f.scheduleId === scheduleId);
+    return allFeedbacks.find(f => f.schedule_id === scheduleId);
   };
 
   // 生成週內日期（週一到週五）
