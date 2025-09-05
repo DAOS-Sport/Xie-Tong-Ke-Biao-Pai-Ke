@@ -400,6 +400,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 新增課表
+  app.post('/api/:schoolCode/schedules', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      const db = await getSchoolDb(schoolCode);
+      
+      const validation = insertScheduleSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid schedule data", 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const scheduleData = validation.data;
+      const newSchedule = await db.insert(schedules)
+        .values({
+          ...scheduleData,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+      
+      res.json(newSchedule[0]);
+    } catch (error) {
+      console.error('Error adding schedule:', error);
+      res.status(500).json({ message: "Failed to add schedule" });
+    }
+  });
+
+  // 刪除課表
+  app.delete('/api/:schoolCode/schedules/:scheduleId', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode, scheduleId } = req.params;
+      const db = await getSchoolDb(schoolCode);
+      
+      const deletedSchedule = await db.delete(schedules)
+        .where(eq(schedules.id, scheduleId))
+        .returning();
+      
+      if (deletedSchedule.length === 0) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      
+      res.json({ message: "Schedule deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+      res.status(500).json({ message: "Failed to delete schedule" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,19 +1,26 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useLocation } from 'wouter';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { School, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Schedule, TimeSlot, Venue } from '@shared/schema';
+import { School, ChevronLeft, ChevronRight, Edit, Plus, Save, X } from 'lucide-react';
+import type { Schedule, TimeSlot, Venue, TeacherFeedback } from '@shared/schema';
 
 // 多學校管理後台
 export default function MultiSchoolAdmin() {
   const [, setLocation] = useLocation();
   const [selectedSchool, setSelectedSchool] = useState<string>('demo');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingCell, setEditingCell] = useState<{date: string, timeSlotId: string} | null>(null);
+  const [newSchedule, setNewSchedule] = useState({ className: '', coachName: '' });
+  const queryClient = useQueryClient();
   const [currentWeek, setCurrentWeek] = useState(() => {
     // 設定為新北高中課表資料的週期（2024年9月22日週）
     const targetDate = new Date('2024-09-22');
@@ -63,6 +70,19 @@ export default function MultiSchoolAdmin() {
     enabled: !!selectedSchool,
   });
 
+  // 獲取老師回覆狀態
+  const { data: feedbacks = [] } = useQuery<TeacherFeedback[]>({
+    queryKey: [`/api/${selectedSchool}/feedbacks`, 'all'],
+    queryFn: async () => {
+      const response = await fetch(`/api/${selectedSchool}/feedbacks`);
+      if (!response.ok) {
+        console.warn('獲取回覆狀態失敗:', response.status);
+        return [];
+      }
+      return response.json();
+    },
+  });
+
   // 週期導航
   const navigateToPrevWeek = () => setCurrentWeek(prev => addWeeks(prev, -1));
   const navigateToNextWeek = () => setCurrentWeek(prev => addWeeks(prev, 1));
@@ -76,19 +96,54 @@ export default function MultiSchoolAdmin() {
     const filtered = schedules.filter(s => 
       format(new Date(s.date), 'yyyy-MM-dd') === dateStr && s.timeSlotId === timeSlotId
     );
-    
-    // 調試所有匹配邏輯
-    if (dateStr === '2024-09-16') {
-      console.log(`檢查 ${dateStr} 時間段 ${timeSlotId}:`);
-      console.log('- 總課表數:', schedules.length);
-      console.log('- 當日課表:', schedules.filter(s => format(new Date(s.date), 'yyyy-MM-dd') === dateStr).length);
-      console.log('- 匹配結果:', filtered.length);
-      if (filtered.length > 0) {
-        console.log('- 找到課程:', filtered.map(f => `${f.className}${f.coachName}`));
-      }
-    }
     return filtered;
   };
+
+  // 獲取課程的回覆狀態
+  const getFeedbackForSchedule = (scheduleId: string) => {
+    return feedbacks.find(f => f.scheduleId === scheduleId);
+  };
+
+  // 新增課表
+  const addSchedule = useMutation({
+    mutationFn: async (data: {
+      date: string;
+      timeSlotId: string;
+      className: string;
+      coachName: string;
+      venueId: string;
+    }) => {
+      const response = await fetch(`/api/${selectedSchool}/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          notes: '新增課程'
+        })
+      });
+      if (!response.ok) throw new Error('Failed to add schedule');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/${selectedSchool}/schedules`] });
+      setEditingCell(null);
+      setNewSchedule({ className: '', coachName: '' });
+    }
+  });
+
+  // 刪除課表
+  const deleteSchedule = useMutation({
+    mutationFn: async (scheduleId: string) => {
+      const response = await fetch(`/api/${selectedSchool}/schedules/${scheduleId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete schedule');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/${selectedSchool}/schedules`] });
+    }
+  });
 
   // 獲取選中學校的資訊
   const selectedSchoolInfo = availableSchools.find(s => s.code === selectedSchool);
@@ -180,6 +235,16 @@ export default function MultiSchoolAdmin() {
                 ))}
               </SelectContent>
             </Select>
+            
+            {/* 編輯模式開關 */}
+            <Button
+              variant={isEditMode ? "default" : "outline"}
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              {isEditMode ? '退出編輯' : '編輯模式'}
+            </Button>
           </div>
           
           <div className="flex items-center gap-2">
@@ -242,19 +307,75 @@ export default function MultiSchoolAdmin() {
                     return (
                       <TableCell 
                         key={dayIndex}
-                        className="border-r border-gray-800 p-2 align-top min-h-16"
+                        className="border-r border-gray-800 p-2 align-top min-h-16 relative"
                       >
                         {daySchedules.length > 0 ? (
                           <div className="space-y-1">
-                            {daySchedules.map((schedule, idx) => (
-                              <div key={idx} className="text-blue-600 text-sm leading-tight">
-                                <div>{schedule.className}</div>
-                                <div>{schedule.coachName}</div>
-                              </div>
-                            ))}
+                            {daySchedules.map((schedule, idx) => {
+                              const feedback = getFeedbackForSchedule(schedule.id);
+                              return (
+                                <div key={idx} className="text-blue-600 text-sm leading-tight relative">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div>{schedule.className}</div>
+                                      <div>{schedule.coachName}</div>
+                                    </div>
+                                    
+                                    {/* 回覆狀態顯示 */}
+                                    {feedback && (
+                                      <Badge 
+                                        variant={
+                                          feedback.status === 'need_coop' ? 'destructive' :
+                                          feedback.status === 'reschedule' ? 'secondary' :
+                                          'default'
+                                        }
+                                        className="text-xs ml-1"
+                                      >
+                                        {feedback.status === 'need_coop' ? '需協同' :
+                                         feedback.status === 'reschedule' ? '調課' : '不需協同'}
+                                      </Badge>
+                                    )}
+                                    
+                                    {/* 編輯模式下的刪除按鈕 */}
+                                    {isEditMode && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                        onClick={() => deleteSchedule.mutate(schedule.id)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  
+                                  {/* 顯示調課資訊 */}
+                                  {feedback?.status === 'reschedule' && feedback.rescheduleDate && (
+                                    <div className="text-xs text-gray-500">
+                                      調至: {feedback.rescheduleDate} {feedback.reschedulePeriod}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="h-12"></div>
+                        )}
+                        
+                        {/* 編輯模式下的新增按鈕 */}
+                        {isEditMode && daySchedules.length === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600"
+                            onClick={() => setEditingCell({
+                              date: format(day, 'yyyy-MM-dd'),
+                              timeSlotId: timeSlot.id
+                            })}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         )}
                       </TableCell>
                     );
@@ -264,6 +385,73 @@ export default function MultiSchoolAdmin() {
             </TableBody>
           </Table>
         </div>
+        
+        {/* 新增課表對話框 */}
+        <Dialog 
+          open={!!editingCell} 
+          onOpenChange={(open) => !open && setEditingCell(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>新增課表</DialogTitle>
+            </DialogHeader>
+            
+            {editingCell && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">日期與時間</label>
+                  <p className="text-sm text-gray-600">
+                    {format(new Date(editingCell.date), 'yyyy年MM月dd日')} 
+                    第{timeSlots.findIndex(ts => ts.id === editingCell.timeSlotId) + 1}節
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">班級</label>
+                  <Input
+                    value={newSchedule.className}
+                    onChange={(e) => setNewSchedule(prev => ({...prev, className: e.target.value}))}
+                    placeholder="請輸入班級名稱（如：301）"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">教師</label>
+                  <Input
+                    value={newSchedule.coachName}
+                    onChange={(e) => setNewSchedule(prev => ({...prev, coachName: e.target.value}))}
+                    placeholder="請輸入教師姓名"
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setEditingCell(null)}
+                  >
+                    取消
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (newSchedule.className && newSchedule.coachName && venues.length > 0) {
+                        addSchedule.mutate({
+                          date: editingCell.date,
+                          timeSlotId: editingCell.timeSlotId,
+                          className: newSchedule.className,
+                          coachName: newSchedule.coachName,
+                          venueId: venues[0].id // 使用第一個場館
+                        });
+                      }
+                    }}
+                    disabled={!newSchedule.className || !newSchedule.coachName || addSchedule.isPending}
+                  >
+                    {addSchedule.isPending ? '新增中...' : '新增'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
