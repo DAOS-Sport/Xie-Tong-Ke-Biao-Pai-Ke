@@ -14,25 +14,30 @@ import type { Schedule, TimeSlot, Venue } from '@shared/schema';
 export default function MultiSchoolAdmin() {
   const [, setLocation] = useLocation();
   const [selectedSchool, setSelectedSchool] = useState<string>('demo');
-  const [currentWeek, setCurrentWeek] = useState(() => 
-    startOfWeek(new Date('2024-09-22'), { weekStartsOn: 1 })
-  );
+  const [currentWeek, setCurrentWeek] = useState(() => {
+    // 設定為新北高中課表資料的週期（2024年9月22日週）
+    const targetDate = new Date('2024-09-22');
+    return startOfWeek(targetDate, { weekStartsOn: 1 });
+  });
 
   // 可用學校列表（實際環境中可能從API獲取）
   const availableSchools = [
     { code: 'demo', name: '新北高中' }
   ];
 
-  // 獲取選定學校的數據
+  // 獲取選定學校的數據 - 根據當前週期查詢
   const { data: schedules = [] } = useQuery<Schedule[]>({
-    queryKey: [`/api/${selectedSchool}/schedules`, 'all'],
+    queryKey: [`/api/${selectedSchool}/schedules`, format(currentWeek, 'yyyy-MM-dd')],
     queryFn: async () => {
-      const response = await fetch(`/api/${selectedSchool}/schedules`);
+      const startDate = format(currentWeek, 'yyyy-MM-dd');
+      const endDate = format(addDays(currentWeek, 4), 'yyyy-MM-dd');
+      const response = await fetch(`/api/${selectedSchool}/schedules?startDate=${startDate}&endDate=${endDate}`);
       if (!response.ok) {
         console.error('API 錯誤:', response.status, response.statusText);
         throw new Error('Failed to fetch schedules');
       }
       const data = await response.json();
+      console.log(`查詢 ${startDate} 到 ${endDate}:`, data.length, '筆課表');
       return data;
     },
     enabled: !!selectedSchool,
