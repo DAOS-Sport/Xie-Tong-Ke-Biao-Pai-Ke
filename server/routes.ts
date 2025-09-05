@@ -265,6 +265,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 獲取學校的時間段
+  app.get('/api/:schoolCode/time-slots', validateSchoolCode, async (req, res) => {
+    try {
+      const timeSlots = await storage.getTimeSlots(); // 使用共用的時間段
+      res.json(timeSlots);
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      res.status(500).json({ message: "Failed to fetch time slots" });
+    }
+  });
+
+  // 獲取學校的場館
+  app.get('/api/:schoolCode/venues', validateSchoolCode, async (req, res) => {
+    try {
+      const venues = await storage.getVenues(); // 使用共用的場館
+      res.json(venues);
+    } catch (error) {
+      console.error('Error fetching venues:', error);
+      res.status(500).json({ message: "Failed to fetch venues" });
+    }
+  });
+
   // 獲取學校的課表（支援篩選）
   app.get('/api/:schoolCode/schedules', validateSchoolCode, async (req, res) => {
     try {
