@@ -2,8 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertScheduleSchema, insertCoachRegistrationSchema } from "@shared/schema";
+import { insertScheduleSchema, insertCoachRegistrationSchema, insertTeacherFeedbackSchema } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
+import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
+import { eq, and } from "drizzle-orm";
+import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -199,6 +202,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching coach registrations:', error);
       res.status(500).json({ message: "Failed to fetch coach registrations" });
+    }
+  });
+
+  // === 多學校系統 API ===
+  
+  // 中介軟體：驗證學校代碼
+  const validateSchoolCode = (req: any, res: any, next: any) => {
+    const { schoolCode } = req.params;
+    if (!isValidSchoolCode(schoolCode)) {
+      return res.status(400).json({ message: "Invalid school code" });
+    }
+    next();
+  };
+
+  // 初始化學校 schema（管理功能）
+  app.post('/api/admin/init-school/:schoolCode', async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      if (!isValidSchoolCode(schoolCode)) {
+        return res.status(400).json({ message: "Invalid school code" });
+      }
+      
+      await initializeSchoolSchema(schoolCode);
+      res.json({ message: `School ${schoolCode} initialized successfully` });
+    } catch (error) {
+      console.error('Error initializing school:', error);
+      res.status(500).json({ message: "Failed to initialize school" });
+    }
+  });
+
+  // 獲取學校的教師列表
+  app.get('/api/:schoolCode/teachers', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      const db = await getSchoolDb(schoolCode);
+      
+      const teacherList = await db.select().from(teachers);
+      res.json(teacherList);
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      res.status(500).json({ message: "Failed to fetch teachers" });
+    }
+  });
+
+  // 獲取學校的課表（支援篩選）
+  app.get('/api/:schoolCode/schedules', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      const { teacher, weekStart, weekEnd, startDate, endDate } = req.query as any;
+      const db = await getSchoolDb(schoolCode);
+      
+      let whereConditions: any[] = [];
+      
+      // 教師篩選
+      if (teacher) {
+        whereConditions.push(eq(schedules.coachName, teacher));
+      }
+      
+      // 日期範圍篩選 - 簡化邏輯
+      if (startDate && endDate) {
+        // 如果有日期範圍，使用 between 或 gte/lte
+        whereConditions.push(
+          and(
+            eq(schedules.date, startDate)
+          )
+        );
+      }
+      
+      const scheduleList = whereConditions.length > 0 
+        ? await db.select().from(schedules).where(and(...whereConditions))
+        : await db.select().from(schedules);
+      
+      res.json(scheduleList);
+    } catch (error) {
+      console.error('Error fetching school schedules:', error);
+      res.status(500).json({ message: "Failed to fetch schedules" });
+    }
+  });
+
+  // 獲取教師回覆
+  app.get('/api/:schoolCode/feedbacks', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      const { teacher, scheduleId } = req.query as any;
+      const db = await getSchoolDb(schoolCode);
+      
+      let whereConditions: any[] = [];
+      
+      if (teacher) {
+        whereConditions.push(eq(teacherFeedbacks.teacherName, teacher));
+      }
+      
+      if (scheduleId) {
+        whereConditions.push(eq(teacherFeedbacks.scheduleId, scheduleId));
+      }
+      
+      const feedbacks = whereConditions.length > 0
+        ? await db.select().from(teacherFeedbacks).where(and(...whereConditions))
+        : await db.select().from(teacherFeedbacks);
+      
+      res.json(feedbacks);
+    } catch (error) {
+      console.error('Error fetching teacher feedbacks:', error);
+      res.status(500).json({ message: "Failed to fetch feedbacks" });
+    }
+  });
+
+  // 提交或更新教師回覆
+  app.post('/api/:schoolCode/feedbacks', validateSchoolCode, async (req, res) => {
+    try {
+      const { schoolCode } = req.params;
+      const db = await getSchoolDb(schoolCode);
+      
+      const validation = insertTeacherFeedbackSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid feedback data", 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const feedbackData = validation.data;
+      
+      // 驗證調課資料
+      if (feedbackData.status === 'reschedule') {
+        if (!feedbackData.rescheduleDate || !feedbackData.reschedulePeriod) {
+          return res.status(400).json({ 
+            message: "Reschedule date and period are required when status is reschedule" 
+          });
+        }
+      }
+      
+      // 使用 ON CONFLICT 來處理更新或插入
+      const feedback = await db.insert(teacherFeedbacks)
+        .values({
+          ...feedbackData,
+          updatedAt: new Date()
+        })
+        .onConflictDoUpdate({
+          target: [teacherFeedbacks.scheduleId, teacherFeedbacks.teacherName],
+          set: {
+            status: feedbackData.status,
+            rescheduleDate: feedbackData.rescheduleDate,
+            reschedulePeriod: feedbackData.reschedulePeriod,
+            comment: feedbackData.comment,
+            updatedAt: new Date()
+          }
+        })
+        .returning();
+      
+      res.json(feedback[0]);
+    } catch (error) {
+      console.error('Error saving teacher feedback:', error);
+      res.status(500).json({ message: "Failed to save feedback" });
     }
   });
 

@@ -75,6 +75,30 @@ export const coachRegistrations = pgTable("coach_registrations", {
   registeredAt: timestamp("registered_at").defaultNow(),
 });
 
+// 多學校系統表定義
+// 教師表 - 各學校的教師清單
+export const teachers = pgTable("teachers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherName: varchar("teacher_name").notNull(),
+  subject: varchar("subject"), // 科目（可選）
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// 教師回覆表 - 老師對課程的回覆狀態
+export const teacherFeedbacks = pgTable("teacher_feedbacks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduleId: varchar("schedule_id").notNull().references(() => schedules.id, { onDelete: 'cascade' }),
+  teacherName: varchar("teacher_name").notNull(),
+  status: varchar("status").notNull(), // need_coop / no_coop / reschedule
+  rescheduleDate: date("reschedule_date"), // 調課日期（status=reschedule時必填）
+  reschedulePeriod: varchar("reschedule_period"), // 調課節次（status=reschedule時必填）
+  comment: text("comment"), // 備註（可選）
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  // 同一老師對同一課程只保留最後一次回覆
+  unique().on(table.scheduleId, table.teacherName),
+]);
+
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],
@@ -85,6 +109,7 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
     references: [timeSlots.id],
   }),
   coachRegistrations: many(coachRegistrations),
+  teacherFeedbacks: many(teacherFeedbacks),
 }));
 
 export const coachRegistrationsRelations = relations(coachRegistrations, ({ one }) => ({
@@ -102,6 +127,17 @@ export const timeSlotsRelations = relations(timeSlots, ({ many }) => ({
   schedules: many(schedules),
 }));
 
+export const teachersRelations = relations(teachers, ({ many }) => ({
+  feedbacks: many(teacherFeedbacks),
+}));
+
+export const teacherFeedbacksRelations = relations(teacherFeedbacks, ({ one }) => ({
+  schedule: one(schedules, {
+    fields: [teacherFeedbacks.scheduleId],
+    references: [schedules.id],
+  }),
+}));
+
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertVenue = typeof venues.$inferInsert;
@@ -112,6 +148,10 @@ export type InsertSchedule = typeof schedules.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
 export type InsertCoachRegistration = typeof coachRegistrations.$inferInsert;
 export type CoachRegistration = typeof coachRegistrations.$inferSelect;
+export type InsertTeacher = typeof teachers.$inferInsert;
+export type Teacher = typeof teachers.$inferSelect;
+export type InsertTeacherFeedback = typeof teacherFeedbacks.$inferInsert;
+export type TeacherFeedback = typeof teacherFeedbacks.$inferSelect;
 
 export const insertScheduleSchema = createInsertSchema(schedules).omit({
   id: true,
@@ -130,6 +170,12 @@ export const insertCoachRegistrationSchema = createInsertSchema(coachRegistratio
   registeredAt: true,
 });
 
+export const insertTeacherFeedbackSchema = createInsertSchema(teacherFeedbacks).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export type InsertScheduleType = z.infer<typeof insertScheduleSchema>;
 export type InsertUserType = z.infer<typeof insertUserSchema>;
 export type InsertCoachRegistrationType = z.infer<typeof insertCoachRegistrationSchema>;
+export type InsertTeacherFeedbackType = z.infer<typeof insertTeacherFeedbackSchema>;
