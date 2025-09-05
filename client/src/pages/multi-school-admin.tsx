@@ -210,6 +210,13 @@ export default function MultiSchoolAdmin() {
               <i className="fas fa-search mr-1 sm:mr-2"></i>尋找教練
             </button>
             <button 
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation('/teacher-portal')}
+              data-testid="tab-teacher-portal"
+            >
+              <i className="fas fa-users mr-1 sm:mr-2"></i>教師協作回覆
+            </button>
+            <button 
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
               data-testid="tab-multi-school"
             >
