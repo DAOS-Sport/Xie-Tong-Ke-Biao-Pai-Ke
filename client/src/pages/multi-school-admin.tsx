@@ -239,8 +239,12 @@ export default function MultiSchoolAdmin() {
             {/* 編輯模式開關 */}
             <Button
               variant={isEditMode ? "default" : "outline"}
-              onClick={() => setIsEditMode(!isEditMode)}
+              onClick={() => {
+                console.log('編輯模式切換:', isEditMode, '->', !isEditMode);
+                setIsEditMode(!isEditMode);
+              }}
               className="flex items-center gap-2"
+              data-testid="toggle-edit-mode"
             >
               <Edit className="h-4 w-4" />
               {isEditMode ? '退出編輯' : '編輯模式'}
@@ -364,17 +368,18 @@ export default function MultiSchoolAdmin() {
                         )}
                         
                         {/* 編輯模式下的新增按鈕 */}
-                        {isEditMode && daySchedules.length === 0 && (
+                        {isEditMode && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600"
+                            className={`${daySchedules.length === 0 ? 'absolute inset-0 w-full h-full' : 'mt-1 w-full'} flex items-center justify-center text-gray-400 hover:text-gray-600 border border-dashed border-gray-300 hover:border-gray-400`}
                             onClick={() => setEditingCell({
                               date: format(day, 'yyyy-MM-dd'),
                               timeSlotId: timeSlot.id
                             })}
                           >
                             <Plus className="h-4 w-4" />
+                            {daySchedules.length === 0 ? '' : '新增班級'}
                           </Button>
                         )}
                       </TableCell>
