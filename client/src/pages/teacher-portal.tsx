@@ -9,10 +9,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, XCircle, RotateCcw, Users, User } from 'lucide-react';
 import type { Schedule, Teacher, TeacherFeedback } from '@shared/schema';
 
 // 使用者前台：老師協作回覆系統
@@ -20,11 +21,9 @@ export default function TeacherPortal() {
   const { schoolCode } = useParams<{ schoolCode: string }>();
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [viewMode, setViewMode] = useState<'all' | 'single'>('all');
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // 週曆顯示（週一到週日）
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
 
   // 獲取教師列表
   const { data: teachers = [] } = useQuery<Teacher[]>({
@@ -32,8 +31,20 @@ export default function TeacherPortal() {
     enabled: !!schoolCode,
   });
 
+  // 獲取所有課表（用於整週視圖）
+  const { data: allSchedules = [] } = useQuery<Schedule[]>({
+    queryKey: [`/api/${schoolCode}/schedules`, 'all', currentWeek],
+    queryFn: async () => {
+      const startDate = format(currentWeek, 'yyyy-MM-dd');
+      const endDate = format(addDays(currentWeek, 6), 'yyyy-MM-dd');
+      const response = await fetch(`/api/${schoolCode}/schedules?startDate=${startDate}&endDate=${endDate}`);
+      return response.json();
+    },
+    enabled: !!schoolCode,
+  });
+
   // 獲取選定教師的課表
-  const { data: schedules = [] } = useQuery<Schedule[]>({
+  const { data: teacherSchedules = [] } = useQuery<Schedule[]>({
     queryKey: [`/api/${schoolCode}/schedules`, selectedTeacher, currentWeek],
     queryFn: async () => {
       if (!selectedTeacher) return [];
@@ -45,15 +56,14 @@ export default function TeacherPortal() {
     enabled: !!schoolCode && !!selectedTeacher,
   });
 
-  // 獲取回覆狀態
-  const { data: feedbacks = [] } = useQuery<TeacherFeedback[]>({
-    queryKey: [`/api/${schoolCode}/feedbacks`, selectedTeacher],
+  // 獲取所有回覆狀態
+  const { data: allFeedbacks = [] } = useQuery<TeacherFeedback[]>({
+    queryKey: [`/api/${schoolCode}/feedbacks`, 'all'],
     queryFn: async () => {
-      if (!selectedTeacher) return [];
-      const response = await fetch(`/api/${schoolCode}/feedbacks?teacher=${encodeURIComponent(selectedTeacher)}`);
+      const response = await fetch(`/api/${schoolCode}/feedbacks`);
       return response.json();
     },
-    enabled: !!schoolCode && !!selectedTeacher,
+    enabled: !!schoolCode,
   });
 
   // 提交回覆
@@ -85,7 +95,28 @@ export default function TeacherPortal() {
 
   // 獲取回覆狀態
   const getFeedbackForSchedule = (scheduleId: string) => {
-    return feedbacks.find(f => f.scheduleId === scheduleId);
+    // 確保 allFeedbacks 是數組
+    if (!Array.isArray(allFeedbacks)) {
+      console.warn('allFeedbacks is not an array:', allFeedbacks);
+      return undefined;
+    }
+    return allFeedbacks.find(f => f.scheduleId === scheduleId);
+  };
+
+  // 計算有課程的日子（只顯示有課的日子）
+  const getScheduleDays = () => {
+    const schedules = viewMode === 'all' ? allSchedules : teacherSchedules;
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeek, i));
+    
+    return weekDays.filter(day => {
+      return schedules.some(s => isSameDay(new Date(s.date), day));
+    });
+  };
+
+  // 獲取指定日期的課程
+  const getSchedulesForDay = (day: Date) => {
+    const schedules = viewMode === 'all' ? allSchedules : teacherSchedules;
+    return schedules.filter(s => isSameDay(new Date(s.date), day));
   };
 
   // 狀態圖示和顏色
@@ -120,63 +151,88 @@ export default function TeacherPortal() {
           <p className="text-gray-600">請選擇您的姓名，然後針對每堂課程選擇協作狀態</p>
         </div>
 
-        {/* 教師選擇 */}
+        {/* 視圖模式切換 */}
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>選擇教師</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="請選擇您的姓名..." />
-              </SelectTrigger>
-              <SelectContent>
-                {teachers.map((teacher) => (
-                  <SelectItem key={teacher.id} value={teacher.teacherName}>
-                    {teacher.teacherName} {teacher.subject && `(${teacher.subject})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <CardContent className="p-4">
+            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'all' | 'single')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="all" className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  整週所有老師
+                </TabsTrigger>
+                <TabsTrigger value="single" className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  選擇教師
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardContent>
         </Card>
 
-        {selectedTeacher && (
-          <>
-            {/* 週導航 */}
-            <Card className="mb-6">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentWeek(addDays(currentWeek, -7))}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-2" />
-                    上一週
-                  </Button>
-                  
-                  <h2 className="text-lg font-semibold">
-                    {format(currentWeek, 'yyyy年MM月dd日', { locale: zhTW })} - {' '}
-                    {format(addDays(currentWeek, 6), 'MM月dd日', { locale: zhTW })}
-                  </h2>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentWeek(addDays(currentWeek, 7))}
-                  >
-                    下一週
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* 教師選擇（單一教師模式時顯示） */}
+        {viewMode === 'single' && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>選擇教師</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                <SelectTrigger className="w-full max-w-xs">
+                  <SelectValue placeholder="請選擇您的姓名..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teachers.map((teacher) => (
+                    <SelectItem key={teacher.id} value={teacher.teacherName}>
+                      {teacher.teacherName} {teacher.subject && `(${teacher.subject})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
-            {/* 週曆顯示 */}
-            <div className="grid grid-cols-7 gap-4">
-              {weekDays.map((day, dayIndex) => {
-                const daySchedules = schedules.filter(s => 
-                  isSameDay(new Date(s.date), day)
-                );
+        {/* 週導航 */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentWeek(addDays(currentWeek, -7))}
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                上一週
+              </Button>
+              
+              <h2 className="text-lg font-semibold">
+                {format(currentWeek, 'yyyy年MM月dd日', { locale: zhTW })} - {' '}
+                {format(addDays(currentWeek, 6), 'MM月dd日', { locale: zhTW })}
+              </h2>
+              
+              <Button
+                variant="outline"
+                onClick={() => setCurrentWeek(addDays(currentWeek, 7))}
+              >
+                下一週
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 條件檢查：單一教師模式需要選擇教師 */}
+        {viewMode === 'single' && !selectedTeacher ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-gray-500">請先選擇教師</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* 週曆顯示 - 只顯示有課程的日子 */}
+            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${getScheduleDays().length || 1}, 1fr)` }}>
+              {getScheduleDays().map((day, dayIndex) => {
+                const daySchedules = getSchedulesForDay(day);
                 
                 return (
                   <Card key={dayIndex} className="min-h-[400px]">
@@ -185,6 +241,11 @@ export default function TeacherPortal() {
                         {format(day, 'EEEE', { locale: zhTW })}
                         <br />
                         {format(day, 'MM/dd')}
+                        {daySchedules.length > 0 && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {daySchedules.length}堂課
+                          </Badge>
+                        )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
@@ -198,23 +259,27 @@ export default function TeacherPortal() {
                             feedback={feedback}
                             onSubmitFeedback={(data) => submitFeedback.mutate({
                               ...data,
-                              teacherName: selectedTeacher,
+                              teacherName: viewMode === 'single' ? selectedTeacher : schedule.coachName || '',
                               scheduleId: schedule.id,
                             })}
                             isSubmitting={submitFeedback.isPending}
+                            showTeacherName={viewMode === 'all'}
+                            currentUser={viewMode === 'single' ? selectedTeacher : ''}
                           />
                         );
                       })}
-                      
-                      {daySchedules.length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-4">
-                          今日無課程
-                        </p>
-                      )}
                     </CardContent>
                   </Card>
                 );
               })}
+              
+              {getScheduleDays().length === 0 && (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <p className="text-gray-500">本週無課程</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </>
         )}
@@ -228,12 +293,16 @@ function ScheduleCard({
   schedule, 
   feedback, 
   onSubmitFeedback, 
-  isSubmitting 
+  isSubmitting,
+  showTeacherName = false,
+  currentUser = ''
 }: {
   schedule: Schedule;
   feedback?: TeacherFeedback;
   onSubmitFeedback: (data: any) => void;
   isSubmitting: boolean;
+  showTeacherName?: boolean;
+  currentUser?: string;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const [status, setStatus] = useState(feedback?.status || '');
@@ -265,7 +334,7 @@ function ScheduleCard({
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
           <p className="font-medium text-sm">{schedule.className}</p>
-          <p className="text-xs text-gray-600">{schedule.coachName}</p>
+          {showTeacherName && <p className="text-xs text-gray-600">{schedule.coachName}</p>}
         </div>
         {getStatusIcon(feedback?.status)}
       </div>
@@ -285,14 +354,18 @@ function ScheduleCard({
         )}
       </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full text-xs"
-        onClick={() => setShowDetails(!showDetails)}
-      >
-        {showDetails ? '收起' : '回覆'}
-      </Button>
+      {/* 只有在整週模式下且是該老師的課，或在單一教師模式下，才顯示回覆按鈕 */}
+      {(showTeacherName && schedule.coachName) || currentUser ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full text-xs"
+          onClick={() => setShowDetails(!showDetails)}
+          disabled={showTeacherName && schedule.coachName !== currentUser && currentUser !== ''}
+        >
+          {showDetails ? '收起' : '回覆'}
+        </Button>
+      ) : null}
 
       {showDetails && (
         <div className="mt-3 space-y-3 border-t pt-3">
