@@ -77,9 +77,15 @@ export default function MultiSchoolAdmin() {
       format(new Date(s.date), 'yyyy-MM-dd') === dateStr && s.timeSlotId === timeSlotId
     );
     
-    // 調試日誌
-    if (dateStr === '2024-09-16' && filtered.length > 0) {
-      console.log(`${dateStr} 找到課程:`, filtered.map(f => `${f.className}${f.coachName}`));
+    // 調試所有匹配邏輯
+    if (dateStr === '2024-09-16') {
+      console.log(`檢查 ${dateStr} 時間段 ${timeSlotId}:`);
+      console.log('- 總課表數:', schedules.length);
+      console.log('- 當日課表:', schedules.filter(s => format(new Date(s.date), 'yyyy-MM-dd') === dateStr).length);
+      console.log('- 匹配結果:', filtered.length);
+      if (filtered.length > 0) {
+        console.log('- 找到課程:', filtered.map(f => `${f.className}${f.coachName}`));
+      }
     }
     return filtered;
   };
