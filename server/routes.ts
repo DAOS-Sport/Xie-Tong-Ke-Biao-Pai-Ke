@@ -15,6 +15,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default data
   await storage.initializeVenues();
   await storage.initializeTimeSlots();
+  
+  // 強制初始化多學校系統 - 確保部署環境與開發環境一致
+  try {
+    console.log('🔧 Initializing multi-school system...');
+    await initializeSchoolSchema('demo');
+    await initializeSchoolSchema('school1');
+    await initializeSchoolSchema('school2');
+    console.log('✅ Multi-school system initialized successfully');
+  } catch (error) {
+    console.error('⚠️ Multi-school initialization error (continuing anyway):', error);
+  }
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

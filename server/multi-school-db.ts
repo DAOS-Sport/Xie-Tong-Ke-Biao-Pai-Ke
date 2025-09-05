@@ -99,9 +99,7 @@ export async function initializeSchoolSchema(schoolCode: string) {
         coach_name VARCHAR,
         notes TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (venue_id) REFERENCES ${schemaName}.venues(id),
-        FOREIGN KEY (time_slot_id) REFERENCES ${schemaName}.time_slots(id)
+        updated_at TIMESTAMP DEFAULT NOW()
       );
     `));
     
@@ -131,6 +129,11 @@ export async function initializeSchoolSchema(schoolCode: string) {
       );
     `));
     
+    // 為示範學校添加課表資料（只在demo時執行）
+    if (schoolCode === 'demo') {
+      await seedDemoData(mainDb, schemaName);
+    }
+    
     console.log(`✅ Successfully initialized schema for school: ${schoolCode}`);
     
   } catch (error) {
@@ -138,6 +141,78 @@ export async function initializeSchoolSchema(schoolCode: string) {
     throw error;
   } finally {
     await mainPool.end();
+  }
+}
+
+/**
+ * 為示範學校添加課表和教師資料
+ */
+async function seedDemoData(db: any, schemaName: string) {
+  try {
+    // 檢查是否已有教師資料
+    const existingTeachers = await db.execute(sql.raw(`SELECT COUNT(*) as count FROM ${schemaName}.teachers`));
+    const teacherCount = existingTeachers.rows[0]?.count || 0;
+    
+    if (teacherCount === 0) {
+      // 添加教師資料
+      const teachers = [
+        ['吳育汝', '游泳'],
+        ['周彥真', '游泳'],
+        ['張宇熙', '游泳'],
+        ['張暐承', '游泳'],
+        ['李冠賢', '游泳'],
+        ['王慶熙', '游泳'],
+        ['蔡正雄', '游泳'],
+        ['邱俊傑', '游泳'],
+        ['陳潔', '游泳'],
+        ['王老師', '數學'],
+        ['李老師', '英語'],
+        ['張老師', '物理'],
+        ['陳老師', '化學']
+      ];
+      
+      for (const [teacherName, subject] of teachers) {
+        await db.execute(sql.raw(`
+          INSERT INTO ${schemaName}.teachers (teacher_name, subject) 
+          VALUES ('${teacherName}', '${subject}');
+        `));
+      }
+    }
+    
+    // 添加課表資料（2024年9月16-20日）
+    const scheduleData = [
+      ['2024-09-16', '113', '張暐承', '新北高中第二學期體育課程'],
+      ['2024-09-17', '115', '周彥真', '新北高中第二學期體育課程'],
+      ['2024-09-18', '114', '李冠賢', '新北高中第二學期體育課程'],
+      ['2024-09-19', '112', '王慶熙', '新北高中第二學期體育課程'],
+      ['2024-09-20', '116', '吳育汝', '新北高中第二學期體育課程'],
+      ['2024-09-16', '201', '張宇熙', '新北高中第二學期體育課程'],
+      ['2024-09-17', '202', '蔡正雄', '新北高中第二學期體育課程'],
+      ['2024-09-18', '203', '邱俊傑', '新北高中第二學期體育課程'],
+      ['2024-09-19', '204', '陳潔', '新北高中第二學期體育課程'],
+      ['2024-09-20', '205', '張暐承', '新北高中第二學期體育課程']
+    ];
+    
+    // 檢查是否已有資料，避免重複插入
+    const existingSchedules = await db.execute(sql.raw(`SELECT COUNT(*) as count FROM ${schemaName}.schedules`));
+    const count = existingSchedules.rows[0]?.count || 0;
+    
+    if (count === 0) {
+      for (const [date, className, coachName, notes] of scheduleData) {
+        await db.execute(sql.raw(`
+          INSERT INTO ${schemaName}.schedules (date, venue_id, time_slot_id, class_name, coach_name, notes) 
+          VALUES ('${date}', 
+                  (SELECT id FROM ${schemaName}.venues LIMIT 1), 
+                  (SELECT id FROM ${schemaName}.time_slots LIMIT 1), 
+                  '${className}', '${coachName}', '${notes}');
+        `));
+      }
+    }
+    
+    console.log(`✅ Demo data seeded for ${schemaName}`);
+  } catch (error) {
+    console.error(`⚠️ Error seeding demo data for ${schemaName}:`, error);
+    // 不拋出錯誤，因為資料可能已存在
   }
 }
 
