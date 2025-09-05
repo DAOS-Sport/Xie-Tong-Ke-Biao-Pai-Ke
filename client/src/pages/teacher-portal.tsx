@@ -109,6 +109,8 @@ export default function TeacherPortal() {
       const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       try {
+        console.log('🚀 開始發送請求:', data);
+        
         const response = await fetch(`/api/${schoolCode}/feedbacks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -117,21 +119,35 @@ export default function TeacherPortal() {
         });
         clearTimeout(timeoutId);
         
+        console.log('📡 收到回應:', response.status, response.statusText);
+        
         if (!response.ok) {
           let detail = await response.text();
+          console.log('❌ 錯誤回應內容:', detail);
           try {
             const jsonError = JSON.parse(detail);
-            detail = jsonError.message || detail;
+            detail = jsonError.message || jsonError.error || detail;
           } catch {}
           throw new Error(`儲存失敗：${detail}`);
         }
-        return response.json();
+        
+        const result = await response.json();
+        console.log('✅ 成功回應:', result);
+        return result;
       } catch (error) {
         clearTimeout(timeoutId);
+        console.error('🚨 Fetch 錯誤:', error);
+        
         if (error instanceof Error && error.name === 'AbortError') {
           throw new Error('請求超時，請檢查網路連接');
         }
-        throw error;
+        
+        // 確保錯誤有意義的消息
+        if (error instanceof Error) {
+          throw error;
+        } else {
+          throw new Error('網絡錯誤，請重試');
+        }
       }
     },
     onSuccess: () => {
@@ -140,7 +156,26 @@ export default function TeacherPortal() {
     },
     onError: (error) => {
       console.error('提交錯誤:', error);
-      const message = error instanceof Error ? error.message : '請稍後再試';
+      
+      // 更好的錯誤處理
+      let message = '請稍後再試';
+      
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof error === 'string') {
+        message = error;
+      } else if (error && typeof error === 'object') {
+        // 處理空錯誤對象或其他對象
+        message = (error as any).message || (error as any).error || '網絡連接錯誤，請重試';
+      }
+      
+      console.error('完整錯誤信息:', {
+        error,
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        message
+      });
+      
       toast({ 
         title: "❌ 儲存失敗", 
         description: message, 
