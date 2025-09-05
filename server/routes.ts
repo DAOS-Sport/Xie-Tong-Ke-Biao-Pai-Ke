@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertScheduleSchema, insertCoachRegistrationSchema, insertTeacherFeedbackSchema } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -279,12 +279,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whereConditions.push(eq(schedules.coachName, teacher));
       }
       
-      // 日期範圍篩選 - 簡化邏輯
+      // 日期範圍篩選 - 修正邏輯
       if (startDate && endDate) {
-        // 如果有日期範圍，使用 between 或 gte/lte
         whereConditions.push(
           and(
-            eq(schedules.date, startDate)
+            gte(schedules.date, startDate),
+            lte(schedules.date, endDate)
           )
         );
       }
