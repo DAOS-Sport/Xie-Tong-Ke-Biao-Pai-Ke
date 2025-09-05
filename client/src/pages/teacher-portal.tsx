@@ -335,11 +335,43 @@ export default function TeacherPortal() {
                                         <div className="mt-1">
                                           <FeedbackButtons
                                             schedule={schedule}
-                                            onSubmitFeedback={(data) => submitFeedback.mutate({
-                                              ...data,
-                                              teacherName: viewMode === 'single' ? selectedTeacher : schedule.coachName || '',
-                                              scheduleId: schedule.id,
-                                            })}
+                                            onSubmitFeedback={(data) => {
+                                              const teacherName = viewMode === 'single' 
+                                                ? selectedTeacher 
+                                                : schedule.coachName || '未知教師';
+                                              
+                                              // 驗證 scheduleId 格式
+                                              if (!schedule.id || schedule.id.length < 10) {
+                                                toast({
+                                                  title: "❌ 資料錯誤",
+                                                  description: "課程 ID 無效，請重新整理頁面",
+                                                  variant: "destructive"
+                                                });
+                                                return;
+                                              }
+                                              
+                                              // 驗證教師名稱
+                                              if (!teacherName || teacherName.trim() === '') {
+                                                toast({
+                                                  title: "❌ 資料錯誤", 
+                                                  description: "教師名稱無效，請重新整理頁面",
+                                                  variant: "destructive"
+                                                });
+                                                return;
+                                              }
+                                              
+                                              console.log('🔍 提交回覆:', {
+                                                ...data,
+                                                teacherName: teacherName.trim(),
+                                                scheduleId: schedule.id,
+                                              });
+                                              
+                                              submitFeedback.mutate({
+                                                ...data,
+                                                teacherName: teacherName.trim(),
+                                                scheduleId: schedule.id,
+                                              });
+                                            }}
                                             isSubmitting={submitFeedback.isPending}
                                           />
                                         </div>

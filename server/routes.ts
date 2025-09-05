@@ -373,6 +373,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const db = await getSchoolDb(schoolCode);
       
+      // 額外驗證 UUID 格式
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(req.body.scheduleId)) {
+        return res.status(400).json({ 
+          message: "Invalid schedule ID format - must be valid UUID" 
+        });
+      }
+      
       const validation = insertTeacherFeedbackSchema.safeParse(req.body);
       if (!validation.success) {
         console.error('❌ Validation failed:', validation.error.issues);
