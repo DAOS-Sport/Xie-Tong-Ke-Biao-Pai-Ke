@@ -32,7 +32,12 @@ export async function getSchoolDb(schoolCode: string) {
   const db = drizzle({ client: pool, schema });
   
   // 設定 search_path 到指定的 schema
-  await db.execute(sql.raw(`SET search_path TO school_${schoolCode}, public;`));
+  try {
+    await db.execute(sql.raw(`SET search_path TO school_${schoolCode}, public;`));
+    console.log(`✅ Set search_path to school_${schoolCode}`);
+  } catch (error) {
+    console.error(`❌ Failed to set search_path for school_${schoolCode}:`, error);
+  }
   
   schemaPools.set(cacheKey, db);
   
