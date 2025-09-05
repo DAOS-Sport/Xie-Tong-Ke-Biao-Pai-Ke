@@ -365,9 +365,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { schoolCode } = req.params;
       
       if (isDeployment) {
-        console.log('🚀 Deployment: Saving feedback for school:', schoolCode);
-        console.log('🚀 Deployment: Request body:', req.body);
-        console.log('🚀 Deployment: DATABASE_URL exists:', !!process.env.DATABASE_URL);
+        console.log('🚀 PRODUCTION: Saving feedback for school:', schoolCode);
+        console.log('🚀 PRODUCTION: Request body:', JSON.stringify(req.body, null, 2));
+        console.log('🚀 PRODUCTION: DATABASE_URL exists:', !!process.env.DATABASE_URL);
+        console.log('🚀 PRODUCTION: Current timestamp:', new Date().toISOString());
       }
       
       const db = await getSchoolDb(schoolCode);
@@ -412,17 +413,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `;
       
       if (isDeployment) {
-        console.log('🔍 Deployment: About to execute query');
-        console.log('🔍 Deployment: Final query:', insertQuery);
+        console.log('🔍 PRODUCTION: About to execute query');
+        console.log('🔍 PRODUCTION: Final query:', insertQuery);
+        console.log('🔍 PRODUCTION: Database object type:', typeof db);
+        console.log('🔍 PRODUCTION: Database object keys:', Object.keys(db));
       }
       
       const result = await db.execute(sql.raw(insertQuery));
       
       if (isDeployment) {
-        console.log('✅ Deployment: Query executed successfully');
-        console.log('✅ Deployment: Result object:', result);
-        console.log('✅ Deployment: Result rows:', result.rows);
-        console.log('✅ Deployment: Rows length:', result.rows?.length);
+        console.log('✅ PRODUCTION: Query executed successfully');
+        console.log('✅ PRODUCTION: Result type:', typeof result);
+        console.log('✅ PRODUCTION: Result keys:', Object.keys(result));
+        console.log('✅ PRODUCTION: Result object:', JSON.stringify(result, null, 2));
+        console.log('✅ PRODUCTION: Result rows:', result.rows);
+        console.log('✅ PRODUCTION: Rows length:', result.rows?.length);
+        if (result.rows && result.rows.length > 0) {
+          console.log('✅ PRODUCTION: First row:', JSON.stringify(result.rows[0], null, 2));
+        }
       }
       
       if (!result.rows || result.rows.length === 0) {
@@ -437,12 +445,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(savedFeedback);
     } catch (error) {
-      console.error('Error saving teacher feedback:', error);
+      console.error('💥 ERROR: Failed to save teacher feedback:', error);
       if (isDeployment) {
-        console.error('🚨 Deployment: Detailed error:', error);
-        console.error('🚨 Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+        console.error('🚨 PRODUCTION ERROR: Type:', typeof error);
+        console.error('🚨 PRODUCTION ERROR: Constructor:', error?.constructor?.name);
+        console.error('🚨 PRODUCTION ERROR: Message:', error instanceof Error ? error.message : 'Unknown error');
+        console.error('🚨 PRODUCTION ERROR: Stack:', error instanceof Error ? error.stack : 'No stack trace');
+        console.error('🚨 PRODUCTION ERROR: Full error object:', JSON.stringify(error, null, 2));
       }
-      res.status(500).json({ message: "Failed to save feedback" });
+      res.status(500).json({ 
+        message: "Failed to save feedback",
+        error: isDeployment ? (error instanceof Error ? error.message : 'Unknown error') : 'Database error',
+        timestamp: new Date().toISOString(),
+        schoolCode: req.params.schoolCode
+      });
     }
   });
 
