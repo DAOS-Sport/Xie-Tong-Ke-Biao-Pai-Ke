@@ -40,6 +40,16 @@ export default function MultiSchoolAdmin() {
 
   const { data: timeSlots = [] } = useQuery<TimeSlot[]>({
     queryKey: [`/api/${selectedSchool}/time-slots`],
+    queryFn: async () => {
+      const response = await fetch(`/api/${selectedSchool}/time-slots`);
+      if (!response.ok) {
+        console.error('時間段 API 錯誤:', response.status, response.statusText);
+        throw new Error('Failed to fetch time slots');
+      }
+      const data = await response.json();
+      console.log('時間段資料載入:', data.length, '個');
+      return data;
+    },
     enabled: !!selectedSchool,
   });
 
@@ -61,6 +71,11 @@ export default function MultiSchoolAdmin() {
     const filtered = schedules.filter(s => 
       format(new Date(s.date), 'yyyy-MM-dd') === dateStr && s.timeSlotId === timeSlotId
     );
+    
+    // 調試日誌
+    if (dateStr === '2024-09-16' && filtered.length > 0) {
+      console.log(`${dateStr} 找到課程:`, filtered.map(f => `${f.className}${f.coachName}`));
+    }
     return filtered;
   };
 
