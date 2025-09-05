@@ -340,8 +340,9 @@ export default function TeacherPortal() {
                                                 ? selectedTeacher 
                                                 : schedule.coachName || '未知教師';
                                               
-                                              // 驗證 scheduleId 格式
+                                              // 驗證 scheduleId 格式 (支援 varchar UUID 格式)
                                               if (!schedule.id || schedule.id.length < 10) {
+                                                console.error('無效的 schedule ID:', schedule.id);
                                                 toast({
                                                   title: "❌ 資料錯誤",
                                                   description: "課程 ID 無效，請重新整理頁面",

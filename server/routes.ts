@@ -373,11 +373,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const db = await getSchoolDb(schoolCode);
       
-      // 額外驗證 UUID 格式
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(req.body.scheduleId)) {
+      // 額外驗證 schedule ID 格式（支援 varchar UUID）
+      if (!req.body.scheduleId || req.body.scheduleId.length < 10) {
         return res.status(400).json({ 
-          message: "Invalid schedule ID format - must be valid UUID" 
+          message: "Invalid schedule ID - ID is required" 
         });
       }
       
