@@ -1,0 +1,134 @@
+快速判斷清單（請先做這 5 件）
+
+這一週真的有資料嗎？
+後端查詢是用 startDate ~ endDate 範圍（週一到週五；若週六是補班日才會含週六）。請先到「場館課表編輯」頁，切到同一週（2025/9/1–9/5），看該週有沒有課（schedules 表是否有資料）。
+
+DATABASE_URL 指到的資料庫裡有這一週的資料嗎？
+專案用的是 Neon（server/db.ts）。如果你覺得「本地有、畫面卻沒顯示」，很可能現在連的不是你以為的那個資料庫。
+
+教練名稱分隔符號一致嗎？
+系統大量假設「班級-教練1-教練2」用的是半形減號 -。
+如果你的資料用到 全形減號 －、破折號 —、逗號 、/， 之類，前端與後端的拆解/比對就會失敗，結果就是整週「無課程」。
+
+「選擇教練」下拉所選的名字，和資料表 schedules.coach_name 的實際值一致嗎？
+後端的查詢 getCoachSchedules() 只會命中：
+
+coach_name = 選擇的名字，或
+
+coach_name LIKE '名字-%' / '%-名字' / '%-名字-%'（多教練）
+
+如果資料裡存的是「班級-陳正浩」，但你選的是「陳正浩」，理論上會命中；
+但若資料裡存的是「班級－陳正浩（全形減號）」或「班級-陳正浩(當班)」，就不會命中。
+
+Network 面板看一下 /api/coach-schedules?startDate=...&endDate=...&coachName=... 回傳的是不是空陣列 []。
+如果是空陣列，幾乎可確定就是字串不一致或沒有資料。
+
+建議的程式修正（保險處理所有分隔符 & 大小寫 & 空白）
+A. 前端：抽教練名時支援多種分隔符
+
+檔案：client/src/pages/coach-view.tsx
+把你現在的：
+
+const splitScheduleRow = (row: string): string[] => {
+  const parts = row.split("-");
+  return parts.length === 2 ? parts : [row];
+};
+
+const extractCoachName = (scheduleRow: string): string => {
+  const parts = scheduleRow.split("-");
+  if (parts.length === 2) {
+    return parts[1];
+  }
+  return scheduleRow;
+};
+
+
+換成（容錯更多常見符號：- － — 、 ， / | ~ 等）：
+
+const normalize = (s: string) =>
+  s.replace(/\s+/g, "").replace(/[－—–~～]/g, "-").trim();
+
+const splitByAnySep = (s: string) =>
+  normalize(s).split(/[-、，,/|]/).filter(Boolean);
+
+const extractCoachesFromClassName = (className?: string) => {
+  if (!className) return [] as string[];
+  const parts = splitByAnySep(className);
+  // 班級在第一段，其餘視為教練
+  return parts.slice(1).filter((c) => c && c !== "缺");
+};
+
+
+並把使用處改成用 extractCoachesFromClassName 來充實 derivedCoaches。
+
+B. 後端：查詢時也做正常化 + ILIKE
+
+檔案：server/storage.ts 的 getCoachSchedules()
+把只用 like() 的比對，改成大小寫不敏感並且同時比對多種可能分隔符（用 SQL 的 REPLACE 正規化；在 Drizzle 可以塞 `sql`` 片段）：
+
+import { sql, and, or, between } from "drizzle-orm";
+// ...
+
+async getCoachSchedules(coachName: string, startDate: string, endDate: string) {
+  // 將全形減號等轉成半形，並移除空白
+  const normCoach = coachName.replace(/\s+/g, "").replace(/[－—–~～]/g, "-");
+
+  const norm = (expr: any) =>
+    sql`replace(replace(replace(replace(${expr}, '－','-'), '—','-'), '–','-'), ' ', '')`;
+
+  return await db
+    .select({ /* 省略 */ })
+    .from(schedules)
+    .innerJoin(venues, eq(schedules.venueId, venues.id))
+    .innerJoin(timeSlots, eq(schedules.timeSlotId, timeSlots.id))
+    .where(
+      and(
+        or(
+          sql`${norm(schedules.coachName)} ILIKE ${normCoach}`,
+          sql`${norm(schedules.coachName)} ILIKE ${normCoach || ''} || '-%'`,
+          sql`${norm(schedules.coachName)} ILIKE '%-' || ${normCoach}`,
+          sql`${norm(schedules.coachName)} ILIKE '%-' || ${normCoach} || '-%'`
+        ),
+        between(schedules.date, startDate, endDate)
+      )
+    );
+}
+
+C. 後端：/api/coaches 產生清單時納入「單一教練」格式
+
+檔案：server/storage.ts 的 getUniqueCoaches()
+目前只在有 - 時才拆，沒有 - 的純教練名會被漏掉。請補一個 else：
+
+if (result.coachName.includes('-') || /[－—–]/.test(result.coachName)) {
+  const parts = splitByAnySep(result.coachName);
+  for (let i = 1; i < parts.length; i++) {
+    const c = parts[i].trim();
+    if (c && c !== '缺') uniqueCoaches.add(c);
+  }
+} else {
+  const c = result.coachName.trim();
+  if (c) uniqueCoaches.add(c);   // <== 補這行，單一教練也納入
+}
+
+
+（splitByAnySep 可複用上面 A 的邏輯，抽成 util 共用）
+
+若你想立刻驗證
+
+在「場館課表編輯」同一週新增一筆測試資料：
+
+class_name: 初級一-陳正浩（半形 -）
+
+coach_name: 留空或寫 陳正浩
+
+回到教練視圖，選「陳正浩」→ 應該會看到該時段顯示課程。
+
+再把 class_name 改成 初級一－陳正浩（全形 －）
+
+套用上面 A/B 修正後，依然應該能顯示；未修正前則會顯示「無課程」。
+
+補充兩個易踩坑
+
+你的週範圍是以 startOfWeek(new Date(), { weekStartsOn:1 }) 算現在週。如果資料在別週，畫面就會是空的；用頁面上的左右箭頭切週，或直接在 Admin 也切到同週確認。
+
+/api/coach-schedules 查詢與 /api/coaches 的清單來源不同步時，會出現「能選到教練，但查不到課」的情況（B/C 的修正可以大幅降低這問題）。

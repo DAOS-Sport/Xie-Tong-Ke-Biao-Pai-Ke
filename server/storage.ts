@@ -14,7 +14,7 @@ import {
   type InsertCoachRegistrationType,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, between, desc, sql, like, or } from "drizzle-orm";
+import { eq, and, between, desc, sql, like, or, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -51,6 +51,16 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // 正常化字串：統一分隔符號，移除空白
+  private normalizeString(s: string): string {
+    return s.replace(/\s+/g, "").replace(/[－—–~～]/g, "-").trim();
+  }
+
+  // 按多種分隔符號拆分
+  private splitByAnySeparator(s: string): string[] {
+    return this.normalizeString(s).split(/[-、，,/|]/).filter(Boolean);
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -183,6 +193,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCoachSchedules(coachName: string, startDate: string, endDate: string): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]> {
+    // 正常化輸入的教練名稱
+    const normalizedCoachName = this.normalizeString(coachName);
+    
     return await db
       .select({
         id: schedules.id,
@@ -203,10 +216,15 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           or(
+            // 完全匹配
             eq(schedules.coachName, coachName),
-            like(schedules.coachName, `${coachName}-%`),
+            // 前綴匹配（班級-教練）
             like(schedules.coachName, `%-${coachName}`),
-            like(schedules.coachName, `%-${coachName}-%`)
+            like(schedules.coachName, `${coachName}-%`),
+            // 中間匹配（班級-教練1-教練2）
+            like(schedules.coachName, `%-${coachName}-%`),
+            // 正常化後的匹配（處理不同分隔符號）
+            sql`replace(replace(replace(${schedules.coachName}, '－', '-'), '—', '-'), ' ', '') ILIKE ${`%${normalizedCoachName}%`}`
           ),
           between(schedules.date, startDate, endDate)
         )
@@ -341,22 +359,27 @@ export class DatabaseStorage implements IStorage {
       .from(schedules)
       .where(sql`${schedules.coachName} IS NOT NULL AND ${schedules.coachName} != '' AND ${schedules.coachName} NOT LIKE '%缺%'`);
     
-    // 分析教練名稱，支援多教練格式：班級-教練1-教練2
+    // 分析教練名稱，支援多教練格式：班級-教練1-教練2 及單獨教練
     const uniqueCoaches = new Set<string>();
     
     results.forEach(result => {
       if (!result.coachName) return;
       
-      // 如果教練名稱包含連字符，表示可能是多個教練
-      if (result.coachName.includes('-')) {
-        // 分割教練名稱，第一部分通常是班級名稱，其他部分是教練
-        const parts = result.coachName.split('-');
-        // 跳過第一部分（班級名稱），處理其他部分作為教練名稱
+      // 檢查是否包含任何分隔符號
+      if (/[-－—–~～、，,/|]/.test(result.coachName)) {
+        // 多教練格式：分割後跳過第一部分（班級），其餘為教練
+        const parts = this.splitByAnySeparator(result.coachName);
         for (let i = 1; i < parts.length; i++) {
           const coach = parts[i].trim();
           if (coach && coach !== '缺') {
             uniqueCoaches.add(coach);
           }
+        }
+      } else {
+        // 單獨教練名稱，直接加入
+        const coach = result.coachName.trim();
+        if (coach && coach !== '缺') {
+          uniqueCoaches.add(coach);
         }
       }
     });
