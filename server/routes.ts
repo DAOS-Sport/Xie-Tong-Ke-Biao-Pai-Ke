@@ -329,21 +329,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teacher, scheduleId } = req.query as any;
       const db = await getSchoolDb(schoolCode);
       
-      let whereConditions: any[] = [];
+      let query = `SELECT * FROM school_${schoolCode}.teacher_feedbacks`;
+      const conditions = [];
       
       if (teacher) {
-        whereConditions.push(eq(teacherFeedbacks.teacherName, teacher));
+        conditions.push(`teacher_name = '${teacher}'`);
       }
       
       if (scheduleId) {
-        whereConditions.push(eq(teacherFeedbacks.scheduleId, scheduleId));
+        conditions.push(`schedule_id = '${scheduleId}'`);
       }
       
-      const feedbacks = whereConditions.length > 0
-        ? await db.select().from(teacherFeedbacks).where(and(...whereConditions))
-        : await db.select().from(teacherFeedbacks);
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
       
-      res.json(feedbacks);
+      query += ' ORDER BY updated_at DESC';
+      
+      const result = await db.execute(sql.raw(query));
+      res.json(result.rows || []);
     } catch (error) {
       console.error('Error fetching teacher feedbacks:', error);
       res.status(500).json({ message: "Failed to fetch feedbacks" });
@@ -375,25 +379,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 使用 ON CONFLICT 來處理更新或插入
-      const feedback = await db.insert(teacherFeedbacks)
-        .values({
-          ...feedbackData,
-          updatedAt: new Date()
-        })
-        .onConflictDoUpdate({
-          target: [teacherFeedbacks.scheduleId, teacherFeedbacks.teacherName],
-          set: {
-            status: feedbackData.status,
-            rescheduleDate: feedbackData.rescheduleDate,
-            reschedulePeriod: feedbackData.reschedulePeriod,
-            comment: feedbackData.comment,
-            updatedAt: new Date()
-          }
-        })
-        .returning();
+      // 使用原生SQL插入，處理更新或插入
+      const insertQuery = `
+        INSERT INTO school_${schoolCode}.teacher_feedbacks 
+        (schedule_id, teacher_name, status, reschedule_date, reschedule_period, comment, updated_at) 
+        VALUES ('${feedbackData.scheduleId}', '${feedbackData.teacherName}', '${feedbackData.status}', 
+                ${feedbackData.rescheduleDate ? `'${feedbackData.rescheduleDate}'` : 'NULL'}, 
+                ${feedbackData.reschedulePeriod ? `'${feedbackData.reschedulePeriod}'` : 'NULL'}, 
+                ${feedbackData.comment ? `'${feedbackData.comment.replace(/'/g, "''")}'` : 'NULL'}, 
+                NOW())
+        ON CONFLICT (schedule_id, teacher_name) 
+        DO UPDATE SET 
+          status = EXCLUDED.status,
+          reschedule_date = EXCLUDED.reschedule_date,
+          reschedule_period = EXCLUDED.reschedule_period,
+          comment = EXCLUDED.comment,
+          updated_at = NOW()
+        RETURNING *
+      `;
       
-      res.json(feedback[0]);
+      const result = await db.execute(sql.raw(insertQuery));
+      
+      res.json(result.rows[0]);
     } catch (error) {
       console.error('Error saving teacher feedback:', error);
       res.status(500).json({ message: "Failed to save feedback" });
