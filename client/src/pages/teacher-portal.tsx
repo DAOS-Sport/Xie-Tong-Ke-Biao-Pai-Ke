@@ -94,7 +94,7 @@ export default function TeacherPortal() {
     },
   });
 
-  // 提交回覆
+  // 提交回覆（帶重試機制）
   const submitFeedback = useMutation({
     mutationFn: async (data: {
       scheduleId: string;
@@ -104,64 +104,92 @@ export default function TeacherPortal() {
       reschedulePeriod?: string;
       comment?: string;
     }) => {
-      // 設置10秒超時，適合生產環境
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // 重試函數
+      const attemptRequest = async (attempt: number = 1): Promise<any> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 增加到15秒
       
-      try {
-        console.log('🚀 開始發送請求:', data);
-        
-        const response = await fetch(`/api/${schoolCode}/feedbacks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        
-        console.log('📡 收到回應:', response.status, response.statusText);
-        
-        if (!response.ok) {
-          const contentType = response.headers.get('content-type');
-          console.log('❌ 錯誤狀態:', response.status, response.statusText);
-          console.log('❌ Content-Type:', contentType);
+        try {
+          console.log(`🚀 嘗試 ${attempt}/3 發送請求:`, data);
           
-          let detail = '';
-          try {
-            if (contentType && contentType.includes('application/json')) {
-              const jsonError = await response.json();
-              detail = jsonError.message || jsonError.error || `HTTP ${response.status}`;
-              console.log('❌ JSON錯誤:', jsonError);
-            } else {
-              detail = await response.text();
-              console.log('❌ 文本錯誤:', detail);
-            }
-          } catch (parseError) {
-            console.log('❌ 解析錯誤失敗:', parseError);
-            detail = `HTTP ${response.status} ${response.statusText}`;
+          // 添加隨機延遲避免並發問題
+          if (attempt > 1) {
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
           }
           
-          throw new Error(`儲存失敗：${detail || '伺服器錯誤'}`);
+          const response = await fetch(`/api/${schoolCode}/feedbacks`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest' // 標識AJAX請求
+            },
+            body: JSON.stringify(data),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          
+          console.log('📡 收到回應:', response.status, response.statusText);
+          
+          if (!response.ok) {
+            const contentType = response.headers.get('content-type');
+            console.log('❌ 錯誤狀態:', response.status, response.statusText);
+            console.log('❌ Content-Type:', contentType);
+            
+            let detail = '';
+            try {
+              if (contentType && contentType.includes('application/json')) {
+                const jsonError = await response.json();
+                detail = jsonError.message || jsonError.error || `HTTP ${response.status}`;
+                console.log('❌ JSON錯誤:', jsonError);
+              } else {
+                detail = await response.text();
+                console.log('❌ 文本錯誤:', detail);
+              }
+            } catch (parseError) {
+              console.log('❌ 解析錯誤失敗:', parseError);
+              detail = `HTTP ${response.status} ${response.statusText}`;
+            }
+            
+            // 如果是500錯誤且還有重試次數，進行重試
+            if (response.status === 500 && attempt < 3) {
+              console.log(`🔄 第${attempt}次失敗，準備重試...`);
+              return attemptRequest(attempt + 1);
+            }
+            
+            throw new Error(`儲存失敗：${detail || '伺服器錯誤'}`);
+          }
+          
+          const result = await response.json();
+          console.log('✅ 成功回應:', result);
+          return result;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          console.error('🚨 Fetch 錯誤:', error);
+          
+          if (error instanceof Error && error.name === 'AbortError') {
+            if (attempt < 3) {
+              console.log(`🔄 超時，準備重試 ${attempt + 1}/3...`);
+              return attemptRequest(attempt + 1);
+            }
+            throw new Error('請求超時，請檢查網路連接');
+          }
+          
+          // 對於網路錯誤，嘗試重試
+          if (attempt < 3 && (!(error instanceof Error) || !error.message.includes('儲存失敗'))) {
+            console.log(`🔄 網路錯誤，準備重試 ${attempt + 1}/3...`);
+            return attemptRequest(attempt + 1);
+          }
+          
+          // 確保錯誤有意義的消息
+          if (error instanceof Error) {
+            throw error;
+          } else {
+            throw new Error('網絡錯誤，請重試');
+          }
         }
-        
-        const result = await response.json();
-        console.log('✅ 成功回應:', result);
-        return result;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        console.error('🚨 Fetch 錯誤:', error);
-        
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('請求超時，請檢查網路連接');
-        }
-        
-        // 確保錯誤有意義的消息
-        if (error instanceof Error) {
-          throw error;
-        } else {
-          throw new Error('網絡錯誤，請重試');
-        }
-      }
+      };
+      
+      return attemptRequest();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/${schoolCode}/feedbacks`] });
