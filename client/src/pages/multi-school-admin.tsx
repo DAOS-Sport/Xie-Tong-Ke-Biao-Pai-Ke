@@ -20,9 +20,7 @@ export default function MultiSchoolAdmin() {
 
   // 可用學校列表（實際環境中可能從API獲取）
   const availableSchools = [
-    { code: 'demo', name: '新北市立新北高中第二美學館' },
-    { code: 'school1', name: '學校A音樂總合表' },
-    { code: 'school2', name: '學校B游泳課表' }
+    { code: 'demo', name: '新北高中' }
   ];
 
   // 獲取選定學校的數據
@@ -35,7 +33,6 @@ export default function MultiSchoolAdmin() {
         throw new Error('Failed to fetch schedules');
       }
       const data = await response.json();
-      console.log('課表資料載入:', data.length, '筆');
       return data;
     },
     enabled: !!selectedSchool,
@@ -57,7 +54,6 @@ export default function MultiSchoolAdmin() {
   
   // 生成週內日期
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(currentWeek, i));
-  console.log('當前週期:', weekDays.map(d => format(d, 'yyyy-MM-dd')));
   
   // 根據時間段和日期組織課程數據
   const getScheduleForDayAndSlot = (date: Date, timeSlotId: string) => {
@@ -65,10 +61,6 @@ export default function MultiSchoolAdmin() {
     const filtered = schedules.filter(s => 
       format(new Date(s.date), 'yyyy-MM-dd') === dateStr && s.timeSlotId === timeSlotId
     );
-    // 調試日誌
-    if (dateStr === '2024-09-22' && filtered.length > 0) {
-      console.log('找到課表:', dateStr, timeSlotId, filtered);
-    }
     return filtered;
   };
 
