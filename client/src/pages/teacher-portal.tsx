@@ -305,18 +305,41 @@ export default function TeacherPortal() {
               <CardTitle>選擇教師</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                <SelectTrigger className="w-full max-w-xs">
-                  <SelectValue placeholder="請選擇您的姓名..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {teachers.map((teacher, index) => (
-                    <SelectItem key={index} value={teacher}>
-                      {teacher}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-3 items-start">
+                {/* 搜尋輸入框 */}
+                <div className="flex-1">
+                  <Label className="text-sm text-gray-600 mb-1 block">搜尋教師名稱</Label>
+                  <Input
+                    type="text"
+                    placeholder="輸入教師名稱..."
+                    value={selectedTeacher}
+                    onChange={(e) => setSelectedTeacher(e.target.value)}
+                    className="w-full"
+                    data-testid="search-teacher-input"
+                  />
+                </div>
+                
+                {/* 下拉選單 */}
+                <div className="flex-1">
+                  <Label className="text-sm text-gray-600 mb-1 block">或從列表選擇</Label>
+                  <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="請選擇您的姓名..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers
+                        .filter(teacher => 
+                          teacher.toLowerCase().includes(selectedTeacher.toLowerCase())
+                        )
+                        .map((teacher, index) => (
+                          <SelectItem key={index} value={teacher}>
+                            {teacher}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
