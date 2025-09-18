@@ -106,6 +106,16 @@ function VenueScheduleEditContent() {
       });
       // 同時刷新整個週期的數據（用於admin schedule頁面）
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // 刷新所有課表相關查詢（確保全系統同步）
+      queryClient.invalidateQueries({ predicate: (query) => 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].includes('/api/schedules')
+      });
+      // 刷新多學校系統課表
+      queryClient.invalidateQueries({ predicate: (query) => 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].includes('/schedules')
+      });
       toast({
         title: "儲存成功",
         description: "課表已更新",
@@ -131,6 +141,16 @@ function VenueScheduleEditContent() {
         queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`]
       });
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // 刷新所有課表相關查詢（確保全系統同步）
+      queryClient.invalidateQueries({ predicate: (query) => 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].includes('/api/schedules')
+      });
+      // 刷新多學校系統課表
+      queryClient.invalidateQueries({ predicate: (query) => 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].includes('/schedules')
+      });
       toast({
         title: "刪除成功",
         description: "課表已刪除",
