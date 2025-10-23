@@ -1,20 +1,24 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import WeekScheduleGrid from "@/components/week-schedule-grid";
+import WeekScheduleGrid, { type WeekScheduleGridRef } from "@/components/week-schedule-grid";
 import WeekConflictAlert from "@/components/week-conflict-alert";
 import PasswordProtect from "@/components/password-protect";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminSchedule() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const gridRef = useRef<WeekScheduleGridRef>(null);
+  const [selectedDay, setSelectedDay] = useState<string>("0");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Remove Replit authentication requirement for public access
 
@@ -31,6 +35,28 @@ export default function AdminSchedule() {
   const navigateToThisWeek = () => {
     setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
+
+  const handleDownloadDaySchedule = async () => {
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    try {
+      const dayIndex = parseInt(selectedDay);
+      if (gridRef.current) {
+        await gridRef.current.downloadDaySchedule(dayIndex);
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const weekDays = Array.from({ length: 5 }, (_, i) => {
+    const day = addDays(currentWeek, i);
+    return {
+      value: i.toString(),
+      label: format(day, 'M月d日 (EEEE)', { locale: zhTW }),
+    };
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,7 +184,40 @@ export default function AdminSchedule() {
                 本週
               </Button>
             </div>
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <div className="flex items-center space-x-2 w-full sm:w-auto flex-wrap gap-2">
+              <div className="flex items-center space-x-2">
+                <Select value={selectedDay} onValueChange={setSelectedDay}>
+                  <SelectTrigger className="w-40 h-9 text-xs sm:text-sm">
+                    <SelectValue placeholder="選擇日期" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {weekDays.map((day) => (
+                      <SelectItem key={day.value} value={day.value}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleDownloadDaySchedule}
+                  disabled={isDownloading}
+                  data-testid="button-download-day"
+                  className="flex-1 sm:flex-none text-xs sm:text-sm"
+                >
+                  {isDownloading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-primary border-t-transparent mr-1 sm:mr-2"></div>
+                      下載中...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-download mr-1 sm:mr-2"></i>下載本日課表
+                    </>
+                  )}
+                </Button>
+              </div>
               <Button variant="secondary" size="sm" data-testid="button-copy-week" className="flex-1 sm:flex-none text-xs sm:text-sm">
                 <i className="fas fa-copy mr-1 sm:mr-2"></i>複製週課表
               </Button>
@@ -169,7 +228,7 @@ export default function AdminSchedule() {
           </div>
 
           <PasswordProtect>
-            <WeekScheduleGrid weekStart={currentWeek} />
+            <WeekScheduleGrid ref={gridRef} weekStart={currentWeek} />
           </PasswordProtect>
         </div>
       </main>

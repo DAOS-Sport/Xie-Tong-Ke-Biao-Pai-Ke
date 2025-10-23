@@ -1,19 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CoachAutocomplete from "./coach-autocomplete";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
 import { getExtendedWeekDays, getExtendedWeekEnd, getExtendedWeekdayNames } from "@/utils/special-workdays";
+import html2canvas from "html2canvas";
 
 interface WeekScheduleGridProps {
   weekStart: Date;
 }
 
-export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
+export interface WeekScheduleGridRef {
+  downloadDaySchedule: (dayIndex: number) => Promise<void>;
+}
+
+const WeekScheduleGrid = forwardRef<WeekScheduleGridRef, WeekScheduleGridProps>(({ weekStart }, ref) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const dayRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeCell, setActiveCell] = useState<{ 
     date: string; 
     venueId: string; 
@@ -25,6 +31,83 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
 
   const weekDays = getExtendedWeekDays(weekStart); // 支援特殊工作日
   const weekEnd = getExtendedWeekEnd(weekStart);
+  
+  useImperativeHandle(ref, () => ({
+    downloadDaySchedule: async (dayIndex: number) => {
+      const dayElement = dayRefs.current[dayIndex];
+      if (!dayElement) {
+        toast({
+          title: "下載失敗",
+          description: "找不到課表元素",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 找到包含overflow的容器
+      const overflowContainer = dayElement.querySelector('.overflow-x-auto') as HTMLElement;
+      
+      // 保存原始樣式（提升到try-catch外部以便finally訪問）
+      let originalMaxHeight = '';
+      let originalOverflow = '';
+      let originalOverflowX = '';
+      let originalOverflowY = '';
+      
+      if (overflowContainer) {
+        originalMaxHeight = overflowContainer.style.maxHeight || '';
+        originalOverflow = overflowContainer.style.overflow || '';
+        originalOverflowX = overflowContainer.style.overflowX || '';
+        originalOverflowY = overflowContainer.style.overflowY || '';
+      }
+
+      try {
+        // 暫時移除所有overflow限制以捕獲完整內容
+        if (overflowContainer) {
+          overflowContainer.style.maxHeight = 'none';
+          overflowContainer.style.overflow = 'visible';
+          overflowContainer.style.overflowX = 'visible';
+          overflowContainer.style.overflowY = 'visible';
+        }
+
+        // 等待DOM更新
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const canvas = await html2canvas(dayElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false,
+          useCORS: true,
+          windowHeight: dayElement.scrollHeight,
+        });
+
+        const link = document.createElement('a');
+        const dateStr = format(weekDays[dayIndex], 'yyyy-MM-dd');
+        link.download = `課表_${dateStr}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        toast({
+          title: "下載成功",
+          description: `課表已下載：${dateStr}`,
+        });
+      } catch (error) {
+        console.error('Download error:', error);
+        toast({
+          title: "下載失敗",
+          description: "無法生成圖片，請稍後再試",
+          variant: "destructive",
+        });
+      } finally {
+        // 無論成功或失敗，都恢復原始樣式
+        if (overflowContainer) {
+          overflowContainer.style.maxHeight = originalMaxHeight;
+          overflowContainer.style.overflow = originalOverflow;
+          overflowContainer.style.overflowX = originalOverflowX;
+          overflowContainer.style.overflowY = originalOverflowY;
+        }
+      }
+    },
+  }));
 
   const { data: venues } = useQuery<Venue[]>({
     queryKey: ['/api/venues'],
@@ -284,16 +367,22 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
         const dateStr = format(day, 'yyyy-MM-dd');
         
         return (
-          <div key={dayIndex} className="bg-card rounded-lg border border-border p-4">
-            <h3 className="text-lg font-semibold mb-4 text-center">
-              {format(day, 'M月d日')} {weekDayNames[dayIndex]}
-            </h3>
+          <div 
+            key={dayIndex} 
+            ref={(el) => dayRefs.current[dayIndex] = el}
+            className="bg-card rounded-lg border border-border p-4"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold flex-1 text-center">
+                {format(day, 'M月d日')} {weekDayNames[dayIndex]}
+              </h3>
+            </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
+            <div className="overflow-x-auto" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+              <table className="w-full border-collapse relative">
+                <thead className="sticky top-0 z-10">
                   <tr>
-                    <th className="time-cell bg-muted text-muted-foreground text-sm font-medium p-3 border border-border">
+                    <th className="time-cell bg-muted text-muted-foreground text-sm font-medium p-3 border border-border sticky left-0 z-20">
                       節次/時間
                     </th>
                     {venues.map((venue) => (
@@ -310,7 +399,7 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                 <tbody>
                   {timeSlots.map((timeSlot) => (
                     <tr key={timeSlot.id}>
-                      <td className="time-cell bg-muted text-sm font-medium p-3 border border-border" data-testid={`time-slot-${dayIndex}-${timeSlot.period}`}>
+                      <td className="time-cell bg-muted text-sm font-medium p-3 border border-border sticky left-0 z-10" data-testid={`time-slot-${dayIndex}-${timeSlot.period}`}>
                         {timeSlot.period}<br />
                         <span className="text-xs text-muted-foreground">
                           {timeSlot.startTime}-{timeSlot.endTime}
@@ -374,10 +463,11 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
                                       />
                                     ) : (
                                       <span 
-                                        className="flex-1 truncate cursor-pointer hover:bg-accent/30 rounded px-1"
+                                        className="flex-1 cursor-pointer hover:bg-accent/30 rounded px-1 break-words"
                                         onDoubleClick={() => handleEditSchedule(schedule)}
                                         title="雙擊編輯課程"
                                         data-testid={`span-edit-${dayIndex}-${venue.name}-${timeSlot.period}-${index}`}
+                                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                       >
                                         {schedule.className && schedule.coachName 
                                           ? `${schedule.className}-${schedule.coachName}`
@@ -453,4 +543,8 @@ export default function WeekScheduleGrid({ weekStart }: WeekScheduleGridProps) {
       })}
     </div>
   );
-}
+});
+
+WeekScheduleGrid.displayName = 'WeekScheduleGrid';
+
+export default WeekScheduleGrid;
