@@ -17,7 +17,16 @@ export default function AdminSchedule() {
   const [, setLocation] = useLocation();
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const gridRef = useRef<WeekScheduleGridRef>(null);
-  const [selectedDay, setSelectedDay] = useState<string>("0");
+  // 默認選擇今天，如果今天不在這週範圍內則選擇星期一
+  const getTodayIndex = () => {
+    const today = new Date();
+    const todayDay = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    if (todayDay >= 1 && todayDay <= 5) {
+      return (todayDay - 1).toString(); // 轉換為0-4的索引
+    }
+    return "0"; // 週末默認選擇星期一
+  };
+  const [selectedDay, setSelectedDay] = useState<string>(getTodayIndex());
   const [isDownloading, setIsDownloading] = useState(false);
 
   // Remove Replit authentication requirement for public access
@@ -213,7 +222,7 @@ export default function AdminSchedule() {
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-download mr-1 sm:mr-2"></i>下載本日課表
+                      <i className="fas fa-download mr-1 sm:mr-2"></i>下載課表
                     </>
                   )}
                 </Button>
