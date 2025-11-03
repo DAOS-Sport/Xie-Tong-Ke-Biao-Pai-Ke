@@ -51,6 +51,8 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
         console.log('[FloatingConflictAlert] 被抑制到:', dismissTime);
         setIsVisible(false);
         return;
+      } else {
+        localStorage.removeItem(DISMISS_KEY);
       }
     }
 
