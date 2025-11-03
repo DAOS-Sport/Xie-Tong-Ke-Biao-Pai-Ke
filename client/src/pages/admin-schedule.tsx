@@ -6,7 +6,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import WeekScheduleGrid, { type WeekScheduleGridRef } from "@/components/week-schedule-grid";
-import WeekConflictAlert from "@/components/week-conflict-alert";
+import FloatingConflictAlert from "@/components/floating-conflict-alert";
 import PasswordProtect from "@/components/password-protect";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -157,7 +157,7 @@ export default function AdminSchedule() {
           </nav>
         </div>
 
-        <WeekConflictAlert weekStart={currentWeek} />
+        <FloatingConflictAlert weekStart={currentWeek} />
 
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">

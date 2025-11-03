@@ -11,7 +11,7 @@ import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
 import { getExtendedWeekDays, getExtendedWeekdayNames, getExtendedWeekEnd } from "@/utils/special-workdays";
-import WeekConflictAlert from "@/components/week-conflict-alert";
+import FloatingConflictAlert from "@/components/floating-conflict-alert";
 
 export default function VenueSchedule() {
   const { user } = useAuth();
@@ -173,7 +173,7 @@ export default function VenueSchedule() {
           <h2 className="text-2xl font-bold mb-4">場館課表顯示</h2>
           
           {/* 本週衝突警告 */}
-          <WeekConflictAlert weekStart={currentWeek} />
+          <FloatingConflictAlert weekStart={currentWeek} />
           
           {/* 場館選擇 */}
           <div className="mb-4">
