@@ -18,7 +18,7 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
   
   const conflictQueries = useQueries({
     queries: weekDays.map(day => ({
-      queryKey: ['/api/conflicts', format(day, 'yyyy-MM-dd')],
+      queryKey: [`/api/conflicts/${format(day, 'yyyy-MM-dd')}`],
     })),
   });
 
@@ -35,20 +35,26 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
   );
 
   useEffect(() => {
+    console.log('[FloatingConflictAlert] 衝突數量:', allConflicts.length);
+    console.log('[FloatingConflictAlert] 衝突詳情:', allConflicts);
+    
     if (allConflicts.length === 0) {
       setIsVisible(false);
       return;
     }
 
     const dismissUntil = localStorage.getItem(DISMISS_KEY);
+    console.log('[FloatingConflictAlert] dismissUntil:', dismissUntil);
     if (dismissUntil) {
       const dismissTime = new Date(dismissUntil);
       if (new Date() < dismissTime) {
+        console.log('[FloatingConflictAlert] 被抑制到:', dismissTime);
         setIsVisible(false);
         return;
       }
     }
 
+    console.log('[FloatingConflictAlert] 設置為可見');
     setIsVisible(true);
   }, [allConflicts.length]);
 
@@ -72,13 +78,16 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
     return null;
   }
 
+  console.log('[FloatingConflictAlert] 正在渲染！isVisible:', isVisible);
+  
   return (
     <div
       role="dialog"
       aria-live="polite"
       aria-label="本週臨時異動通知"
-      className="fixed top-24 right-6 w-[400px] max-w-[calc(100vw-3rem)] bg-white dark:bg-card rounded-xl shadow-2xl border border-border z-50 p-5"
+      className="fixed top-24 right-6 w-[400px] max-w-[calc(100vw-3rem)] bg-white dark:bg-card rounded-xl shadow-2xl border-2 border-destructive z-[9999] p-5"
       data-testid="floating-conflict-alert"
+      style={{ position: 'fixed', top: '96px', right: '24px', zIndex: 9999 }}
     >
       <button
         onClick={handleClose}
