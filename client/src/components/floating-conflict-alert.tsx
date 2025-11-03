@@ -14,6 +14,10 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
   const [isVisible, setIsVisible] = useState(false);
   const [suppressToday, setSuppressToday] = useState(false);
   
+  useEffect(() => {
+    localStorage.removeItem(DISMISS_KEY);
+  }, []);
+  
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
   
   const conflictQueries = useQueries({
