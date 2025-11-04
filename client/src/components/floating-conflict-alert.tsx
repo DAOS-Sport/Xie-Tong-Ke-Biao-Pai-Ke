@@ -100,14 +100,21 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
       ) : (
         <motion.div
           key="expanded"
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.3, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
+          exit={{ scale: 0.3, opacity: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 20 }}
           role="dialog"
           aria-live="polite"
           aria-label="本週臨時異動通知"
-          className="fixed top-24 right-6 w-[400px] max-w-[calc(100vw-3rem)] bg-white dark:bg-card rounded-xl shadow-2xl border-2 border-destructive z-[9999] p-5"
+          className="fixed w-[400px] max-w-[calc(100vw-3rem)] bg-white dark:bg-card rounded-xl shadow-2xl border-2 border-destructive z-[9999] p-5"
+          style={{
+            bottom: position.y === 0 ? '24px' : 'auto',
+            right: position.x === 0 ? '24px' : 'auto',
+            left: position.x !== 0 ? `${position.x}px` : 'auto',
+            top: position.y !== 0 ? `${position.y}px` : 'auto',
+            transformOrigin: 'bottom right'
+          }}
           data-testid="floating-conflict-alert"
         >
           <button
