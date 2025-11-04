@@ -119,14 +119,26 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
         >
           <button
             onClick={handleToggleCollapse}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors z-10"
             aria-label="收縮通知"
             data-testid="button-minimize-notification"
           >
             <Minimize2 className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <div className="space-y-3">
+          <div 
+            className="space-y-3 cursor-pointer select-none hover:bg-muted/30 rounded-lg p-2 -m-2 transition-colors"
+            onClick={handleToggleCollapse}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggleCollapse();
+              }
+            }}
+            aria-label="點擊收縮通知"
+          >
             <div className="flex items-center">
               <div className="w-2 h-2 rounded-full bg-destructive mr-2" aria-hidden="true"></div>
               <h3 className="text-base font-medium text-foreground">本週臨時異動</h3>
