@@ -29,6 +29,11 @@ export default function FloatingConflictAlert({ weekStart }: FloatingConflictAle
     return { x: 0, y: 0 };
   });
   
+  // Ensure weekStart is a valid Date object
+  if (!weekStart || !(weekStart instanceof Date) || isNaN(weekStart.getTime())) {
+    return null;
+  }
+  
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
   
   const conflictQueries = useQueries({

@@ -562,7 +562,7 @@ function VenueScheduleEditContent() {
           </Card>
         )}
       </main>
-      <FloatingConflictAlert currentWeek={currentWeek} />
+      <FloatingConflictAlert weekStart={currentWeek} />
     </div>
   );
 }
