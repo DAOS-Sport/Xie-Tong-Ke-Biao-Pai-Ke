@@ -329,14 +329,13 @@ function VenueScheduleEditContent() {
           </nav>
         </div>
 
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-4">場館課表編輯</h2>
-
+        {/* 場館選擇 & 週次導航 */}
+        <div className="mb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* 場館選擇 */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">選擇場館：</label>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium whitespace-nowrap">選擇場館：</label>
             <Select value={selectedVenue} onValueChange={setSelectedVenue}>
-              <SelectTrigger className="w-full sm:w-64">
+              <SelectTrigger className="w-48">
                 <SelectValue placeholder="請選擇場館" />
               </SelectTrigger>
               <SelectContent>
@@ -350,33 +349,30 @@ function VenueScheduleEditContent() {
           </div>
 
           {/* 週次導航 */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
-                data-testid="button-prev-week"
-                className="h-8 w-8 sm:h-10 sm:w-10"
-              >
-                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
+          <div className="flex items-center gap-2 sm:gap-4 w-full lg:w-auto">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
+              data-testid="button-prev-week"
+              className="h-8 w-8 sm:h-10 sm:w-10"
+            >
+              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
 
-              <h2 className="text-sm sm:text-xl font-semibold text-center flex-1 sm:flex-none">
-                {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} -{" "}
-                {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
-              </h2>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
-                data-testid="button-next-week"
-                className="h-8 w-8 sm:h-10 sm:w-10"
-              >
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
+            <div className="text-sm sm:text-base font-semibold text-center flex-1 lg:flex-none whitespace-nowrap">
+              {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} - {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
+              data-testid="button-next-week"
+              className="h-8 w-8 sm:h-10 sm:w-10"
+            >
+              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
 
             <Button
               variant="outline"
@@ -384,7 +380,7 @@ function VenueScheduleEditContent() {
                 setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))
               }
               data-testid="button-current-week"
-              className="text-xs sm:text-sm px-3 sm:px-4 w-full sm:w-auto"
+              className="text-xs sm:text-sm px-3 sm:px-4"
             >
               本週
             </Button>
