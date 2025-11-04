@@ -18,6 +18,7 @@ import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import CoachAutocomplete from "@/components/coach-autocomplete";
 import PasswordProtect from "@/components/password-protect";
+import FloatingConflictAlert from "@/components/floating-conflict-alert";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
 import {
   getExtendedWeekDays,
@@ -561,6 +562,7 @@ function VenueScheduleEditContent() {
           </Card>
         )}
       </main>
+      <FloatingConflictAlert currentWeek={currentWeek} />
     </div>
   );
 }
