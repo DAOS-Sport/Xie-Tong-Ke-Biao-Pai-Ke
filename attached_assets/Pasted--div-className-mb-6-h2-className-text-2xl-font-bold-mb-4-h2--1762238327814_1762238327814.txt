@@ -1,0 +1,151 @@
+<div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">場館課表顯示</h2>
+          
+          {/* 本週衝突警告 */}
+          <FloatingConflictAlert weekStart={currentWeek} />
+          
+          {/* 場館選擇 */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">選擇場館：</label>
+            <Select value={selectedVenue} onValueChange={setSelectedVenue}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="請選擇場館" />
+              </SelectTrigger>
+              <SelectContent>
+                {venues.map((venue) => (
+                  <SelectItem key={venue.id} value={venue.id}>
+                    {venue.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 週次導航 */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentWeek(prev => subWeeks(prev, 1))}
+                data-testid="button-prev-week"
+                className="h-8 w-8 sm:h-10 sm:w-10"
+              >
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+              
+              <h2 className="text-sm sm:text-xl font-semibold text-center flex-1 sm:flex-none">
+                {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} - {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
+              </h2>
+              
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentWeek(prev => addWeeks(prev, 1))}
+                data-testid="button-next-week"
+                className="h-8 w-8 sm:h-10 sm:w-10"
+              >
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              data-testid="button-current-week"
+              className="text-xs sm:text-sm px-3 sm:px-4 w-full sm:w-auto"
+            >
+              本週
+            </Button>
+          </div>
+        </div>
+
+        {/* 場館課表網格 */}
+        {selectedVenueData && (
+          <Card>
+            <CardHeader>
+              <CardTitle 
+                className={`text-center text-lg venue-${selectedVenueData.color}`}
+                style={{ 
+                  backgroundColor: `var(--venue-${selectedVenueData.color})`,
+                  color: 'white',
+                  padding: '8px',
+                  borderRadius: '6px'
+                }}
+              >
+                {selectedVenueData.name} - 週課表
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto mobile-table-container">
+                <table className="w-full border-collapse min-w-[600px]">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>
+                      {getExtendedWeekDays(currentWeek).map((date, index) => {
+                        const weekDayNames = getExtendedWeekdayNames(currentWeek);
+                        return (
+                          <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                            <div className="text-center">
+                              <div className="font-semibold">{weekDayNames[index]}</div>
+                              <div className="text-sm text-gray-600">
+                                {format(date, "MM/dd")}
+                              </div>
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {timeSlots.map((timeSlot) => (
+                      <tr key={timeSlot.id}>
+                        <td className="border border-gray-300 p-2 bg-gray-50 text-center">
+                          <div className="font-medium">{timeSlot.period}</div>
+                          <div className="text-xs text-gray-600">
+                            {timeSlot.startTime}-{timeSlot.endTime}
+                          </div>
+                        </td>
+                        {getExtendedWeekDays(currentWeek).map((date, index) => {
+                          const dateStr = format(date, "yyyy-MM-dd");
+                          const daySchedules = schedulesByDateAndTime[dateStr]?.[timeSlot.id] || [];
+                          
+                          return (
+                            <td key={`${timeSlot.id}-${index}`} className="border border-gray-300 p-1 align-top">
+                              <div className="space-y-1 min-h-[60px]">
+                                {daySchedules.map((schedule, index) => (
+                                  <div
+                                    key={`${schedule.id}-${index}`}
+                                    className="text-xs p-1 rounded bg-blue-100 border border-blue-200"
+                                  >
+                                    <div className="font-medium text-blue-800">
+                                      {schedule.className || '游泳課'}
+                                    </div>
+                                    {schedule.coachName && (
+                                      <div className="text-blue-600">
+                                        {schedule.coachName}
+                                      </div>
+                                    )}
+                                    {schedule.notes && (
+                                      <div className="text-gray-600 mt-1">
+                                        {schedule.notes}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </main>
+    </div>
+  );
+}

@@ -5,7 +5,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
@@ -13,7 +19,11 @@ import { zhTW } from "date-fns/locale";
 import CoachAutocomplete from "@/components/coach-autocomplete";
 import PasswordProtect from "@/components/password-protect";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
-import { getExtendedWeekDays, getExtendedWeekdayNames, getExtendedWeekEnd } from "@/utils/special-workdays";
+import {
+  getExtendedWeekDays,
+  getExtendedWeekdayNames,
+  getExtendedWeekEnd,
+} from "@/utils/special-workdays";
 
 function VenueScheduleEditContent() {
   const { user } = useAuth();
@@ -25,9 +35,9 @@ function VenueScheduleEditContent() {
     const now = new Date();
     return startOfWeek(now, { weekStartsOn: 1 }); // 週一開始
   });
-  const [activeCell, setActiveCell] = useState<{ 
-    date: string; 
-    timeSlotId: string; 
+  const [activeCell, setActiveCell] = useState<{
+    date: string;
+    timeSlotId: string;
   } | null>(null);
 
   // Remove Replit authentication requirement for public access
@@ -46,8 +56,12 @@ function VenueScheduleEditContent() {
   const weekStart = format(currentWeek, "yyyy-MM-dd");
   const weekEnd = format(getExtendedWeekEnd(currentWeek), "yyyy-MM-dd"); // 支援週六補班
 
-  const { data: schedules = [] } = useQuery<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>({
-    queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`],
+  const { data: schedules = [] } = useQuery<
+    (Schedule & { venue: Venue; timeSlot: TimeSlot })[]
+  >({
+    queryKey: [
+      `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
+    ],
     enabled: !!selectedVenue,
   });
 
@@ -59,9 +73,12 @@ function VenueScheduleEditContent() {
   }, [venues, selectedVenue]);
 
   // 按日期和時間段組織課表資料
-  const schedulesByDateAndTime: Record<string, Record<string, (Schedule & { venue: Venue; timeSlot: TimeSlot })[]>> = {};
-  
-  schedules.forEach(schedule => {
+  const schedulesByDateAndTime: Record<
+    string,
+    Record<string, (Schedule & { venue: Venue; timeSlot: TimeSlot })[]>
+  > = {};
+
+  schedules.forEach((schedule) => {
     if (schedule.venue.id === selectedVenue) {
       if (!schedulesByDateAndTime[schedule.date]) {
         schedulesByDateAndTime[schedule.date] = {};
@@ -84,37 +101,45 @@ function VenueScheduleEditContent() {
     }) => {
       if (!scheduleData.className && !scheduleData.coachName) {
         // 如果兩者都空，刪除課程
-        const existingSchedule = schedules?.find(s => 
-          s.date === scheduleData.date && 
-          s.venueId === scheduleData.venueId && 
-          s.timeSlotId === scheduleData.timeSlotId
+        const existingSchedule = schedules?.find(
+          (s) =>
+            s.date === scheduleData.date &&
+            s.venueId === scheduleData.venueId &&
+            s.timeSlotId === scheduleData.timeSlotId,
         );
         if (existingSchedule) {
-          const response = await apiRequest('DELETE', `/api/schedules/${existingSchedule.id}`);
+          const response = await apiRequest(
+            "DELETE",
+            `/api/schedules/${existingSchedule.id}`,
+          );
           return response.json();
         }
         return null;
       }
-      
-      const response = await apiRequest('POST', '/api/schedules', scheduleData);
+
+      const response = await apiRequest("POST", "/api/schedules", scheduleData);
       return response.json();
     },
     onSuccess: () => {
       // 刷新當前查詢的數據
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`]
+      queryClient.invalidateQueries({
+        queryKey: [
+          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
+        ],
       });
       // 同時刷新整個週期的數據（用於admin schedule頁面）
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       // 刷新所有課表相關查詢（確保全系統同步）
-      queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && 
-        query.queryKey[0].includes('/api/schedules')
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
       });
       // 刷新多學校系統課表
-      queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && 
-        query.queryKey[0].includes('/schedules')
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/schedules"),
       });
       toast({
         title: "儲存成功",
@@ -133,23 +158,30 @@ function VenueScheduleEditContent() {
   // 刪除課程的 mutation
   const deleteMutation = useMutation({
     mutationFn: async (scheduleId: string) => {
-      const response = await apiRequest('DELETE', `/api/schedules/${scheduleId}`);
+      const response = await apiRequest(
+        "DELETE",
+        `/api/schedules/${scheduleId}`,
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`]
+      queryClient.invalidateQueries({
+        queryKey: [
+          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
+        ],
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       // 刷新所有課表相關查詢（確保全系統同步）
-      queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && 
-        query.queryKey[0].includes('/api/schedules')
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
       });
       // 刷新多學校系統課表
-      queryClient.invalidateQueries({ predicate: (query) => 
-        typeof query.queryKey[0] === 'string' && 
-        query.queryKey[0].includes('/schedules')
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/schedules"),
       });
       toast({
         title: "刪除成功",
@@ -169,15 +201,15 @@ function VenueScheduleEditContent() {
   const handleAddClass = (date: string, timeSlotId: string, value: string) => {
     const trimmedValue = value.trim();
     if (!trimmedValue || !selectedVenue) return;
-    
+
     // 解析輸入格式：班級-教練名
-    let className = '';
-    let coachName = '';
-    
-    if (trimmedValue.includes('-')) {
-      const parts = trimmedValue.split('-');
+    let className = "";
+    let coachName = "";
+
+    if (trimmedValue.includes("-")) {
+      const parts = trimmedValue.split("-");
       className = parts[0].trim();
-      coachName = parts.slice(1).join('-').trim();
+      coachName = parts.slice(1).join("-").trim();
     } else {
       className = trimmedValue;
     }
@@ -196,7 +228,7 @@ function VenueScheduleEditContent() {
     deleteMutation.mutate(scheduleId);
   };
 
-  const selectedVenueData = venues?.find(v => v.id === selectedVenue);
+  const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
   if (!venues || !timeSlots) {
     return (
@@ -213,7 +245,9 @@ function VenueScheduleEditContent() {
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 gap-4">
             <div className="flex items-center space-x-4">
               <i className="fas fa-swimming-pool text-primary text-xl sm:text-2xl"></i>
-              <h1 className="text-lg sm:text-xl font-bold text-primary">五泳池課表整合系統</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-primary">
+                五泳池課表整合系統
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm bg-red-500 text-white px-3 py-1 rounded-full">
@@ -225,12 +259,14 @@ function VenueScheduleEditContent() {
                     <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                       <i className="fas fa-user text-primary-foreground text-sm"></i>
                     </div>
-                    <span className="text-sm font-medium">{user.firstName || user.email}</span>
+                    <span className="text-sm font-medium">
+                      {user.firstName || user.email}
+                    </span>
                   </div>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => window.location.href = '/api/logout'}
+                    onClick={() => (window.location.href = "/api/logout")}
                     data-testid="button-logout"
                   >
                     登出
@@ -244,44 +280,47 @@ function VenueScheduleEditContent() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
-          <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
-            <button 
+          <nav
+            className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0"
+            aria-label="Tabs"
+          >
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/admin/schedule')}
+              onClick={() => setLocation("/admin/schedule")}
               data-testid="tab-schedule-edit"
             >
               <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
-            <button 
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/coach')}
+              onClick={() => setLocation("/coach")}
               data-testid="tab-coach-view"
             >
               <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
             </button>
-            <button 
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/venue-schedule')}
+              onClick={() => setLocation("/venue-schedule")}
               data-testid="tab-venue-schedule"
             >
               <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
-            <button 
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
               data-testid="tab-venue-schedule-edit"
             >
               <i className="fas fa-edit mr-1 sm:mr-2"></i>場館課表編輯
             </button>
-            <button 
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/statistics')}
+              onClick={() => setLocation("/statistics")}
               data-testid="tab-statistics"
             >
               <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
-            <button 
+            <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/find-coach')}
+              onClick={() => setLocation("/find-coach")}
               data-testid="tab-find-coach"
             >
               <i className="fas fa-search mr-1 sm:mr-2"></i>尋找教練
@@ -291,7 +330,7 @@ function VenueScheduleEditContent() {
 
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-4">場館課表編輯</h2>
-          
+
           {/* 場館選擇 */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">選擇場館：</label>
@@ -315,31 +354,34 @@ function VenueScheduleEditContent() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentWeek(prev => subWeeks(prev, 1))}
+                onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
                 data-testid="button-prev-week"
                 className="h-8 w-8 sm:h-10 sm:w-10"
               >
                 <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              
+
               <h2 className="text-sm sm:text-xl font-semibold text-center flex-1 sm:flex-none">
-                {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} - {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
+                {format(currentWeek, "yyyy年MM月dd日", { locale: zhTW })} -{" "}
+                {format(addDays(currentWeek, 4), "MM月dd日", { locale: zhTW })}
               </h2>
-              
+
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setCurrentWeek(prev => addWeeks(prev, 1))}
+                onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
                 data-testid="button-next-week"
                 className="h-8 w-8 sm:h-10 sm:w-10"
               >
                 <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
-            
+
             <Button
               variant="outline"
-              onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              onClick={() =>
+                setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))
+              }
               data-testid="button-current-week"
               className="text-xs sm:text-sm px-3 sm:px-4 w-full sm:w-auto"
             >
@@ -352,13 +394,13 @@ function VenueScheduleEditContent() {
         {selectedVenueData && (
           <Card>
             <CardHeader>
-              <CardTitle 
+              <CardTitle
                 className={`text-center text-lg venue-${selectedVenueData.color}`}
-                style={{ 
+                style={{
                   backgroundColor: `var(--venue-${selectedVenueData.color})`,
-                  color: 'white',
-                  padding: '8px',
-                  borderRadius: '6px'
+                  color: "white",
+                  padding: "8px",
+                  borderRadius: "6px",
                 }}
               >
                 {selectedVenueData.name} - 週課表編輯
@@ -369,13 +411,21 @@ function VenueScheduleEditContent() {
                 <table className="w-full border-collapse min-w-[600px]">
                   <thead>
                     <tr>
-                      <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>
+                      <th className="border border-gray-300 p-2 bg-gray-50 w-20">
+                        節次/時間
+                      </th>
                       {getExtendedWeekDays(currentWeek).map((date, index) => {
-                        const weekDayNames = getExtendedWeekdayNames(currentWeek);
+                        const weekDayNames =
+                          getExtendedWeekdayNames(currentWeek);
                         return (
-                          <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                          <th
+                            key={index}
+                            className="border border-gray-300 p-2 bg-gray-50 min-w-32"
+                          >
                             <div className="text-center">
-                              <div className="font-semibold">{weekDayNames[index]}</div>
+                              <div className="font-semibold">
+                                {weekDayNames[index]}
+                              </div>
                               <div className="text-sm text-gray-600">
                                 {format(date, "MM/dd")}
                               </div>
@@ -396,27 +446,35 @@ function VenueScheduleEditContent() {
                         </td>
                         {getExtendedWeekDays(currentWeek).map((date, index) => {
                           const dateStr = format(date, "yyyy-MM-dd");
-                          const daySchedules = schedulesByDateAndTime[dateStr]?.[timeSlot.id] || [];
-                          
-                          const isActive = activeCell?.date === dateStr && 
-                                           activeCell?.timeSlotId === timeSlot.id;
-                          
+                          const daySchedules =
+                            schedulesByDateAndTime[dateStr]?.[timeSlot.id] ||
+                            [];
+
+                          const isActive =
+                            activeCell?.date === dateStr &&
+                            activeCell?.timeSlotId === timeSlot.id;
+
                           return (
-                            <td 
-                              key={`${timeSlot.id}-${index}`} 
+                            <td
+                              key={`${timeSlot.id}-${index}`}
                               className="border border-gray-300 p-1 align-top hover:bg-accent/50 cursor-pointer relative"
-                              style={{ minHeight: '60px', verticalAlign: 'top' }}
+                              style={{
+                                minHeight: "60px",
+                                verticalAlign: "top",
+                              }}
                             >
                               <div className="space-y-1 min-h-[60px]">
                                 {daySchedules.map((schedule, index) => (
-                                  <div 
-                                    key={schedule.id} 
+                                  <div
+                                    key={schedule.id}
                                     className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group"
                                   >
                                     <span className="flex-1 truncate">
-                                      {schedule.className && schedule.coachName 
+                                      {schedule.className && schedule.coachName
                                         ? `${schedule.className}-${schedule.coachName}`
-                                        : schedule.className || schedule.coachName || '未命名'}
+                                        : schedule.className ||
+                                          schedule.coachName ||
+                                          "未命名"}
                                     </span>
                                     <button
                                       onClick={(e) => {
@@ -433,22 +491,40 @@ function VenueScheduleEditContent() {
                                 <input
                                   type="text"
                                   className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
-                                  placeholder={daySchedules.length === 0 ? "班級-教練" : "新增課程"}
-                                  onFocus={() => setActiveCell({ date: dateStr, timeSlotId: timeSlot.id })}
+                                  placeholder={
+                                    daySchedules.length === 0
+                                      ? "班級-教練"
+                                      : "新增課程"
+                                  }
+                                  onFocus={() =>
+                                    setActiveCell({
+                                      date: dateStr,
+                                      timeSlotId: timeSlot.id,
+                                    })
+                                  }
                                   onBlur={(e) => {
                                     const value = e.target.value.trim();
                                     if (value) {
-                                      handleAddClass(dateStr, timeSlot.id, value);
-                                      e.target.value = '';
+                                      handleAddClass(
+                                        dateStr,
+                                        timeSlot.id,
+                                        value,
+                                      );
+                                      e.target.value = "";
                                     }
                                     setActiveCell(null);
                                   }}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const value = e.currentTarget.value.trim();
+                                    if (e.key === "Enter") {
+                                      const value =
+                                        e.currentTarget.value.trim();
                                       if (value) {
-                                        handleAddClass(dateStr, timeSlot.id, value);
-                                        e.currentTarget.value = '';
+                                        handleAddClass(
+                                          dateStr,
+                                          timeSlot.id,
+                                          value,
+                                        );
+                                        e.currentTarget.value = "";
                                       }
                                       e.currentTarget.blur();
                                     }
@@ -459,10 +535,14 @@ function VenueScheduleEditContent() {
                               {isActive && (
                                 <CoachAutocomplete
                                   onSelect={(coachName: string) => {
-                                    const input = document.querySelector(`[data-testid="input-${dateStr}-${timeSlot.id}"]`) as HTMLInputElement;
+                                    const input = document.querySelector(
+                                      `[data-testid="input-${dateStr}-${timeSlot.id}"]`,
+                                    ) as HTMLInputElement;
                                     if (input) {
                                       const currentValue = input.value;
-                                      const newValue = currentValue ? `${currentValue}-${coachName}` : coachName;
+                                      const newValue = currentValue
+                                        ? `${currentValue}-${coachName}`
+                                        : coachName;
                                       input.value = newValue;
                                     }
                                     setActiveCell(null);
