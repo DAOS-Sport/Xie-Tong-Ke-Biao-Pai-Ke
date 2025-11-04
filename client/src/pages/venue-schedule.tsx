@@ -246,7 +246,7 @@ export default function VenueSchedule() {
                 <table className="w-full border-collapse min-w-[600px]">
                   <thead>
                     <tr>
-                      <th className="border border-gray-300 p-2 bg-gray-50 w-20">節次/時間</th>
+                      <th className="border border-gray-300 p-2 bg-gray-50 w-20 sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">節次/時間</th>
                       {getExtendedWeekDays(currentWeek).map((date, index) => {
                         const weekDayNames = getExtendedWeekdayNames(currentWeek);
                         return (
@@ -265,7 +265,7 @@ export default function VenueSchedule() {
                   <tbody>
                     {timeSlots.map((timeSlot) => (
                       <tr key={timeSlot.id}>
-                        <td className="border border-gray-300 p-2 bg-gray-50 text-center">
+                        <td className="border border-gray-300 p-2 bg-gray-50 text-center sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
                           <div className="font-medium">{timeSlot.period}</div>
                           <div className="text-xs text-gray-600">
                             {timeSlot.startTime}-{timeSlot.endTime}
