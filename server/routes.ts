@@ -928,6 +928,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === 教練可用時段 API ===
+
+  app.get('/api/coach-availability', async (req, res) => {
+    try {
+      const { weekStart } = req.query as { weekStart: string };
+      if (!weekStart) {
+        return res.status(400).json({ message: "Missing weekStart parameter" });
+      }
+      const availability = await storage.getCoachAvailabilityByWeek(weekStart);
+      res.json(availability);
+    } catch (error) {
+      console.error('Error fetching coach availability:', error);
+      res.status(500).json({ message: "Failed to fetch coach availability" });
+    }
+  });
+
+  app.get('/api/coach-portal/availability', async (req, res) => {
+    try {
+      const { coachName, weekStart } = req.query as { coachName: string; weekStart: string };
+      if (!coachName || !weekStart) {
+        return res.status(400).json({ message: "Missing coachName or weekStart" });
+      }
+      const availability = await storage.getCoachAvailabilityForCoach(coachName, weekStart);
+      res.json(availability);
+    } catch (error) {
+      console.error('Error fetching coach availability:', error);
+      res.status(500).json({ message: "Failed to fetch coach availability" });
+    }
+  });
+
+  app.post('/api/coach-portal/availability', async (req, res) => {
+    try {
+      const { coachName, weekStart, slots } = req.body as {
+        coachName: string;
+        weekStart: string;
+        slots: { dayOfWeek: number; timeSlotOrder: number }[];
+      };
+      if (!coachName || !weekStart || !Array.isArray(slots)) {
+        return res.status(400).json({ message: "Missing coachName, weekStart, or slots" });
+      }
+      for (const slot of slots) {
+        if (slot.dayOfWeek < 1 || slot.dayOfWeek > 7 || slot.timeSlotOrder < 1 || slot.timeSlotOrder > 7) {
+          return res.status(400).json({ message: "dayOfWeek must be 1-7, timeSlotOrder must be 1-7" });
+        }
+      }
+      await storage.upsertCoachAvailability(coachName, weekStart, slots);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving coach availability:', error);
+      res.status(500).json({ message: "Failed to save coach availability" });
+    }
+  });
+
   const httpServer = createServer(app);
   // 部署環境診斷端點
   app.get('/api/deployment-test', async (req, res) => {

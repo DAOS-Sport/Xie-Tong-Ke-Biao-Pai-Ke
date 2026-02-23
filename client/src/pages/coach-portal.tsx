@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar } from "lucide-react";
-import type { CoachUser, Schedule, Venue, TimeSlot, VenueInfo } from "@shared/schema";
+import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import type { CoachUser, Schedule, Venue, TimeSlot, VenueInfo, CoachAvailability } from "@shared/schema";
 
 type ScheduleWithDetails = Schedule & { venue: Venue; timeSlot: TimeSlot };
 
@@ -321,6 +323,8 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
+        <CoachAvailabilityCard coachName={coachName} />
+
         <CoachRulesCard />
 
         <VenueInfoCard />
@@ -328,6 +332,174 @@ function ApprovedDashboard({
         <GoogleCalendarCard schedules={mySchedules} coachName={coachName} />
       </main>
     </div>
+  );
+}
+
+function CoachAvailabilityCard({ coachName }: { coachName: string }) {
+  const { toast } = useToast();
+  const [availWeek, setAvailWeek] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+  const weekStartStr = format(availWeek, "yyyy-MM-dd");
+  const availWeekDays = getWeekDays(availWeek);
+
+  const { data: existingAvailability = [], isLoading } = useQuery<CoachAvailability[]>({
+    queryKey: ["/api/coach-portal/availability", coachName, weekStartStr],
+    queryFn: async () => {
+      const res = await fetch(`/api/coach-portal/availability?coachName=${encodeURIComponent(coachName)}&weekStart=${weekStartStr}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const [checkedSlots, setCheckedSlots] = useState<Set<string>>(new Set());
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    const newSet = new Set<string>();
+    for (const a of existingAvailability) {
+      newSet.add(`${a.dayOfWeek}-${a.timeSlotOrder}`);
+    }
+    setCheckedSlots(newSet);
+    setInitialized(true);
+  }, [existingAvailability]);
+
+  const toggleSlot = useCallback((dayOfWeek: number, timeSlotOrder: number) => {
+    const key = `${dayOfWeek}-${timeSlotOrder}`;
+    setCheckedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const slots = Array.from(checkedSlots).map(k => {
+        const [d, t] = k.split("-").map(Number);
+        return { dayOfWeek: d, timeSlotOrder: t };
+      });
+      const res = await fetch("/api/coach-portal/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coachName, weekStart: weekStartStr, slots }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability", coachName, weekStartStr] });
+      toast({ title: "已儲存", description: "可用時段已更新" });
+    },
+    onError: () => {
+      toast({ title: "儲存失敗", variant: "destructive" });
+    },
+  });
+
+  const selectAll = () => {
+    const all = new Set<string>();
+    for (let d = 1; d <= 7; d++) {
+      for (let t = 1; t <= 7; t++) {
+        all.add(`${d}-${t}`);
+      }
+    }
+    setCheckedSlots(all);
+  };
+
+  const clearAll = () => setCheckedSlots(new Set());
+
+  const dayLabels = ["一", "二", "三", "四", "五", "六", "日"];
+  const periodLabels = ["第1節", "第2節", "第3節", "第4節", "第5節", "第6節", "第7節"];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CheckSquare className="h-4 w-4" />
+            可用時段填報
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAvailWeek(prev => addWeeks(prev, -1))}>
+              <ChevronLeft className="h-3 w-3" />
+            </Button>
+            <span className="text-xs font-medium min-w-[100px] text-center">
+              {format(availWeekDays[0], "MM/dd")} - {format(availWeekDays[6], "MM/dd")}
+            </span>
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAvailWeek(prev => addWeeks(prev, 1))}>
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-4 text-muted-foreground text-sm">載入中...</div>
+        ) : (
+          <>
+            <div className="flex gap-2 mb-3">
+              <Button variant="outline" size="sm" className="text-xs h-7" onClick={selectAll}>全選</Button>
+              <Button variant="outline" size="sm" className="text-xs h-7" onClick={clearAll}>清除</Button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="p-1 border text-center bg-gray-50 w-14"></th>
+                    {dayLabels.map((label, i) => (
+                      <th key={i} className="p-1 border text-center bg-gray-50 min-w-[40px]">
+                        <div>{label}</div>
+                        <div className="text-[10px] text-muted-foreground">{format(availWeekDays[i], "MM/dd")}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {periodLabels.map((period, tIdx) => (
+                    <tr key={tIdx}>
+                      <td className="p-1 border text-center bg-gray-50 font-medium">{period}</td>
+                      {dayLabels.map((_, dIdx) => {
+                        const dayOfWeek = dIdx + 1;
+                        const timeSlotOrder = tIdx + 1;
+                        const key = `${dayOfWeek}-${timeSlotOrder}`;
+                        const checked = checkedSlots.has(key);
+                        return (
+                          <td
+                            key={dIdx}
+                            className={`p-1 border text-center cursor-pointer select-none transition-colors ${checked ? "bg-green-100 hover:bg-green-200" : "bg-white hover:bg-gray-100"}`}
+                            onClick={() => toggleSlot(dayOfWeek, timeSlotOrder)}
+                          >
+                            {checked ? (
+                              <span className="text-green-600 font-bold">✓</span>
+                            ) : (
+                              <span className="text-gray-300">·</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-muted-foreground">
+                已選 {checkedSlots.size} / 49 個時段
+              </span>
+              <Button
+                size="sm"
+                className="bg-green-500 hover:bg-green-600"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending ? "儲存中..." : "儲存可用時段"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -7,6 +7,7 @@ import {
   coachUsers,
   systemSettings,
   venueInfos,
+  coachAvailability,
   type User,
   type UpsertUser,
   type Venue,
@@ -19,6 +20,7 @@ import {
   type InsertCoachUserType,
   type SystemSetting,
   type VenueInfo,
+  type CoachAvailability,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, between, desc, sql, like, or, ilike } from "drizzle-orm";
@@ -80,6 +82,11 @@ export interface IStorage {
   unlockSchedules(venueId: string, startDate: string, endDate: string): Promise<void>;
   assignCoach(scheduleId: string, coachName: string | null): Promise<Schedule>;
   getScheduleLockStatus(venueId: string, startDate: string, endDate: string): Promise<boolean>;
+
+  // Coach availability
+  getCoachAvailabilityByWeek(weekStart: string): Promise<CoachAvailability[]>;
+  getCoachAvailabilityForCoach(coachName: string, weekStart: string): Promise<CoachAvailability[]>;
+  upsertCoachAvailability(coachName: string, weekStart: string, slots: { dayOfWeek: number; timeSlotOrder: number }[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -773,6 +780,46 @@ export class DatabaseStorage implements IStorage {
       );
     if (result.length === 0) return false;
     return result.every(s => s.isClassLocked);
+  }
+
+  async getCoachAvailabilityByWeek(weekStart: string): Promise<CoachAvailability[]> {
+    return await db
+      .select()
+      .from(coachAvailability)
+      .where(eq(coachAvailability.weekStart, weekStart));
+  }
+
+  async getCoachAvailabilityForCoach(coachName: string, weekStart: string): Promise<CoachAvailability[]> {
+    return await db
+      .select()
+      .from(coachAvailability)
+      .where(
+        and(
+          eq(coachAvailability.coachName, coachName),
+          eq(coachAvailability.weekStart, weekStart)
+        )
+      );
+  }
+
+  async upsertCoachAvailability(coachName: string, weekStart: string, slots: { dayOfWeek: number; timeSlotOrder: number }[]): Promise<void> {
+    await db
+      .delete(coachAvailability)
+      .where(
+        and(
+          eq(coachAvailability.coachName, coachName),
+          eq(coachAvailability.weekStart, weekStart)
+        )
+      );
+    if (slots.length > 0) {
+      await db.insert(coachAvailability).values(
+        slots.map(s => ({
+          coachName,
+          weekStart,
+          dayOfWeek: s.dayOfWeek,
+          timeSlotOrder: s.timeSlotOrder,
+        }))
+      );
+    }
   }
 
 }

@@ -36,6 +36,7 @@ Preferred communication style: Simple, everyday language.
   - `timeSlots` - Available time periods for scheduling
   - `schedules` - Class bookings linking coaches to venues and time slots (coachCount: 1-2, coachName2 for second coach)
   - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, status, linkedCoachName)
+  - `coach_availability` - Coach weekly availability slots (coachName, weekStart, dayOfWeek 1-7, timeSlotOrder 1-7)
   - `sessions` - Authentication session storage (required for Replit Auth)
 
 ## Authentication & Authorization
@@ -62,6 +63,14 @@ Preferred communication style: Simple, everyday language.
   - Coach rules display (admin-editable)
   - Venue info with video links
   - Google Calendar export (.ics download + per-event links)
+  - Weekly availability matrix (7x7 checkbox grid: Mon-Sun, periods 1-7)
+- **Coach Availability Matching**: Availability-aware coach assignment system
+  - Coaches fill weekly availability via 7x7 matrix in coach portal
+  - Admin coach assignment UI shows available coaches with ✅ markers, grouped separately
+  - Missing coach highlighting (red for no coach1, amber for missing coach2)
+  - Auto-fill button: assigns coaches based on availability + load balancing (least-assigned-first)
+  - Sidebar panel: shows available/assigned coaches for selected time slot with weekly stats
+  - Weekly stats: assigned count vs available count per coach
 - **Admin Coach Approval (2.0)**: Dashboard for managing coach registrations
   - Approve/reject coach accounts
   - Coach rules editor
