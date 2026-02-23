@@ -55,20 +55,6 @@ function CoachAssignmentContent() {
     enabled: !!selectedVenue,
   });
 
-  const { data: lockStatusData } = useQuery<{ isLocked: boolean }>({
-    queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/schedules/lock-status?venueId=${selectedVenue}&startDate=${weekStart}&endDate=${weekEnd}`,
-      );
-      if (!res.ok) return { isLocked: false };
-      return res.json();
-    },
-    enabled: !!selectedVenue,
-  });
-
-  const isLocked = lockStatusData?.isLocked ?? false;
-
   const { data: coaches = [] } = useQuery<string[]>({
     queryKey: ["/api/unique-coaches"],
   });
@@ -306,27 +292,7 @@ function CoachAssignmentContent() {
           </div>
         </div>
 
-        {selectedVenue && !isLocked && (
-          <Card className="mb-6 border-orange-300 bg-orange-50">
-            <CardContent className="py-6">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <i className="fas fa-lock text-orange-500 text-3xl"></i>
-                <p className="text-orange-700 font-medium">
-                  此場館本週課表尚未鎖定，請先至「學校課表編輯」完成第一階段並鎖定課表。
-                </p>
-                <Button
-                  variant="outline"
-                  className="border-orange-500 text-orange-600 hover:bg-orange-100"
-                  onClick={() => setLocation("/venue-schedule-edit")}
-                >
-                  <i className="fas fa-edit mr-2"></i>前往學校課表編輯
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {selectedVenueData && isLocked && (
+        {selectedVenueData && (
           <Card>
             <CardHeader>
               <CardTitle
@@ -339,9 +305,6 @@ function CoachAssignmentContent() {
                 }}
               >
                 {selectedVenueData.name} - 教練指派
-                <span className="ml-2 inline-block bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded">
-                  已鎖定
-                </span>
               </CardTitle>
             </CardHeader>
             <CardContent>

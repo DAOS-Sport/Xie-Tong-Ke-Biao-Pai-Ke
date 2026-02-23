@@ -60,96 +60,6 @@ function VenueScheduleEditContent() {
     enabled: !!selectedVenue,
   });
 
-  const { data: lockStatusData } = useQuery<{ isLocked: boolean }>({
-    queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/schedules/lock-status?venueId=${selectedVenue}&startDate=${weekStart}&endDate=${weekEnd}`,
-      );
-      if (!res.ok) return { isLocked: false };
-      return res.json();
-    },
-    enabled: !!selectedVenue,
-  });
-
-  const isLocked = lockStatusData?.isLocked ?? false;
-
-  const lockMutation = useMutation({
-    mutationFn: async () => {
-      const adminPassword = sessionStorage.getItem("admin-password") || "";
-      const res = await fetch("/api/schedules/lock", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({
-          venueId: selectedVenue,
-          startDate: weekStart,
-          endDate: weekEnd,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      toast({ title: "鎖定成功", description: "課表已鎖定" });
-    },
-    onError: (error) => {
-      toast({
-        title: "鎖定失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const unlockMutation = useMutation({
-    mutationFn: async () => {
-      const adminPassword = sessionStorage.getItem("admin-password") || "";
-      const res = await fetch("/api/schedules/unlock", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({
-          venueId: selectedVenue,
-          startDate: weekStart,
-          endDate: weekEnd,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      toast({ title: "解鎖成功", description: "課表已解鎖" });
-    },
-    onError: (error) => {
-      toast({
-        title: "解鎖失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   useEffect(() => {
     if (venues && venues.length > 0 && !selectedVenue) {
       setSelectedVenue(venues[0].id);
@@ -461,28 +371,6 @@ function VenueScheduleEditContent() {
             >
               本週
             </Button>
-
-            {selectedVenue && (
-              <Button
-                variant={isLocked ? "destructive" : "outline"}
-                onClick={() => {
-                  if (isLocked) {
-                    unlockMutation.mutate();
-                  } else {
-                    lockMutation.mutate();
-                  }
-                }}
-                disabled={lockMutation.isPending || unlockMutation.isPending}
-                className={
-                  isLocked
-                    ? "text-xs sm:text-sm px-3 sm:px-4"
-                    : "text-xs sm:text-sm px-3 sm:px-4 border-orange-500 text-orange-600 hover:bg-orange-50"
-                }
-                data-testid="button-lock-toggle"
-              >
-                {isLocked ? "🔓 解鎖課表" : "🔒 鎖定課表"}
-              </Button>
-            )}
           </div>
         </div>
 
@@ -499,11 +387,6 @@ function VenueScheduleEditContent() {
                 }}
               >
                 {selectedVenueData.name} - 週課表編輯
-                {isLocked && (
-                  <span className="ml-2 inline-block bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded">
-                    已鎖定
-                  </span>
-                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -568,65 +451,61 @@ function VenueScheduleEditContent() {
                                     <span className="flex-1 truncate">
                                       {schedule.className || "未命名"}
                                     </span>
-                                    {!isLocked && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteClass(schedule.id);
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
-                                        data-testid={`button-delete-${schedule.id}`}
-                                      >
-                                        <i className="fas fa-times text-xs"></i>
-                                      </button>
-                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteClass(schedule.id);
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
+                                      data-testid={`button-delete-${schedule.id}`}
+                                    >
+                                      <i className="fas fa-times text-xs"></i>
+                                    </button>
                                   </div>
                                 ))}
-                                {!isLocked && (
-                                  <input
-                                    type="text"
-                                    className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
-                                    placeholder={
-                                      daySchedules.length === 0
-                                        ? "輸入班級名稱"
-                                        : "新增課程"
+                                <input
+                                  type="text"
+                                  className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
+                                  placeholder={
+                                    daySchedules.length === 0
+                                      ? "輸入班級名稱"
+                                      : "新增課程"
+                                  }
+                                  onFocus={() =>
+                                    setActiveCell({
+                                      date: dateStr,
+                                      timeSlotId: timeSlot.id,
+                                    })
+                                  }
+                                  onBlur={(e) => {
+                                    const value = e.target.value.trim();
+                                    if (value) {
+                                      handleAddClass(
+                                        dateStr,
+                                        timeSlot.id,
+                                        value,
+                                      );
+                                      e.target.value = "";
                                     }
-                                    onFocus={() =>
-                                      setActiveCell({
-                                        date: dateStr,
-                                        timeSlotId: timeSlot.id,
-                                      })
-                                    }
-                                    onBlur={(e) => {
-                                      const value = e.target.value.trim();
+                                    setActiveCell(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      const value =
+                                        e.currentTarget.value.trim();
                                       if (value) {
                                         handleAddClass(
                                           dateStr,
                                           timeSlot.id,
                                           value,
                                         );
-                                        e.target.value = "";
+                                        e.currentTarget.value = "";
                                       }
-                                      setActiveCell(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        const value =
-                                          e.currentTarget.value.trim();
-                                        if (value) {
-                                          handleAddClass(
-                                            dateStr,
-                                            timeSlot.id,
-                                            value,
-                                          );
-                                          e.currentTarget.value = "";
-                                        }
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                    data-testid={`input-${dateStr}-${timeSlot.id}`}
-                                  />
-                                )}
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  data-testid={`input-${dateStr}-${timeSlot.id}`}
+                                />
                               </div>
                             </td>
                           );
