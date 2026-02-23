@@ -255,6 +255,13 @@ export default function FindCoach() {
             >
               <i className="fas fa-search mr-1 sm:mr-2"></i>尋找教練
             </button>
+            <button
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation("/coach-approval")}
+              data-testid="tab-coach-approval"
+            >
+              <i className="fas fa-user-check mr-1 sm:mr-2"></i>教練審核
+            </button>
           </nav>
         </div>
       </header>
