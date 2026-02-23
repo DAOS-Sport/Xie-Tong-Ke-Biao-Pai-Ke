@@ -14,6 +14,8 @@ import VenueScheduleEdit from "@/pages/venue-schedule-edit";
 import FindCoach from "@/pages/find-coach";
 import TeacherPortal from "@/pages/teacher-portal";
 import MultiSchoolAdmin from "@/pages/multi-school-admin";
+import CoachPortal from "@/pages/coach-portal";
+import CoachApproval from "@/pages/coach-approval";
 import PasswordProtect from "@/components/password-protect";
 
 // Protected AdminSchedule component
@@ -51,9 +53,13 @@ function Router() {
       {/* Multi-school admin */}
       <Route path="/multi-school-admin" component={MultiSchoolAdmin} />
       
+      {/* Coach portal (front-end for coaches) */}
+      <Route path="/coach-portal" component={CoachPortal} />
+      
       {/* Password protected admin functions */}
       <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
       <Route path="/statistics" component={Statistics} />
+      <Route path="/coach-approval" component={CoachApproval} />
       
       {/* Auth pages */}
       <Route path="/home" component={Home} />

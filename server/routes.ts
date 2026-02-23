@@ -610,6 +610,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === 管理端密碼驗證中介軟體 ===
+  const ADMIN_PASSWORD = 'dream28559983';
+  
+  const requireAdminPassword = (req: any, res: any, next: any) => {
+    const password = req.headers['x-admin-password'] || req.query.password;
+    if (password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ message: "需要管理員密碼" });
+    }
+    next();
+  };
+
+  // === 教練前台系統 API ===
+
+  // 教練註冊（模擬 LINE 登入）
+  app.post('/api/coach-portal/register', async (req, res) => {
+    try {
+      const { lineId, name, phone, email } = req.body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "姓名為必填欄位" });
+      }
+      if (phone && typeof phone !== 'string') {
+        return res.status(400).json({ message: "電話格式無效" });
+      }
+      if (email && typeof email !== 'string') {
+        return res.status(400).json({ message: "信箱格式無效" });
+      }
+
+      const existingUser = lineId ? await storage.getCoachUserByLineId(lineId) : null;
+      if (existingUser) {
+        return res.json(existingUser);
+      }
+
+      const coachUser = await storage.createCoachUser({
+        lineId: lineId || null,
+        name: name.trim(),
+        phone: phone?.trim() || null,
+        email: email?.trim() || null,
+        status: 'pending',
+        role: 'coach',
+        linkedCoachName: null,
+      });
+
+      res.json(coachUser);
+    } catch (error) {
+      console.error('Error registering coach user:', error);
+      res.status(500).json({ message: "註冊失敗" });
+    }
+  });
+
+  // 教練登入（用 LINE ID 或用戶 ID 查詢）
+  app.get('/api/coach-portal/me/:identifier', async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      let user = await storage.getCoachUserByLineId(identifier);
+      if (!user) {
+        user = await storage.getCoachUserById(identifier);
+      }
+      if (!user) {
+        return res.status(404).json({ message: "找不到用戶" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error('Error fetching coach user:', error);
+      res.status(500).json({ message: "查詢失敗" });
+    }
+  });
+
+  // 教練個人課表
+  app.get('/api/coach-portal/my-schedule', async (req, res) => {
+    try {
+      const { coachName, startDate, endDate } = req.query as {
+        coachName: string;
+        startDate: string;
+        endDate: string;
+      };
+
+      if (!coachName || !startDate || !endDate) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+
+      const mySchedules = await storage.getCoachSchedules(coachName, startDate, endDate);
+      res.json(mySchedules);
+    } catch (error) {
+      console.error('Error fetching personal schedule:', error);
+      res.status(500).json({ message: "查詢個人課表失敗" });
+    }
+  });
+
+  // 當日同場教練查詢
+  app.get('/api/coach-portal/colleagues', async (req, res) => {
+    try {
+      const { coachName, date, venueId, timeSlotId } = req.query as {
+        coachName: string;
+        date: string;
+        venueId: string;
+        timeSlotId: string;
+      };
+
+      if (!coachName || !date || !venueId || !timeSlotId) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+
+      const colleagues = await storage.getColleaguesForCoach(coachName, date, venueId, timeSlotId);
+      res.json(colleagues);
+    } catch (error) {
+      console.error('Error fetching colleagues:', error);
+      res.status(500).json({ message: "查詢同場教練失敗" });
+    }
+  });
+
+  // === 管理端：教練帳號審核 API（需密碼驗證） ===
+
+  // 獲取所有教練用戶
+  app.get('/api/admin/coach-users', requireAdminPassword, async (req, res) => {
+    try {
+      const { status } = req.query as { status?: string };
+      if (status === 'pending') {
+        const users = await storage.getPendingCoachUsers();
+        res.json(users);
+      } else {
+        const users = await storage.getAllCoachUsers();
+        res.json(users);
+      }
+    } catch (error) {
+      console.error('Error fetching coach users:', error);
+      res.status(500).json({ message: "查詢教練用戶失敗" });
+    }
+  });
+
+  // 審核教練帳號（通過/拒絕）
+  app.put('/api/admin/coach-users/:id/status', requireAdminPassword, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "狀態只能是 approved 或 rejected" });
+      }
+
+      const user = await storage.updateCoachUserStatus(id, status);
+      res.json(user);
+    } catch (error) {
+      console.error('Error updating coach user status:', error);
+      res.status(500).json({ message: "更新審核狀態失敗" });
+    }
+  });
+
+  // 綁定教練名稱
+  app.put('/api/admin/coach-users/:id/link', requireAdminPassword, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { linkedCoachName } = req.body;
+
+      if (!linkedCoachName) {
+        return res.status(400).json({ message: "教練名稱為必填" });
+      }
+
+      const user = await storage.linkCoachUser(id, linkedCoachName);
+      res.json(user);
+    } catch (error) {
+      console.error('Error linking coach user:', error);
+      res.status(500).json({ message: "綁定教練名稱失敗" });
+    }
+  });
+
   const httpServer = createServer(app);
   // 部署環境診斷端點
   app.get('/api/deployment-test', async (req, res) => {

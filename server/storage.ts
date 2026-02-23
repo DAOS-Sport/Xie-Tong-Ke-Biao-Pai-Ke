@@ -4,6 +4,7 @@ import {
   timeSlots,
   schedules,
   coachRegistrations,
+  coachUsers,
   type User,
   type UpsertUser,
   type Venue,
@@ -12,6 +13,8 @@ import {
   type InsertScheduleType,
   type CoachRegistration,
   type InsertCoachRegistrationType,
+  type CoachUser,
+  type InsertCoachUserType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, between, desc, sql, like, or, ilike } from "drizzle-orm";
@@ -48,6 +51,16 @@ export interface IStorage {
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]>;
   getUniqueCoaches(): Promise<string[]>;
+  
+  // Coach user operations (LINE-based)
+  getCoachUserByLineId(lineId: string): Promise<CoachUser | undefined>;
+  getCoachUserById(id: string): Promise<CoachUser | undefined>;
+  createCoachUser(data: InsertCoachUserType): Promise<CoachUser>;
+  updateCoachUserStatus(id: string, status: string): Promise<CoachUser>;
+  linkCoachUser(id: string, linkedCoachName: string): Promise<CoachUser>;
+  getAllCoachUsers(): Promise<CoachUser[]>;
+  getPendingCoachUsers(): Promise<CoachUser[]>;
+  getColleaguesForCoach(coachName: string, date: string, venueId: string, timeSlotId: string): Promise<{ name: string; phone: string | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -95,6 +108,8 @@ export class DatabaseStorage implements IStorage {
         { name: "福林國小", color: "yellow", order: 4 },
         { name: "新莊國中", color: "orange", order: 5 },
         { name: "士東國小", color: "pink", order: 6 },
+        { name: "清江國小", color: "teal", order: 7 },
+        { name: "松山國小", color: "red", order: 8 },
       ];
       
       await db.insert(venues).values(defaultVenues);
@@ -557,6 +572,83 @@ export class DatabaseStorage implements IStorage {
       .where(eq(coachRegistrations.scheduleId, scheduleId))
       .orderBy(coachRegistrations.registeredAt);
   }
+
+  // === Coach User 操作 (LINE 前台系統) ===
+
+  async getCoachUserByLineId(lineId: string): Promise<CoachUser | undefined> {
+    const [user] = await db.select().from(coachUsers).where(eq(coachUsers.lineId, lineId));
+    return user;
+  }
+
+  async getCoachUserById(id: string): Promise<CoachUser | undefined> {
+    const [user] = await db.select().from(coachUsers).where(eq(coachUsers.id, id));
+    return user;
+  }
+
+  async createCoachUser(data: InsertCoachUserType): Promise<CoachUser> {
+    const [user] = await db.insert(coachUsers).values(data).returning();
+    return user;
+  }
+
+  async updateCoachUserStatus(id: string, status: string): Promise<CoachUser> {
+    const [user] = await db
+      .update(coachUsers)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(coachUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async linkCoachUser(id: string, linkedCoachName: string): Promise<CoachUser> {
+    const [user] = await db
+      .update(coachUsers)
+      .set({ linkedCoachName, updatedAt: new Date() })
+      .where(eq(coachUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async getAllCoachUsers(): Promise<CoachUser[]> {
+    return await db.select().from(coachUsers).orderBy(desc(coachUsers.createdAt));
+  }
+
+  async getPendingCoachUsers(): Promise<CoachUser[]> {
+    return await db.select().from(coachUsers).where(eq(coachUsers.status, 'pending')).orderBy(desc(coachUsers.createdAt));
+  }
+
+  async getColleaguesForCoach(coachName: string, date: string, venueId: string, timeSlotId: string): Promise<{ name: string; phone: string | null }[]> {
+    const sameSlotSchedules = await db
+      .select({ coachName: schedules.coachName })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.date, date),
+          eq(schedules.venueId, venueId),
+          eq(schedules.timeSlotId, timeSlotId)
+        )
+      );
+
+    const colleagueNames = sameSlotSchedules
+      .map(s => s.coachName)
+      .filter((name): name is string => !!name && name !== coachName);
+
+    if (colleagueNames.length === 0) return [];
+
+    const colleagues: { name: string; phone: string | null }[] = [];
+    for (const name of colleagueNames) {
+      const [coachUser] = await db
+        .select({ name: coachUsers.name, phone: coachUsers.phone })
+        .from(coachUsers)
+        .where(eq(coachUsers.linkedCoachName, name));
+      colleagues.push({
+        name,
+        phone: coachUser?.phone || null,
+      });
+    }
+
+    return colleagues;
+  }
+
 }
 
 export const storage = new DatabaseStorage();

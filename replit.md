@@ -32,9 +32,10 @@ Preferred communication style: Simple, everyday language.
 - **Schema Management**: Drizzle Kit for migrations and schema management
 - **Key Tables**:
   - `users` - User accounts with role-based permissions (admin/coach/student)
-  - `venues` - Swimming pool locations with color coding
+  - `venues` - Swimming pool locations with color coding (8 venues including 清江國小, 松山國小)
   - `timeSlots` - Available time periods for scheduling
   - `schedules` - Class bookings linking coaches to venues and time slots
+  - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, status, linkedCoachName)
   - `sessions` - Authentication session storage (required for Replit Auth)
 
 ## Authentication & Authorization
@@ -50,6 +51,15 @@ Preferred communication style: Simple, everyday language.
 - **Statistics Dashboard**: Class count analytics with venue breakdowns
 - **Coach Autocomplete**: Dynamic search functionality for coach assignment
 - **Date Navigation**: Week and day-based schedule browsing
+- **Coach Portal (2.0)**: LINE-based coach registration with admin approval workflow
+  - Registration form with name, phone, email
+  - Pending/Approved/Rejected status flow
+  - Personal weekly schedule view (only shows coach's own classes)
+  - Today's same-venue colleague info with emergency phone contacts
+- **Admin Coach Approval (2.0)**: Dashboard for managing coach registrations
+  - Approve/reject coach accounts
+  - Link registered coaches to scheduling system coach names
+  - Password-protected API endpoints (server-side validation)
 
 # External Dependencies
 
