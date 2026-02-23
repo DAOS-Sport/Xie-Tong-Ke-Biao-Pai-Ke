@@ -12,7 +12,7 @@ export default function Home() {
     if (!isLoading && user) {
       // Redirect based on role
       if (user.role === 'admin') {
-        setLocation('/admin/schedule');
+        setLocation('/mgt-x9k7p2/schedule');
       } else if (user.role === 'coach') {
         setLocation('/coach');
       }
@@ -61,7 +61,7 @@ export default function Home() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {user?.role === 'admin' && (
             <>
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/statistics')}>
+              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/mgt-x9k7p2/stats')}>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <i className="fas fa-chart-bar text-primary"></i>

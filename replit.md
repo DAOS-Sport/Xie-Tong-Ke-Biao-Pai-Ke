@@ -115,9 +115,15 @@ Preferred communication style: Simple, everyday language.
 ## Password Protection
 - **Admin Functions**: Course schedule editing and statistics require password authentication
 - **Password**: `dream0935314711` (stored in component, session-based authentication)
+- **Admin URL Prefix**: `/mgt-x9k7p2/` (complex prefix to prevent URL guessing)
+  - Schedule: `/mgt-x9k7p2/schedule`
+  - Class Edit (Phase 1): `/mgt-x9k7p2/class-edit`
+  - Coach Assignment (Phase 2): `/mgt-x9k7p2/assign`
+  - Statistics: `/mgt-x9k7p2/stats`
+  - Coach Approval: `/mgt-x9k7p2/approval`
 - **Session Management**: Authorization stored in browser sessionStorage, cleared on browser close
 - **User Experience**: "Return to Coach View" button available from password screens
 
 ## Default Access
-- **Default Landing Page**: Coach view (public access)
-- **Navigation**: Password-protected functions clearly separated from public coach view
+- **Default Landing Page**: Coach portal (public access, LINE login)
+- **Navigation**: Password-protected functions use complex URLs, separated from public coach view

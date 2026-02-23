@@ -300,21 +300,21 @@ function VenueScheduleEditContent() {
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation("/coach-assignment")}
+              onClick={() => setLocation("/mgt-x9k7p2/assign")}
               data-testid="tab-coach-assignment"
             >
               <i className="fas fa-user-plus mr-1 sm:mr-2"></i>教練指派 (第二階段)
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation("/statistics")}
+              onClick={() => setLocation("/mgt-x9k7p2/stats")}
               data-testid="tab-statistics"
             >
               <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation("/coach-approval")}
+              onClick={() => setLocation("/mgt-x9k7p2/approval")}
               data-testid="tab-coach-approval"
             >
               <i className="fas fa-user-check mr-1 sm:mr-2"></i>教練審核

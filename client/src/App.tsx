@@ -41,8 +41,7 @@ function Router() {
   return (
     <Switch>
       {/* Public pages - no authentication required */}
-      <Route path="/" component={AdminSchedule} />
-      <Route path="/admin/schedule" component={AdminSchedule} />
+      <Route path="/" component={CoachPortal} />
       <Route path="/coach" component={CoachView} />
       <Route path="/venue-schedule" component={VenueSchedule} />
       
@@ -59,11 +58,12 @@ function Router() {
       {/* Coach portal (front-end for coaches) */}
       <Route path="/coach-portal" component={CoachPortal} />
       
-      {/* Password protected admin functions */}
-      <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
-      <Route path="/coach-assignment" component={CoachAssignment} />
-      <Route path="/statistics" component={Statistics} />
-      <Route path="/coach-approval" component={CoachApproval} />
+      {/* Password protected admin functions (complex URLs) */}
+      <Route path="/mgt-x9k7p2/schedule" component={AdminSchedule} />
+      <Route path="/mgt-x9k7p2/class-edit" component={VenueScheduleEdit} />
+      <Route path="/mgt-x9k7p2/assign" component={CoachAssignment} />
+      <Route path="/mgt-x9k7p2/stats" component={Statistics} />
+      <Route path="/mgt-x9k7p2/approval" component={CoachApproval} />
       
       {/* Auth pages */}
       <Route path="/home" component={Home} />

@@ -38,11 +38,11 @@ function CoachApprovalContent() {
       <main className="max-w-5xl mx-auto p-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate("/venue-schedule-edit")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/mgt-x9k7p2/class-edit")}>
               <ArrowLeft className="h-4 w-4 mr-1" />
               學校課表編輯
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/coach-assignment")}>
+            <Button variant="outline" size="sm" onClick={() => navigate("/mgt-x9k7p2/assign")}>
               <Users className="h-4 w-4 mr-1" />
               教練指派
             </Button>
