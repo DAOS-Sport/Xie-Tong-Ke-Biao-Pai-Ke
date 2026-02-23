@@ -55,9 +55,26 @@ function CoachAssignmentContent() {
     enabled: !!selectedVenue,
   });
 
+  const { data: allSchedules = [] } = useQuery<
+    (Schedule & { venue: Venue; timeSlot: TimeSlot })[]
+  >({
+    queryKey: [`/api/schedules?startDate=${weekStart}&endDate=${weekEnd}`],
+  });
+
   const { data: coaches = [] } = useQuery<string[]>({
     queryKey: ["/api/approved-coaches"],
   });
+
+  const getConflictingCoaches = (date: string, timeSlotId: string, currentScheduleId: string): Set<string> => {
+    const conflicting = new Set<string>();
+    allSchedules.forEach((s) => {
+      if (s.id === currentScheduleId) return;
+      if (s.date !== date || s.timeSlotId !== timeSlotId) return;
+      if (s.coachName) conflicting.add(s.coachName);
+      if (s.coachName2) conflicting.add(s.coachName2);
+    });
+    return conflicting;
+  };
 
   const assignCoachMutation = useMutation({
     mutationFn: async ({
@@ -86,19 +103,9 @@ function CoachAssignmentContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
-        ],
-      });
-      queryClient.invalidateQueries({
         predicate: (query) =>
           typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/conflicts"),
+          (query.queryKey[0].includes("/api/schedules") || query.queryKey[0].includes("/api/conflicts")),
       });
       toast({ title: "指派成功", description: "教練已更新" });
     },
@@ -371,6 +378,7 @@ function CoachAssignmentContent() {
                                   const hasCoach = !!schedule.coachName;
                                   const hasCoach2 = !!schedule.coachName2;
                                   const needsTwo = (schedule.coachCount || 1) >= 2;
+                                  const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
                                   return (
                                     <div
                                       key={schedule.id}
@@ -410,11 +418,19 @@ function CoachAssignmentContent() {
                                                 <span className="text-gray-400">清除教練</span>
                                               </SelectItem>
                                             )}
-                                            {coaches.map((coach) => (
-                                              <SelectItem key={coach} value={coach}>
-                                                {coach}
-                                              </SelectItem>
-                                            ))}
+                                            {coaches.map((coach) => {
+                                              const isConflict = conflicting.has(coach);
+                                              return (
+                                                <SelectItem
+                                                  key={coach}
+                                                  value={coach}
+                                                  disabled={isConflict}
+                                                  className={isConflict ? "opacity-40 line-through" : ""}
+                                                >
+                                                  {coach}{isConflict ? " (衝突)" : ""}
+                                                </SelectItem>
+                                              );
+                                            })}
                                           </SelectContent>
                                         </Select>
                                       </div>
@@ -449,11 +465,19 @@ function CoachAssignmentContent() {
                                                   <span className="text-gray-400">清除教練</span>
                                                 </SelectItem>
                                               )}
-                                              {coaches.map((coach) => (
-                                                <SelectItem key={coach} value={coach}>
-                                                  {coach}
-                                                </SelectItem>
-                                              ))}
+                                              {coaches.map((coach) => {
+                                                const isConflict = conflicting.has(coach);
+                                                return (
+                                                  <SelectItem
+                                                    key={coach}
+                                                    value={coach}
+                                                    disabled={isConflict}
+                                                    className={isConflict ? "opacity-40 line-through" : ""}
+                                                  >
+                                                    {coach}{isConflict ? " (衝突)" : ""}
+                                                  </SelectItem>
+                                                );
+                                              })}
                                             </SelectContent>
                                           </Select>
                                         </div>
