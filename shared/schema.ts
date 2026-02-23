@@ -133,6 +133,17 @@ export const venueInfos = pgTable("venue_infos", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const coachAvailability = pgTable("coach_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachName: varchar("coach_name").notNull(),
+  weekStart: date("week_start").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(),
+  timeSlotOrder: integer("time_slot_order").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique().on(table.coachName, table.weekStart, table.dayOfWeek, table.timeSlotOrder),
+]);
+
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],
@@ -228,3 +239,6 @@ export type InsertUserType = z.infer<typeof insertUserSchema>;
 export type InsertCoachRegistrationType = z.infer<typeof insertCoachRegistrationSchema>;
 export type InsertTeacherFeedbackType = z.infer<typeof insertTeacherFeedbackSchema>;
 export type InsertCoachUserType = z.infer<typeof insertCoachUserSchema>;
+
+export type CoachAvailability = typeof coachAvailability.$inferSelect;
+export type InsertCoachAvailability = typeof coachAvailability.$inferInsert;
