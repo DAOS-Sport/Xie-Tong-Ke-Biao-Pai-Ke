@@ -147,9 +147,15 @@ export class DatabaseStorage implements IStorage {
         console.log(`✅ Added missing venues: ${missing.map(v => v.name).join(", ")}`);
       }
       for (const name of removedVenues) {
-        if (existingNames.includes(name)) {
-          await db.delete(venues).where(eq(venues.name, name));
-          console.log(`✅ Removed venue: ${name}`);
+        const venueToRemove = existingVenues.find(v => v.name === name);
+        if (venueToRemove) {
+          try {
+            await db.delete(schedules).where(eq(schedules.venueId, venueToRemove.id));
+            await db.delete(venues).where(eq(venues.id, venueToRemove.id));
+            console.log(`✅ Removed venue and its schedules: ${name}`);
+          } catch (e) {
+            console.log(`⚠️ Could not remove venue ${name}: ${e}`);
+          }
         }
       }
     }
