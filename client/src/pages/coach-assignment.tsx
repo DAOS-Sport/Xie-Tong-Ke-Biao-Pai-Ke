@@ -374,11 +374,11 @@ function CoachAssignmentContent() {
                                       </div>
                                       <div className="relative">
                                         <Select
-                                          value={schedule.coachName || "__none__"}
+                                          value={schedule.coachName || ""}
                                           onValueChange={(value) => {
                                             assignCoachMutation.mutate({
                                               scheduleId: schedule.id,
-                                              coachName: value === "__none__" ? "" : value,
+                                              coachName: value === "__clear__" ? "" : value,
                                             });
                                           }}
                                         >
@@ -397,9 +397,11 @@ function CoachAssignmentContent() {
                                             </div>
                                           </SelectTrigger>
                                           <SelectContent>
-                                            <SelectItem value="__none__">
-                                              <span className="text-gray-400">清除教練</span>
-                                            </SelectItem>
+                                            {hasCoach && (
+                                              <SelectItem value="__clear__">
+                                                <span className="text-gray-400">清除教練</span>
+                                              </SelectItem>
+                                            )}
                                             {coaches.map((coach) => (
                                               <SelectItem key={coach} value={coach}>
                                                 {coach}
