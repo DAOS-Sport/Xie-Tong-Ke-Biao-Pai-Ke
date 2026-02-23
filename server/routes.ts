@@ -734,9 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const lineLoginTokens = new Map<string, { lineId: string; lineName: string; linePicture: string; expiresAt: number }>();
 
   function getLineRedirectUri(req: any) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    return `${protocol}://${host}/api/auth/line/callback`;
+    return `https://swim-scheduler-ronchen2.replit.app/api/auth/line/callback`;
   }
 
   function generateToken(): string {
