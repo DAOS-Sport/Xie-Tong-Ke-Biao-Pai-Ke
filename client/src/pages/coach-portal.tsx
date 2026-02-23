@@ -391,12 +391,17 @@ function ApprovedDashboard({
     enabled: todaySchedules.length > 0,
   });
 
-  const { data: coachRules } = useQuery<{ rules: string }>({
+  const { data: coachRules } = useQuery<{ content: string }>({
     queryKey: ["/api/settings/coach-rules"],
   });
 
   const { data: venueInfos = [] } = useQuery<VenueInfo[]>({
-    queryKey: ["/api/settings/venue-info"],
+    queryKey: ["/api/venue-infos"],
+    queryFn: async () => {
+      const res = await fetch("/api/venue-infos");
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
   const { data: availability = [] } = useQuery<CoachAvailability[]>({
@@ -606,6 +611,51 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
+        {mySchedules.length > 0 && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                本週統計
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-center">
+                  <div className="text-2xl font-bold text-green-600">{mySchedules.length}</div>
+                  <div className="text-xs text-green-700">總堂數</div>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {new Set(mySchedules.map(s => s.venueId)).size}
+                  </div>
+                  <div className="text-xs text-blue-700">場館數</div>
+                </div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Object.keys(schedulesByDate).filter(d => (schedulesByDate[d]?.length || 0) > 0).length}
+                  </div>
+                  <div className="text-xs text-purple-700">上課天數</div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {Object.entries(
+                  mySchedules.reduce<Record<string, number>>((acc, s) => {
+                    const name = s.venue?.name || "未知";
+                    acc[name] = (acc[name] || 0) + 1;
+                    return acc;
+                  }, {})
+                ).map(([venueName, count]) => (
+                  <div key={venueName} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
+                    <span className="font-medium">{venueName}</span>
+                    <Badge variant="secondary">{count} 堂</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {todaySchedules.length > 0 && colleagues.length > 0 && (
           <Card>
             <CardHeader className="py-3">
@@ -685,7 +735,7 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
-        {coachRules?.rules && (
+        {coachRules?.content && (
           <Card>
             <CardHeader className="py-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -694,7 +744,7 @@ function ApprovedDashboard({
               </CardTitle>
             </CardHeader>
             <CardContent className="py-2">
-              <div className="text-sm whitespace-pre-wrap text-muted-foreground">{coachRules.rules}</div>
+              <div className="text-sm whitespace-pre-wrap text-muted-foreground">{coachRules.content}</div>
             </CardContent>
           </Card>
         )}
