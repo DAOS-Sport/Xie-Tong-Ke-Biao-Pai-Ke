@@ -39,12 +39,7 @@ export default function Statistics() {
     totalClasses: number;
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]>({
-    queryKey: ['/api/statistics', { 
-      startDate: currentPeriod.startDate, 
-      endDate: currentPeriod.endDate,
-      ...(searchCoach && { coachName: searchCoach })
-    }],
-    // Allow public access to statistics, no role check required
+    queryKey: [`/api/statistics?startDate=${currentPeriod.startDate}&endDate=${currentPeriod.endDate}`],
   });
 
   if (statsLoading) {

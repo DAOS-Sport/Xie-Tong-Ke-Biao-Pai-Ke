@@ -336,73 +336,64 @@ export class DatabaseStorage implements IStorage {
     totalClasses: number;
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]> {
-    const query = db
+    const allSchedules = await db
       .select({
         coachName: schedules.coachName,
+        coachName2: schedules.coachName2,
         venueName: venues.name,
         venueColor: venues.color,
-        count: sql<number>`count(*)`,
       })
       .from(schedules)
       .innerJoin(venues, eq(schedules.venueId, venues.id))
       .where(
         and(
           between(schedules.date, startDate, endDate),
-          sql`${schedules.coachName} IS NOT NULL`,
-          coachName ? eq(schedules.coachName, coachName) : undefined
+          sql`(${schedules.coachName} IS NOT NULL AND ${schedules.coachName} != '' OR ${schedules.coachName2} IS NOT NULL AND ${schedules.coachName2} != '')`
         )
-      )
-      .groupBy(schedules.coachName, venues.name, venues.color);
+      );
 
-    const results = await query;
-    
     const coachStats = new Map<string, {
       totalClasses: number;
-      venueBreakdown: { venueName: string; count: number; color: string }[];
+      venueMap: Map<string, { count: number; color: string }>;
     }>();
 
-    results.forEach(result => {
-      if (!result.coachName) return;
-      
-      // 分析多教練格式：班級-教練1-教練2
-      const coaches: string[] = [];
-      if (result.coachName.includes('-')) {
-        const parts = result.coachName.split('-');
-        // 跳過第一部分（班級名稱），其他部分是教練
-        for (let i = 1; i < parts.length; i++) {
-          const coach = parts[i].trim();
-          if (coach && coach !== '缺') {
-            coaches.push(coach);
-          }
-        }
+    const addCoachCount = (name: string, venueName: string, venueColor: string) => {
+      if (!name || name.trim() === '') return;
+      const trimmed = name.trim();
+      if (!coachStats.has(trimmed)) {
+        coachStats.set(trimmed, { totalClasses: 0, venueMap: new Map() });
       }
-      
-      // 為每個教練分別計算統計
-      coaches.forEach(coachName => {
-        if (!coachStats.has(coachName)) {
-          coachStats.set(coachName, {
-            totalClasses: 0,
-            venueBreakdown: []
-          });
-        }
+      const stats = coachStats.get(trimmed)!;
+      stats.totalClasses += 1;
+      const existing = stats.venueMap.get(venueName);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        stats.venueMap.set(venueName, { count: 1, color: venueColor });
+      }
+    };
 
-        const stats = coachStats.get(coachName)!;
-        // 如果是多教練課程，每個教練分攤課程數
-        const sharePerCoach = result.count / coaches.length;
-        stats.totalClasses += sharePerCoach;
-        stats.venueBreakdown.push({
-          venueName: result.venueName,
-          count: sharePerCoach,
-          color: result.venueColor
-        });
-      });
-    });
+    for (const row of allSchedules) {
+      if (row.coachName) addCoachCount(row.coachName, row.venueName, row.venueColor);
+      if (row.coachName2) addCoachCount(row.coachName2, row.venueName, row.venueColor);
+    }
 
-    return Array.from(coachStats.entries()).map(([coachName, stats]) => ({
-      coachName,
+    let result = Array.from(coachStats.entries()).map(([name, stats]) => ({
+      coachName: name,
       totalClasses: stats.totalClasses,
-      venueBreakdown: stats.venueBreakdown
+      venueBreakdown: Array.from(stats.venueMap.entries()).map(([venueName, v]) => ({
+        venueName,
+        count: v.count,
+        color: v.color,
+      })),
     }));
+
+    if (coachName) {
+      result = result.filter(r => r.coachName.includes(coachName));
+    }
+
+    result.sort((a, b) => b.totalClasses - a.totalClasses);
+    return result;
   }
 
   async getUniqueCoaches(): Promise<string[]> {
