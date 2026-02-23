@@ -757,21 +757,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 綁定教練名稱
-  app.put('/api/admin/coach-users/:id/link', requireAdminPassword, async (req, res) => {
+  // 取得已通過審核的教練列表（公開，供前台選擇）
+  app.get('/api/coach-portal/approved-coaches', async (req, res) => {
     try {
-      const { id } = req.params;
-      const { linkedCoachName } = req.body;
-
-      if (!linkedCoachName) {
-        return res.status(400).json({ message: "教練名稱為必填" });
-      }
-
-      const user = await storage.linkCoachUser(id, linkedCoachName);
-      res.json(user);
+      const users = await storage.getApprovedCoachUsers();
+      res.json(users);
     } catch (error) {
-      console.error('Error linking coach user:', error);
-      res.status(500).json({ message: "綁定教練名稱失敗" });
+      console.error('Error fetching approved coaches:', error);
+      res.status(500).json({ message: "查詢已通過教練失敗" });
     }
   });
 

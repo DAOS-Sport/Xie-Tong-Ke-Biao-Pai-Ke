@@ -57,9 +57,9 @@ export interface IStorage {
   getCoachUserById(id: string): Promise<CoachUser | undefined>;
   createCoachUser(data: InsertCoachUserType): Promise<CoachUser>;
   updateCoachUserStatus(id: string, status: string): Promise<CoachUser>;
-  linkCoachUser(id: string, linkedCoachName: string): Promise<CoachUser>;
   getAllCoachUsers(): Promise<CoachUser[]>;
   getPendingCoachUsers(): Promise<CoachUser[]>;
+  getApprovedCoachUsers(): Promise<CoachUser[]>;
   getColleaguesForCoach(coachName: string, date: string, venueId: string, timeSlotId: string): Promise<{ name: string; phone: string | null }[]>;
 }
 
@@ -599,21 +599,16 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async linkCoachUser(id: string, linkedCoachName: string): Promise<CoachUser> {
-    const [user] = await db
-      .update(coachUsers)
-      .set({ linkedCoachName, updatedAt: new Date() })
-      .where(eq(coachUsers.id, id))
-      .returning();
-    return user;
-  }
-
   async getAllCoachUsers(): Promise<CoachUser[]> {
     return await db.select().from(coachUsers).orderBy(desc(coachUsers.createdAt));
   }
 
   async getPendingCoachUsers(): Promise<CoachUser[]> {
     return await db.select().from(coachUsers).where(eq(coachUsers.status, 'pending')).orderBy(desc(coachUsers.createdAt));
+  }
+
+  async getApprovedCoachUsers(): Promise<CoachUser[]> {
+    return await db.select().from(coachUsers).where(eq(coachUsers.status, 'approved')).orderBy(coachUsers.name);
   }
 
   async getColleaguesForCoach(coachName: string, date: string, venueId: string, timeSlotId: string): Promise<{ name: string; phone: string | null }[]> {
@@ -639,7 +634,7 @@ export class DatabaseStorage implements IStorage {
       const [coachUser] = await db
         .select({ name: coachUsers.name, phone: coachUsers.phone })
         .from(coachUsers)
-        .where(eq(coachUsers.linkedCoachName, name));
+        .where(eq(coachUsers.name, name));
       colleagues.push({
         name,
         phone: coachUser?.phone || null,

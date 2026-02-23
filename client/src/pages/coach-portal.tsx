@@ -1,12 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut } from "lucide-react";
 import type { CoachUser, Schedule, Venue, TimeSlot } from "@shared/schema";
@@ -72,19 +69,11 @@ export default function CoachPortal() {
   }
 
   if (!coachUser || !sessionId) {
-    return <RegistrationForm onSuccess={(user) => {
+    return <CoachSelectScreen onSuccess={(user) => {
       setCoachUser(user);
       setSessionId(user.id);
       sessionStorage.setItem("coach_portal_id", user.id);
     }} />;
-  }
-
-  if (coachUser.status === "pending") {
-    return <PendingApproval user={coachUser} onLogout={handleLogout} />;
-  }
-
-  if (coachUser.status === "rejected") {
-    return <RejectedNotice user={coachUser} onLogout={handleLogout} />;
   }
 
   return (
@@ -97,23 +86,13 @@ export default function CoachPortal() {
   );
 }
 
-function RegistrationForm({ onSuccess }: { onSuccess: (user: CoachUser) => void }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-
-  const registerMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/coach-portal/register", {
-        lineId: `line_${Date.now()}`,
-        name,
-        phone,
-        email,
-      });
+function CoachSelectScreen({ onSuccess }: { onSuccess: (user: CoachUser) => void }) {
+  const { data: approvedCoaches = [], isLoading } = useQuery<CoachUser[]>({
+    queryKey: ["/api/coach-portal/approved-coaches"],
+    queryFn: async () => {
+      const res = await fetch("/api/coach-portal/approved-coaches");
+      if (!res.ok) throw new Error("Failed");
       return res.json();
-    },
-    onSuccess: (user: CoachUser) => {
-      onSuccess(user);
     },
   });
 
@@ -124,115 +103,33 @@ function RegistrationForm({ onSuccess }: { onSuccess: (user: CoachUser) => void 
           <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
             <User className="h-8 w-8 text-white" />
           </div>
-          <CardTitle className="text-xl">教練註冊</CardTitle>
+          <CardTitle className="text-xl">教練入口</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            請填寫您的基本資料以進行身份審核
+            請選擇您的姓名以查看個人課表
           </p>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              registerMutation.mutate();
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <Label htmlFor="name">姓名 *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="請輸入您的姓名"
-                required
-              />
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">載入中...</div>
+          ) : approvedCoaches.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              目前尚無已審核通過的教練帳號
             </div>
-            <div>
-              <Label htmlFor="phone">聯絡電話</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="請輸入聯絡電話"
-                type="tel"
-              />
+          ) : (
+            <div className="space-y-2">
+              {approvedCoaches.map((coach) => (
+                <Button
+                  key={coach.id}
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-green-50 hover:border-green-300"
+                  onClick={() => onSuccess(coach)}
+                >
+                  <User className="h-4 w-4 mr-3 text-green-500 shrink-0" />
+                  <span className="font-medium">{coach.name}</span>
+                </Button>
+              ))}
             </div>
-            <div>
-              <Label htmlFor="email">電子信箱</Label>
-              <Input
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="請輸入電子信箱"
-                type="email"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-green-500 hover:bg-green-600"
-              disabled={!name || registerMutation.isPending}
-            >
-              {registerMutation.isPending ? "提交中..." : "提交註冊"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function PendingApproval({ user, onLogout }: { user: CoachUser; onLogout: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-yellow-50 to-white flex items-center justify-center p-4">
-      <Card className="w-full max-w-md text-center">
-        <CardHeader>
-          <div className="mx-auto w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center mb-4">
-            <Clock className="h-8 w-8 text-white" />
-          </div>
-          <CardTitle className="text-xl">資料審核中</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            您好，{user.name}！您的教練資料已提交，目前正在等待管理員審核。
-          </p>
-          <p className="text-sm text-muted-foreground">
-            審核通過後，您即可查看個人專屬課表。
-          </p>
-          <Badge variant="outline" className="text-yellow-600 border-yellow-400">
-            待審核
-          </Badge>
-          <div className="pt-4">
-            <Button variant="outline" onClick={onLogout} size="sm">
-              <LogOut className="h-4 w-4 mr-1" />
-              登出
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function RejectedNotice({ user, onLogout }: { user: CoachUser; onLogout: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex items-center justify-center p-4">
-      <Card className="w-full max-w-md text-center">
-        <CardHeader>
-          <CardTitle className="text-xl text-red-600">審核未通過</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            您好，{user.name}。很抱歉，您的教練資料審核未通過。
-          </p>
-          <p className="text-sm text-muted-foreground">
-            如有疑問，請聯繫管理員。
-          </p>
-          <div className="pt-4">
-            <Button variant="outline" onClick={onLogout} size="sm">
-              <LogOut className="h-4 w-4 mr-1" />
-              登出
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -250,7 +147,7 @@ function ApprovedDashboard({
   setCurrentWeek: (fn: (d: Date) => Date) => void;
   onLogout: () => void;
 }) {
-  const coachName = user.linkedCoachName || user.name;
+  const coachName = user.name;
   const weekDays = getWeekDays(currentWeek);
   const startDate = format(weekDays[0], "yyyy-MM-dd");
   const endDate = format(weekDays[6], "yyyy-MM-dd");

@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Link2, Users, ArrowLeft } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import type { CoachUser } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -44,31 +43,12 @@ function CoachApprovalContent() {
     },
   });
 
-  const { data: coaches = [] } = useQuery<string[]>({
-    queryKey: ["/api/coaches"],
-  });
-
   const approveMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await fetch(`/api/admin/coach-users/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
         body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
-    },
-  });
-
-  const linkMutation = useMutation({
-    mutationFn: async ({ id, linkedCoachName }: { id: string; linkedCoachName: string }) => {
-      const res = await fetch(`/api/admin/coach-users/${id}/link`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
-        body: JSON.stringify({ linkedCoachName }),
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -147,7 +127,6 @@ function CoachApprovalContent() {
                       <TableHead>電話</TableHead>
                       <TableHead>信箱</TableHead>
                       <TableHead>狀態</TableHead>
-                      <TableHead>綁定教練</TableHead>
                       <TableHead>註冊時間</TableHead>
                       <TableHead>操作</TableHead>
                     </TableRow>
@@ -159,16 +138,6 @@ function CoachApprovalContent() {
                         <TableCell>{user.phone || "-"}</TableCell>
                         <TableCell>{user.email || "-"}</TableCell>
                         <TableCell>{statusBadge(user.status)}</TableCell>
-                        <TableCell>
-                          <CoachLinkSelect
-                            userId={user.id}
-                            currentLink={user.linkedCoachName}
-                            coaches={coaches}
-                            onLink={(linkedCoachName) =>
-                              linkMutation.mutate({ id: user.id, linkedCoachName })
-                            }
-                          />
-                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {user.createdAt
                             ? format(new Date(user.createdAt), "yyyy/MM/dd HH:mm")
@@ -216,42 +185,6 @@ function CoachApprovalContent() {
         </Card>
       </main>
     </div>
-  );
-}
-
-function CoachLinkSelect({
-  userId,
-  currentLink,
-  coaches,
-  onLink,
-}: {
-  userId: string;
-  currentLink: string | null;
-  coaches: string[];
-  onLink: (name: string) => void;
-}) {
-  if (currentLink) {
-    return (
-      <div className="flex items-center gap-1 text-sm">
-        <Link2 className="h-3 w-3 text-green-500" />
-        <span>{currentLink}</span>
-      </div>
-    );
-  }
-
-  return (
-    <Select onValueChange={onLink}>
-      <SelectTrigger className="h-7 text-xs w-28">
-        <SelectValue placeholder="選擇教練" />
-      </SelectTrigger>
-      <SelectContent>
-        {coaches.map((coach) => (
-          <SelectItem key={coach} value={coach}>
-            {coach}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
