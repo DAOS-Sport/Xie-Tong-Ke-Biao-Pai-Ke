@@ -7,6 +7,7 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
+import { setupWeeklyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1167,6 +1168,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Test failed' });
     }
   });
+
+  app.post('/api/admin/send-weekly-notifications', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.body?.password;
+    if (password !== 'dream28559983') {
+      return res.status(401).json({ message: '密碼錯誤' });
+    }
+
+    try {
+      await sendWeeklyScheduleNotifications();
+      res.json({ success: true, message: '推播已發送' });
+    } catch (error) {
+      console.error('Manual notification trigger error:', error);
+      res.status(500).json({ message: '推播發送失敗' });
+    }
+  });
+
+  setupWeeklyNotificationCron();
 
   return httpServer;
 }
