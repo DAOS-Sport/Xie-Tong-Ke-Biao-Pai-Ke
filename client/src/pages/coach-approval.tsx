@@ -27,7 +27,7 @@ import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
 
-const adminPassword = "dream28559983";
+const adminPassword = "dream0935314711";
 
 function CoachApprovalContent() {
   const [, navigate] = useLocation();

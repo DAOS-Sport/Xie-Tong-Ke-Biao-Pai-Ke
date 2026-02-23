@@ -10,7 +10,7 @@ interface PasswordProtectProps {
   requiredPassword?: string;
 }
 
-export default function PasswordProtect({ children, requiredPassword = "dream28559983" }: PasswordProtectProps) {
+export default function PasswordProtect({ children, requiredPassword = "dream0935314711" }: PasswordProtectProps) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);

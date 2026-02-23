@@ -114,7 +114,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Password Protection
 - **Admin Functions**: Course schedule editing and statistics require password authentication
-- **Password**: `dream28559983` (stored in component, session-based authentication)
+- **Password**: `dream0935314711` (stored in component, session-based authentication)
 - **Session Management**: Authorization stored in browser sessionStorage, cleared on browser close
 - **User Experience**: "Return to Coach View" button available from password screens
 

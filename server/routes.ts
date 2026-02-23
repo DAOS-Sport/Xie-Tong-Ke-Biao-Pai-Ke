@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/schedules/lock', async (req: any, res) => {
     try {
       const password = req.headers['x-admin-password'] || req.query.password;
-      if (password !== 'dream28559983') {
+      if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const { venueId, startDate, endDate } = req.body;
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/schedules/unlock', async (req: any, res) => {
     try {
       const password = req.headers['x-admin-password'] || req.query.password;
-      if (password !== 'dream28559983') {
+      if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const { venueId, startDate, endDate } = req.body;
@@ -192,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/schedules/:id/assign-coach', async (req: any, res) => {
     try {
       const password = req.headers['x-admin-password'] || req.query.password;
-      if (password !== 'dream28559983') {
+      if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const { coachName, coachName2 } = req.body;
@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/schedules/:id', async (req: any, res) => {
     try {
       const password = req.headers['x-admin-password'] || req.query.password;
-      if (password !== 'dream28559983') {
+      if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const { coachCount, coachName, coachName2 } = req.body;
@@ -714,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // === 管理端密碼驗證中介軟體 ===
-  const ADMIN_PASSWORD = 'dream28559983';
+  const ADMIN_PASSWORD = 'dream0935314711';
   
   const requireAdminPassword = (req: any, res: any, next: any) => {
     const password = req.headers['x-admin-password'] || req.query.password;
@@ -1172,7 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/send-weekly-notifications', async (req, res) => {
     const password = req.headers['x-admin-password'] || req.body?.password;
-    if (password !== 'dream28559983') {
+    if (password !== 'dream0935314711') {
       return res.status(401).json({ message: '密碼錯誤' });
     }
 
