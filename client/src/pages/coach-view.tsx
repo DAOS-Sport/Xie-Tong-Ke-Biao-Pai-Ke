@@ -212,6 +212,13 @@ export default function CoachView() {
             >
               <i className="fas fa-user-check mr-1 sm:mr-2"></i>教練審核
             </button>
+            <button
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-green-600 hover:text-green-700 hover:border-green-400 font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-green-50 sm:hover:bg-transparent"
+              onClick={() => setLocation("/coach-portal")}
+              data-testid="tab-coach-portal"
+            >
+              <i className="fas fa-door-open mr-1 sm:mr-2"></i>教練前台
+            </button>
           </nav>
         </div>
       </header>
