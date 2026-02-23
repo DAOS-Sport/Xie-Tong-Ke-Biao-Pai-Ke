@@ -8,7 +8,7 @@ import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
 import { setupWeeklyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
-import { setupRagicSyncCron, syncRagicDepartments, getRagicSyncStatus } from "./ragic";
+import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1240,7 +1240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Unauthorized" });
     }
     try {
-      const result = await syncRagicDepartments();
+      const result = await syncRagicAll();
       res.json({ success: true, ...result });
     } catch (error) {
       console.error("Manual Ragic sync error:", error);

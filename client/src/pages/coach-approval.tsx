@@ -320,7 +320,10 @@ function CoachRulesSection() {
 function RagicSyncSection() {
   const { data: syncStatus, refetch: refetchStatus } = useQuery<{
     lastSyncTime: string | null;
-    lastSyncResult: { added: string[]; updated: string[]; total: number } | null;
+    lastSyncResult: {
+      venues: { added: string[]; updated: string[]; total: number };
+      coaches: { added: number; total: number };
+    } | null;
     isSyncing: boolean;
   }>({
     queryKey: ["/api/admin/ragic-status"],
@@ -347,6 +350,7 @@ function RagicSyncSection() {
       refetchStatus();
       queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/venue-infos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
     },
   });
 
@@ -354,15 +358,17 @@ function RagicSyncSection() {
     ? format(new Date(syncStatus.lastSyncTime), "yyyy/MM/dd HH:mm:ss")
     : "尚未同步";
 
+  const sr = syncStatus?.lastSyncResult;
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Cloud className="h-4 w-4" />
-          Ragic 部門同步
+          Ragic 資料同步
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          自動從 Ragic 部門表同步場館資料（每 30 分鐘），新增不存在的場館並補填 Google 導航連結
+          自動從 Ragic 同步場館和教練資料（每 30 分鐘），僅新增不存在的資料
         </p>
       </CardHeader>
       <CardContent>
@@ -372,17 +378,23 @@ function RagicSyncSection() {
               <span className="text-muted-foreground">最後同步：</span>
               <span className="font-medium">{lastSync}</span>
             </div>
-            {syncStatus?.lastSyncResult && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span>Ragic 部門數：{syncStatus.lastSyncResult.total}</span>
-                {syncStatus.lastSyncResult.added.length > 0 && (
+            {sr && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span>場館 {sr.venues.total} 個</span>
+                <span>教練 {sr.coaches.total} 個（在職）</span>
+                {sr.venues.added.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    新增 {syncStatus.lastSyncResult.added.length} 個場館
+                    新增 {sr.venues.added.length} 場館
                   </Badge>
                 )}
-                {syncStatus.lastSyncResult.updated.length > 0 && (
+                {sr.venues.updated.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    更新 {syncStatus.lastSyncResult.updated.length} 個導航連結
+                    更新 {sr.venues.updated.length} 導航連結
+                  </Badge>
+                )}
+                {sr.coaches.added > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    新增 {sr.coaches.added} 教練
                   </Badge>
                 )}
               </div>

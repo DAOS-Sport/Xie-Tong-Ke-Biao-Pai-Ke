@@ -657,7 +657,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCoachUsers(): Promise<CoachUser[]> {
-    return await db.select().from(coachUsers).orderBy(desc(coachUsers.createdAt));
+    return await db.select().from(coachUsers).orderBy(
+      sql`CASE WHEN ${coachUsers.name} = '陳柏榮' THEN 0 ELSE 1 END`,
+      coachUsers.name
+    );
   }
 
   async getPendingCoachUsers(): Promise<CoachUser[]> {

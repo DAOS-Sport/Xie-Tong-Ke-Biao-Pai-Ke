@@ -1,12 +1,16 @@
 import { storage } from "./storage";
 
-const RAGIC_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/7";
+const RAGIC_DEPT_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/7";
+const RAGIC_COACH_API_URL = "https://ap7.ragic.com/xinsheng/general-information/23";
 const SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
 const VENUE_COLORS = ["blue", "green", "purple", "yellow", "orange", "teal", "red", "pink"];
 
 let lastSyncTime: string | null = null;
-let lastSyncResult: { added: string[]; updated: string[]; total: number } | null = null;
+let lastSyncResult: {
+  venues: { added: string[]; updated: string[]; total: number };
+  coaches: { added: number; total: number };
+} | null = null;
 let isSyncing = false;
 
 export function getRagicSyncStatus() {
@@ -22,13 +26,13 @@ interface RagicRecord {
   [key: string]: any;
 }
 
-async function fetchRagicDepartments(): Promise<RagicRecord[]> {
+async function fetchRagicRecords(apiUrl: string, limit = 500): Promise<RagicRecord[]> {
   const apiKey = process.env.RAGIC_API_KEY;
   if (!apiKey) {
     throw new Error("RAGIC_API_KEY is not configured");
   }
 
-  const url = `${RAGIC_API_URL}?api&APIKey=${apiKey}`;
+  const url = `${apiUrl}?api&APIKey=${apiKey}&limit=${limit}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -36,71 +40,122 @@ async function fetchRagicDepartments(): Promise<RagicRecord[]> {
   }
 
   const data = await response.json() as Record<string, RagicRecord>;
-  const departments: RagicRecord[] = [];
+  return Object.values(data);
+}
 
-  for (const record of Object.values(data)) {
-    if (record["部門名稱"]) {
-      departments.push(record);
+async function syncVenues(): Promise<{ added: string[]; updated: string[]; total: number }> {
+  const departments = (await fetchRagicRecords(RAGIC_DEPT_API_URL)).filter(r => r["部門名稱"]);
+  const existingVenues = await storage.getVenues();
+  const existingVenueNames = new Set(existingVenues.map(v => v.name));
+
+  const existingInfos = await storage.getAllVenueInfos();
+  const existingInfoMap = new Map(existingInfos.map(info => [info.venueName, info]));
+
+  const added: string[] = [];
+  const updated: string[] = [];
+  let colorIndex = existingVenues.length;
+
+  for (const dept of departments) {
+    const name = dept["部門名稱"] as string;
+    const googleMap = (dept["google map"] as string) || "";
+
+    if (!existingVenueNames.has(name)) {
+      const color = VENUE_COLORS[colorIndex % VENUE_COLORS.length];
+      await storage.createVenue(name, color);
+      added.push(name);
+      existingVenueNames.add(name);
+      colorIndex++;
+      console.log(`Ragic sync: added venue "${name}"`);
+    }
+
+    const existingInfo = existingInfoMap.get(name);
+    if (!existingInfo && googleMap) {
+      await storage.upsertVenueInfo(name, null, null, googleMap);
+      updated.push(name);
+      console.log(`Ragic sync: added venue info for "${name}" with map URL`);
+    } else if (existingInfo && !existingInfo.mapUrl && googleMap) {
+      await storage.upsertVenueInfo(
+        name,
+        existingInfo.videoUrl,
+        existingInfo.description,
+        googleMap
+      );
+      updated.push(name);
+      console.log(`Ragic sync: updated map URL for "${name}"`);
     }
   }
 
-  return departments;
+  return { added, updated, total: departments.length };
 }
 
-export async function syncRagicDepartments(): Promise<{ added: string[]; updated: string[]; total: number }> {
+function isCoachRole(record: RagicRecord): boolean {
+  const job = record["應徵職務"];
+  if (Array.isArray(job)) return job.some((j: string) => j.includes("教練"));
+  if (typeof job === "string") return job.includes("教練");
+  return false;
+}
+
+async function syncCoaches(): Promise<{ added: number; total: number }> {
+  const allRecords = await fetchRagicRecords(RAGIC_COACH_API_URL, 500);
+  const EXCLUDED_NAMES = ["(測試帳號)教練"];
+  const activeCoaches = allRecords.filter(r => r["姓名"] && r["在職狀態"] === "在職" && isCoachRole(r) && !EXCLUDED_NAMES.includes(r["姓名"] as string));
+
+  const existingCoaches = await storage.getAllCoachUsers();
+  const existingNames = new Set(existingCoaches.map(c => c.name));
+
+  let added = 0;
+
+  for (const coach of activeCoaches) {
+    const name = coach["姓名"] as string;
+
+    if (existingNames.has(name)) {
+      continue;
+    }
+
+    const phone = (coach["手機"] as string) || null;
+    const email = (coach["E-mail"] as string) || null;
+
+    await storage.createCoachUser({
+      name,
+      phone,
+      email,
+      status: "approved",
+      role: "coach",
+      lineId: null,
+      linkedCoachName: name,
+    });
+
+    existingNames.add(name);
+    added++;
+  }
+
+  if (added > 0) {
+    console.log(`Ragic sync: added ${added} coaches`);
+  }
+
+  return { added, total: activeCoaches.length };
+}
+
+export async function syncRagicAll(): Promise<typeof lastSyncResult> {
   if (isSyncing) {
-    return lastSyncResult || { added: [], updated: [], total: 0 };
+    return lastSyncResult;
   }
 
   isSyncing = true;
 
   try {
-    const departments = await fetchRagicDepartments();
-    const existingVenues = await storage.getVenues();
-    const existingVenueNames = new Set(existingVenues.map(v => v.name));
+    const venueResult = await syncVenues();
+    const coachResult = await syncCoaches();
 
-    const existingInfos = await storage.getAllVenueInfos();
-    const existingInfoMap = new Map(existingInfos.map(info => [info.venueName, info]));
+    const result = {
+      venues: venueResult,
+      coaches: coachResult,
+    };
 
-    const added: string[] = [];
-    const updated: string[] = [];
-    let colorIndex = existingVenues.length;
-
-    for (const dept of departments) {
-      const name = dept["部門名稱"] as string;
-      const googleMap = (dept["google map"] as string) || "";
-
-      if (!existingVenueNames.has(name)) {
-        const color = VENUE_COLORS[colorIndex % VENUE_COLORS.length];
-        await storage.createVenue(name, color);
-        added.push(name);
-        existingVenueNames.add(name);
-        colorIndex++;
-        console.log(`Ragic sync: added venue "${name}"`);
-      }
-
-      const existingInfo = existingInfoMap.get(name);
-      if (!existingInfo && googleMap) {
-        await storage.upsertVenueInfo(name, null, null, googleMap);
-        updated.push(name);
-        console.log(`Ragic sync: added venue info for "${name}" with map URL`);
-      } else if (existingInfo && !existingInfo.mapUrl && googleMap) {
-        await storage.upsertVenueInfo(
-          name,
-          existingInfo.videoUrl,
-          existingInfo.description,
-          googleMap
-        );
-        updated.push(name);
-        console.log(`Ragic sync: updated map URL for "${name}"`);
-      }
-    }
-
-    const result = { added, updated, total: departments.length };
     lastSyncTime = new Date().toISOString();
     lastSyncResult = result;
 
-    console.log(`Ragic sync completed: ${departments.length} departments, ${added.length} added, ${updated.length} map URLs updated`);
+    console.log(`Ragic sync completed: ${venueResult.total} departments (${venueResult.added.length} new), ${coachResult.total} active coaches (${coachResult.added} new)`);
     return result;
   } catch (error) {
     console.error("Ragic sync error:", error);
@@ -111,12 +166,12 @@ export async function syncRagicDepartments(): Promise<{ added: string[]; updated
 }
 
 export function setupRagicSyncCron() {
-  syncRagicDepartments().catch(err => {
+  syncRagicAll().catch(err => {
     console.error("Initial Ragic sync failed:", err);
   });
 
   setInterval(() => {
-    syncRagicDepartments().catch(err => {
+    syncRagicAll().catch(err => {
       console.error("Scheduled Ragic sync failed:", err);
     });
   }, SYNC_INTERVAL_MS);
