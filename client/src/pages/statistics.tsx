@@ -111,13 +111,6 @@ export default function Statistics() {
           <nav className="flex flex-wrap gap-2 sm:space-x-8 sm:gap-0" aria-label="Tabs">
             <button 
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation('/admin/schedule')}
-              data-testid="tab-schedule-edit"
-            >
-              <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
-            </button>
-            <button 
-              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation('/coach')}
               data-testid="tab-coach-view"
             >

@@ -61,20 +61,6 @@ export default function Home() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {user?.role === 'admin' && (
             <>
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/admin/schedule')}>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <i className="fas fa-calendar-alt text-primary"></i>
-                    <span>課表編輯</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-sm">
-                    Excel 格式的課表編輯介面，支援即時衝突檢查
-                  </p>
-                </CardContent>
-              </Card>
-
               <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/statistics')}>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
