@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -416,49 +416,55 @@ function ApprovedDashboard({
   });
 
   const { toast } = useToast();
+  const [localAvailSet, setLocalAvailSet] = useState<Set<string>>(new Set());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const availabilityMutation = useMutation({
-    mutationFn: async (slots: { dayOfWeek: number; timeSlotOrder: number; available: boolean }[]) => {
-      const res = await fetch("/api/coach-portal/availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          coachName,
-          weekStart: format(currentWeek, "yyyy-MM-dd"),
-          slots,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability"] });
-      toast({ title: "可用時段已更新" });
-    },
-  });
-
-  const availabilitySet = useMemo(() => {
+  useEffect(() => {
     const set = new Set<string>();
     availability.forEach(a => set.add(`${a.dayOfWeek}-${a.timeSlotOrder}`));
-    return set;
+    setLocalAvailSet(set);
   }, [availability]);
+
+  const saveAvailability = useCallback((newSet: Set<string>) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const slots: { dayOfWeek: number; timeSlotOrder: number; available: boolean }[] = [];
+      for (let d = 1; d <= 7; d++) {
+        for (let t = 1; t <= 7; t++) {
+          slots.push({ dayOfWeek: d, timeSlotOrder: t, available: newSet.has(`${d}-${t}`) });
+        }
+      }
+      try {
+        const res = await fetch("/api/coach-portal/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            coachName,
+            weekStart: format(currentWeek, "yyyy-MM-dd"),
+            slots,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability"] });
+        toast({ title: "可用時段已更新" });
+      } catch {
+        toast({ title: "儲存失敗，請重試", variant: "destructive" });
+      }
+    }, 600);
+  }, [coachName, currentWeek, toast]);
 
   const toggleAvailability = (dayOfWeek: number, timeSlotOrder: number) => {
     const key = `${dayOfWeek}-${timeSlotOrder}`;
-    const newSet = new Set(availabilitySet);
-    if (newSet.has(key)) {
-      newSet.delete(key);
-    } else {
-      newSet.add(key);
-    }
-
-    const slots: { dayOfWeek: number; timeSlotOrder: number; available: boolean }[] = [];
-    for (let d = 1; d <= 7; d++) {
-      for (let t = 1; t <= 7; t++) {
-        slots.push({ dayOfWeek: d, timeSlotOrder: t, available: newSet.has(`${d}-${t}`) });
+    setLocalAvailSet(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
       }
-    }
-    availabilityMutation.mutate(slots);
+      saveAvailability(newSet);
+      return newSet;
+    });
   };
 
   const getVenueColor = (venueId: string | number) => {
@@ -713,7 +719,7 @@ function ApprovedDashboard({
                       {dayNames.map((_, di) => {
                         const dayOfWeek = di + 1;
                         const timeSlotOrder = ti + 1;
-                        const isAvailable = availabilitySet.has(`${dayOfWeek}-${timeSlotOrder}`);
+                        const isAvailable = localAvailSet.has(`${dayOfWeek}-${timeSlotOrder}`);
                         return (
                           <td key={di} className="p-0.5">
                             <button
