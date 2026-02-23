@@ -56,7 +56,7 @@ function CoachAssignmentContent() {
   });
 
   const { data: coaches = [] } = useQuery<string[]>({
-    queryKey: ["/api/coaches"],
+    queryKey: ["/api/approved-coaches"],
   });
 
   const assignCoachMutation = useMutation({

@@ -250,13 +250,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Coach autocomplete
+  // Coach autocomplete (from schedules)
   app.get('/api/coaches', async (req, res) => {
     try {
       const coaches = await storage.getUniqueCoaches();
       res.json(coaches);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coaches" });
+    }
+  });
+
+  app.get('/api/approved-coaches', async (req, res) => {
+    try {
+      const approvedUsers = await storage.getApprovedCoachUsers();
+      const names = approvedUsers.map(u => u.linkedCoachName || u.name).filter(Boolean);
+      res.json(names);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch approved coaches" });
     }
   });
 
