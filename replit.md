@@ -45,20 +45,27 @@ Preferred communication style: Simple, everyday language.
 - **Security**: HTTP-only cookies with secure flags in production
 
 ## Key Features & Business Logic
-- **Schedule Management**: Create, update, and delete swimming class schedules
+- **Two-Phase Scheduling (3.0)**:
+  - Phase 1 "學校課表編輯": Admin fills in className (class names) only, then locks the venue+week
+  - Phase 2 "教練指派": After locking, admin assigns coaches via dropdown selectors
+  - `isClassLocked` boolean field on schedules controls lock state per-row
+  - Lock/unlock operates on venue+week batch basis
 - **Conflict Detection**: Real-time validation to prevent double-booking coaches
 - **Multi-Role Interface**: Different views and permissions for admins, coaches, and students
 - **Statistics Dashboard**: Class count analytics with venue breakdowns
 - **Coach Autocomplete**: Dynamic search functionality for coach assignment
 - **Date Navigation**: Week and day-based schedule browsing
-- **Coach Portal (2.0)**: LINE-based coach registration with admin approval workflow
-  - Registration form with name, phone, email
-  - Pending/Approved/Rejected status flow
+- **Coach Portal (2.0)**: Coach selection and personal schedule viewing
+  - Select from approved coaches list
   - Personal weekly schedule view (only shows coach's own classes)
   - Today's same-venue colleague info with emergency phone contacts
+  - Coach rules display (admin-editable)
+  - Venue info with video links
+  - Google Calendar export (.ics download + per-event links)
 - **Admin Coach Approval (2.0)**: Dashboard for managing coach registrations
   - Approve/reject coach accounts
-  - Link registered coaches to scheduling system coach names
+  - Coach rules editor
+  - Venue info management (video links, descriptions)
   - Password-protected API endpoints (server-side validation)
 
 # External Dependencies

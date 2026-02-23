@@ -31,6 +31,7 @@ export default function PasswordProtect({ children, requiredPassword = "dream285
     if (password === requiredPassword) {
       setIsAuthorized(true);
       sessionStorage.setItem("admin_authorized", "true");
+      sessionStorage.setItem("admin-password", password);
       toast({
         title: "驗證成功",
         description: "歡迎使用管理功能",

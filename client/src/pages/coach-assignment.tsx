@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -13,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import PasswordProtect from "@/components/password-protect";
@@ -25,7 +24,7 @@ import {
   getExtendedWeekEnd,
 } from "@/utils/special-workdays";
 
-function VenueScheduleEditContent() {
+function CoachAssignmentContent() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -35,10 +34,6 @@ function VenueScheduleEditContent() {
     const now = new Date();
     return startOfWeek(now, { weekStartsOn: 1 });
   });
-  const [activeCell, setActiveCell] = useState<{
-    date: string;
-    timeSlotId: string;
-  } | null>(null);
 
   const { data: venues } = useQuery<Venue[]>({
     queryKey: ["/api/venues"],
@@ -74,76 +69,51 @@ function VenueScheduleEditContent() {
 
   const isLocked = lockStatusData?.isLocked ?? false;
 
-  const lockMutation = useMutation({
-    mutationFn: async () => {
-      const adminPassword = sessionStorage.getItem("admin-password") || "";
-      const res = await fetch("/api/schedules/lock", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({
-          venueId: selectedVenue,
-          startDate: weekStart,
-          endDate: weekEnd,
-        }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      toast({ title: "鎖定成功", description: "課表已鎖定" });
-    },
-    onError: (error) => {
-      toast({
-        title: "鎖定失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+  const { data: coaches = [] } = useQuery<string[]>({
+    queryKey: ["/api/unique-coaches"],
   });
 
-  const unlockMutation = useMutation({
-    mutationFn: async () => {
+  const assignCoachMutation = useMutation({
+    mutationFn: async ({
+      scheduleId,
+      coachName,
+    }: {
+      scheduleId: string;
+      coachName: string;
+    }) => {
       const adminPassword = sessionStorage.getItem("admin-password") || "";
-      const res = await fetch("/api/schedules/unlock", {
-        method: "POST",
+      const res = await fetch(`/api/schedules/${scheduleId}/assign-coach`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "x-admin-password": adminPassword,
         },
-        body: JSON.stringify({
-          venueId: selectedVenue,
-          startDate: weekStart,
-          endDate: weekEnd,
-        }),
+        body: JSON.stringify({ coachName }),
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["lock-status", selectedVenue, weekStart, weekEnd],
+        queryKey: [
+          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
+        ],
       });
       queryClient.invalidateQueries({
         predicate: (query) =>
           typeof query.queryKey[0] === "string" &&
           query.queryKey[0].includes("/api/schedules"),
       });
-      toast({ title: "解鎖成功", description: "課表已解鎖" });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/conflicts"),
+      });
+      toast({ title: "指派成功", description: "教練已更新" });
     },
     onError: (error) => {
       toast({
-        title: "解鎖失敗",
+        title: "指派失敗",
         description: error.message,
         variant: "destructive",
       });
@@ -173,121 +143,6 @@ function VenueScheduleEditContent() {
     }
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async (scheduleData: {
-      date: string;
-      venueId: string;
-      timeSlotId: string;
-      className: string;
-      coachName: string;
-    }) => {
-      if (!scheduleData.className) {
-        const existingSchedule = schedules?.find(
-          (s) =>
-            s.date === scheduleData.date &&
-            s.venueId === scheduleData.venueId &&
-            s.timeSlotId === scheduleData.timeSlotId,
-        );
-        if (existingSchedule) {
-          const response = await apiRequest(
-            "DELETE",
-            `/api/schedules/${existingSchedule.id}`,
-          );
-          return response.json();
-        }
-        return null;
-      }
-
-      const response = await apiRequest("POST", "/api/schedules", scheduleData);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [
-          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
-        ],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/schedules"),
-      });
-      toast({
-        title: "儲存成功",
-        description: "課表已更新",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "儲存失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (scheduleId: string) => {
-      const response = await apiRequest(
-        "DELETE",
-        `/api/schedules/${scheduleId}`,
-      );
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [
-          `/api/schedules?startDate=${weekStart}&endDate=${weekEnd}&venueId=${selectedVenue}`,
-        ],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/api/schedules"),
-      });
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          typeof query.queryKey[0] === "string" &&
-          query.queryKey[0].includes("/schedules"),
-      });
-      toast({
-        title: "刪除成功",
-        description: "課表已刪除",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "刪除失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAddClass = (date: string, timeSlotId: string, value: string) => {
-    const trimmedValue = value.trim();
-    if (!trimmedValue || !selectedVenue) return;
-
-    saveMutation.mutate({
-      date,
-      venueId: selectedVenue,
-      timeSlotId,
-      className: trimmedValue,
-      coachName: "",
-    });
-  };
-
-  const handleDeleteClass = (scheduleId: string) => {
-    deleteMutation.mutate(scheduleId);
-  };
-
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
   if (!venues || !timeSlots) {
@@ -310,8 +165,8 @@ function VenueScheduleEditContent() {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm bg-red-500 text-white px-3 py-1 rounded-full">
-                場館課表編輯
+              <span className="text-sm bg-blue-500 text-white px-3 py-1 rounded-full">
+                教練指派
               </span>
               {user && (
                 <>
@@ -327,7 +182,6 @@ function VenueScheduleEditContent() {
                     variant="outline"
                     size="sm"
                     onClick={() => (window.location.href = "/api/logout")}
-                    data-testid="button-logout"
                   >
                     登出
                   </Button>
@@ -347,62 +201,53 @@ function VenueScheduleEditContent() {
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/admin/schedule")}
-              data-testid="tab-schedule-edit"
             >
               <i className="fas fa-calendar-alt mr-1 sm:mr-2"></i>課表編輯
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/coach")}
-              data-testid="tab-coach-view"
             >
               <i className="fas fa-user-clock mr-1 sm:mr-2"></i>教練視圖
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/venue-schedule")}
-              data-testid="tab-venue-schedule"
             >
               <i className="fas fa-building mr-1 sm:mr-2"></i>場館課表顯示
             </button>
             <button
-              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
-              data-testid="tab-venue-schedule-edit"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
+              onClick={() => setLocation("/venue-schedule-edit")}
             >
               <i className="fas fa-edit mr-1 sm:mr-2"></i>學校課表編輯 (第一階段)
             </button>
             <button
-              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
-              onClick={() => setLocation("/coach-assignment")}
-              data-testid="tab-coach-assignment"
+              className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-primary text-primary font-medium text-xs sm:text-sm rounded-t sm:rounded-none bg-accent sm:bg-transparent"
             >
               <i className="fas fa-user-plus mr-1 sm:mr-2"></i>教練指派 (第二階段)
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/statistics")}
-              data-testid="tab-statistics"
             >
               <i className="fas fa-chart-bar mr-1 sm:mr-2"></i>堂數統計
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/find-coach")}
-              data-testid="tab-find-coach"
             >
               <i className="fas fa-search mr-1 sm:mr-2"></i>尋找教練
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-accent sm:hover:bg-transparent"
               onClick={() => setLocation("/coach-approval")}
-              data-testid="tab-coach-approval"
             >
               <i className="fas fa-user-check mr-1 sm:mr-2"></i>教練審核
             </button>
             <button
               className="whitespace-nowrap py-2 px-2 sm:px-1 border-b-2 border-transparent text-green-600 hover:text-green-700 hover:border-green-400 font-medium text-xs sm:text-sm rounded-t sm:rounded-none hover:bg-green-50 sm:hover:bg-transparent"
               onClick={() => setLocation("/coach-portal")}
-              data-testid="tab-coach-portal"
             >
               <i className="fas fa-door-open mr-1 sm:mr-2"></i>教練前台
             </button>
@@ -431,7 +276,6 @@ function VenueScheduleEditContent() {
               variant="outline"
               size="icon"
               onClick={() => setCurrentWeek((prev) => subWeeks(prev, 1))}
-              data-testid="button-prev-week"
               className="h-8 w-8 sm:h-10 sm:w-10"
             >
               <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -445,7 +289,6 @@ function VenueScheduleEditContent() {
               variant="outline"
               size="icon"
               onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
-              data-testid="button-next-week"
               className="h-8 w-8 sm:h-10 sm:w-10"
             >
               <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -456,37 +299,34 @@ function VenueScheduleEditContent() {
               onClick={() =>
                 setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))
               }
-              data-testid="button-current-week"
               className="text-xs sm:text-sm px-3 sm:px-4"
             >
               本週
             </Button>
-
-            {selectedVenue && (
-              <Button
-                variant={isLocked ? "destructive" : "outline"}
-                onClick={() => {
-                  if (isLocked) {
-                    unlockMutation.mutate();
-                  } else {
-                    lockMutation.mutate();
-                  }
-                }}
-                disabled={lockMutation.isPending || unlockMutation.isPending}
-                className={
-                  isLocked
-                    ? "text-xs sm:text-sm px-3 sm:px-4"
-                    : "text-xs sm:text-sm px-3 sm:px-4 border-orange-500 text-orange-600 hover:bg-orange-50"
-                }
-                data-testid="button-lock-toggle"
-              >
-                {isLocked ? "🔓 解鎖課表" : "🔒 鎖定課表"}
-              </Button>
-            )}
           </div>
         </div>
 
-        {selectedVenueData && (
+        {selectedVenue && !isLocked && (
+          <Card className="mb-6 border-orange-300 bg-orange-50">
+            <CardContent className="py-6">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <i className="fas fa-lock text-orange-500 text-3xl"></i>
+                <p className="text-orange-700 font-medium">
+                  此場館本週課表尚未鎖定，請先至「學校課表編輯」完成第一階段並鎖定課表。
+                </p>
+                <Button
+                  variant="outline"
+                  className="border-orange-500 text-orange-600 hover:bg-orange-100"
+                  onClick={() => setLocation("/venue-schedule-edit")}
+                >
+                  <i className="fas fa-edit mr-2"></i>前往學校課表編輯
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {selectedVenueData && isLocked && (
           <Card>
             <CardHeader>
               <CardTitle
@@ -498,12 +338,10 @@ function VenueScheduleEditContent() {
                   borderRadius: "6px",
                 }}
               >
-                {selectedVenueData.name} - 週課表編輯
-                {isLocked && (
-                  <span className="ml-2 inline-block bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded">
-                    已鎖定
-                  </span>
-                )}
+                {selectedVenueData.name} - 教練指派
+                <span className="ml-2 inline-block bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded">
+                  已鎖定
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -553,80 +391,63 @@ function VenueScheduleEditContent() {
                           return (
                             <td
                               key={`${timeSlot.id}-${index}`}
-                              className="border border-gray-300 p-1 align-top hover:bg-accent/50 cursor-pointer relative"
+                              className="border border-gray-300 p-1 align-top"
                               style={{
-                                minHeight: "60px",
+                                minHeight: "80px",
                                 verticalAlign: "top",
                               }}
                             >
-                              <div className="space-y-1 min-h-[60px]">
-                                {daySchedules.map((schedule) => (
-                                  <div
-                                    key={schedule.id}
-                                    className="flex items-center justify-between bg-background/50 rounded px-1 py-0.5 text-xs group"
-                                  >
-                                    <span className="flex-1 truncate">
-                                      {schedule.className || "未命名"}
-                                    </span>
-                                    {!isLocked && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteClass(schedule.id);
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
-                                        data-testid={`button-delete-${schedule.id}`}
-                                      >
-                                        <i className="fas fa-times text-xs"></i>
-                                      </button>
-                                    )}
-                                  </div>
-                                ))}
-                                {!isLocked && (
-                                  <input
-                                    type="text"
-                                    className="w-full bg-transparent text-xs placeholder-muted-foreground border-none outline-none p-1"
-                                    placeholder={
-                                      daySchedules.length === 0
-                                        ? "輸入班級名稱"
-                                        : "新增課程"
-                                    }
-                                    onFocus={() =>
-                                      setActiveCell({
-                                        date: dateStr,
-                                        timeSlotId: timeSlot.id,
-                                      })
-                                    }
-                                    onBlur={(e) => {
-                                      const value = e.target.value.trim();
-                                      if (value) {
-                                        handleAddClass(
-                                          dateStr,
-                                          timeSlot.id,
-                                          value,
-                                        );
-                                        e.target.value = "";
-                                      }
-                                      setActiveCell(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        const value =
-                                          e.currentTarget.value.trim();
-                                        if (value) {
-                                          handleAddClass(
-                                            dateStr,
-                                            timeSlot.id,
-                                            value,
-                                          );
-                                          e.currentTarget.value = "";
-                                        }
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                    data-testid={`input-${dateStr}-${timeSlot.id}`}
-                                  />
-                                )}
+                              <div className="space-y-1 min-h-[80px]">
+                                {daySchedules.map((schedule) => {
+                                  if (!schedule.className) return null;
+                                  const hasCoach = !!schedule.coachName;
+                                  return (
+                                    <div
+                                      key={schedule.id}
+                                      className="rounded p-1.5 space-y-1"
+                                    >
+                                      <div className="bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded text-center truncate">
+                                        {schedule.className}
+                                      </div>
+                                      <div className="relative">
+                                        <Select
+                                          value={schedule.coachName || "__none__"}
+                                          onValueChange={(value) => {
+                                            assignCoachMutation.mutate({
+                                              scheduleId: schedule.id,
+                                              coachName: value === "__none__" ? "" : value,
+                                            });
+                                          }}
+                                        >
+                                          <SelectTrigger
+                                            className={`h-7 text-xs ${
+                                              hasCoach
+                                                ? "border-green-400 bg-green-50"
+                                                : "border-orange-400 bg-orange-50"
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-1 w-full">
+                                              {hasCoach && (
+                                                <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                              )}
+                                              <SelectValue placeholder="選擇教練" />
+                                            </div>
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__none__">
+                                              <span className="text-gray-400">清除教練</span>
+                                            </SelectItem>
+                                            {coaches.map((coach) => (
+                                              <SelectItem key={coach} value={coach}>
+                                                {coach}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </td>
                           );
@@ -640,15 +461,16 @@ function VenueScheduleEditContent() {
           </Card>
         )}
       </main>
+
       <FloatingConflictAlert weekStart={currentWeek} />
     </div>
   );
 }
 
-export default function VenueScheduleEdit() {
+export default function CoachAssignment() {
   return (
     <PasswordProtect>
-      <VenueScheduleEditContent />
+      <CoachAssignmentContent />
     </PasswordProtect>
   );
 }

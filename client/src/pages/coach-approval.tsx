@@ -36,11 +36,15 @@ function CoachApprovalContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-5xl mx-auto p-4 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate("/venue-schedule-edit")}>
               <ArrowLeft className="h-4 w-4 mr-1" />
-              返回排課
+              學校課表編輯
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/coach-assignment")}>
+              <Users className="h-4 w-4 mr-1" />
+              教練指派
             </Button>
             <h1 className="text-lg font-bold">教練管理後台</h1>
           </div>

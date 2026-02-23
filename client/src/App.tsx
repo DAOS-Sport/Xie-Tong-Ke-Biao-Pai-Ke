@@ -16,6 +16,7 @@ import TeacherPortal from "@/pages/teacher-portal";
 import MultiSchoolAdmin from "@/pages/multi-school-admin";
 import CoachPortal from "@/pages/coach-portal";
 import CoachApproval from "@/pages/coach-approval";
+import CoachAssignment from "@/pages/coach-assignment";
 import PasswordProtect from "@/components/password-protect";
 
 // Protected AdminSchedule component
@@ -58,6 +59,7 @@ function Router() {
       
       {/* Password protected admin functions */}
       <Route path="/venue-schedule-edit" component={VenueScheduleEdit} />
+      <Route path="/coach-assignment" component={CoachAssignment} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach-approval" component={CoachApproval} />
       
