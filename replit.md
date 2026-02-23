@@ -82,9 +82,10 @@ Preferred communication style: Simple, everyday language.
 - **Ragic Integration**: Auto-sync department data from Ragic
   - API: `https://ap7.ragic.com/xinsheng/ragicforms4/7` (部門表)
   - API: `https://ap7.ragic.com/xinsheng/general-information/23` (教練表)
-  - Auto-sync every 30 minutes + on app startup
+  - Auto-sync daily at 03:00 Asia/Taipei + on app startup
   - Syncs: 部門名稱 → venue name, google map → venueInfos.mapUrl
-  - Syncs: 教練姓名/手機/Email → coachUsers (only 在職, auto-approved)
+  - Syncs: 教練姓名/手機/Email → coachUsers (only 在職 + 應徵職務含「教練」, auto-approved)
+  - Excluded names: "(測試帳號)教練"
   - Only additive: adds new venues, fills empty mapUrl; never deletes or overwrites
   - Coach list sorted: 陳柏榮 always first, then alphabetical
   - Manual sync button in admin dashboard

@@ -1,8 +1,8 @@
+import cron from 'node-cron';
 import { storage } from "./storage";
 
 const RAGIC_DEPT_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/7";
 const RAGIC_COACH_API_URL = "https://ap7.ragic.com/xinsheng/general-information/23";
-const SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
 const VENUE_COLORS = ["blue", "green", "purple", "yellow", "orange", "teal", "red", "pink"];
 
@@ -170,11 +170,12 @@ export function setupRagicSyncCron() {
     console.error("Initial Ragic sync failed:", err);
   });
 
-  setInterval(() => {
+  cron.schedule('0 3 * * *', () => {
+    console.log('[Ragic] Daily sync triggered at 3:00 AM (Asia/Taipei)');
     syncRagicAll().catch(err => {
       console.error("Scheduled Ragic sync failed:", err);
     });
-  }, SYNC_INTERVAL_MS);
+  }, { timezone: 'Asia/Taipei' });
 
-  console.log(`Ragic sync cron set up: every ${SYNC_INTERVAL_MS / 60000} minutes`);
+  console.log('[Ragic] Daily sync scheduled: 03:00 Asia/Taipei');
 }
