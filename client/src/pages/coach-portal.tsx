@@ -5,7 +5,7 @@ import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { CoachUser, Schedule, Venue, TimeSlot, VenueInfo, CoachAvailability } from "@shared/schema";
@@ -664,43 +664,32 @@ function GoogleCalendarCard({
           <p className="text-sm text-muted-foreground text-center py-4">本週無課程，無法匯出日曆</p>
         ) : (
         <div className="space-y-3">
-          <Button
-            onClick={exportAllToICS}
-            className="w-full bg-blue-500 hover:bg-blue-600"
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            下載本週全部課表 (.ics)
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            下載 .ics 檔後可匯入 Google 日曆、Apple 日曆等
-          </p>
-          <div className="border-t pt-3">
-            <p className="text-xs text-muted-foreground mb-2">或逐堂加入 Google 日曆：</p>
-            <div className="space-y-1">
-              {mySchedules.map((s) => {
-                const dateStr = typeof s.date === "string"
-                  ? s.date
-                  : format(new Date(s.date), "yyyy-MM-dd");
-                return (
-                  <a
-                    key={s.id}
-                    href={generateGoogleCalendarUrl(s)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs bg-gray-50 hover:bg-blue-50 rounded px-3 py-2 transition-colors"
-                  >
-                    <Calendar className="h-3 w-3 text-blue-500 shrink-0" />
-                    <span className="text-muted-foreground w-16 shrink-0">{dateStr.slice(5)}</span>
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: `var(--venue-${s.venue?.color})` }}
-                    />
-                    <span className="font-medium">{s.venue?.name}</span>
-                    <span className="text-muted-foreground">{s.timeSlot?.startTime}-{s.timeSlot?.endTime}</span>
-                  </a>
-                );
-              })}
-            </div>
+          <p className="text-xs text-muted-foreground">點擊下方課程即可直接加入 Google 日曆：</p>
+          <div className="space-y-1">
+            {mySchedules.map((s) => {
+              const dateStr = typeof s.date === "string"
+                ? s.date
+                : format(new Date(s.date), "yyyy-MM-dd");
+              return (
+                <a
+                  key={s.id}
+                  href={generateGoogleCalendarUrl(s)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm bg-gray-50 hover:bg-blue-50 border rounded-lg px-3 py-2.5 transition-colors"
+                >
+                  <Calendar className="h-4 w-4 text-blue-500 shrink-0" />
+                  <span className="text-muted-foreground w-16 shrink-0">{dateStr.slice(5)}</span>
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: `var(--venue-${s.venue?.color})` }}
+                  />
+                  <span className="font-medium">{s.venue?.name}</span>
+                  <span className="text-muted-foreground">{s.timeSlot?.startTime}-{s.timeSlot?.endTime}</span>
+                  <ExternalLink className="h-3 w-3 text-blue-400 ml-auto shrink-0" />
+                </a>
+              );
+            })}
           </div>
         </div>
         )}
