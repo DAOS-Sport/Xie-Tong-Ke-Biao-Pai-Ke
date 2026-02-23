@@ -215,14 +215,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateSchedule(id: string, updateData: { className: string; coachName: string }): Promise<Schedule> {
+  async updateSchedule(id: string, updateData: Partial<{ className: string; coachName: string; coachName2: string | null; coachCount: number }>): Promise<Schedule> {
+    const setData: any = { updatedAt: new Date() };
+    if (updateData.className !== undefined) setData.className = updateData.className;
+    if (updateData.coachName !== undefined) setData.coachName = updateData.coachName;
+    if (updateData.coachName2 !== undefined) setData.coachName2 = updateData.coachName2;
+    if (updateData.coachCount !== undefined) setData.coachCount = updateData.coachCount;
     const [result] = await db
       .update(schedules)
-      .set({
-        className: updateData.className,
-        coachName: updateData.coachName,
-        updatedAt: new Date(),
-      })
+      .set(setData)
       .where(eq(schedules.id, id))
       .returning();
     return result;
@@ -259,15 +260,13 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           or(
-            // 完全匹配
             eq(schedules.coachName, coachName),
-            // 前綴匹配（班級-教練）
             like(schedules.coachName, `%-${coachName}`),
             like(schedules.coachName, `${coachName}-%`),
-            // 中間匹配（班級-教練1-教練2）
             like(schedules.coachName, `%-${coachName}-%`),
-            // 正常化後的匹配（處理不同分隔符號）
-            sql`replace(replace(replace(${schedules.coachName}, '－', '-'), '—', '-'), ' ', '') ILIKE ${`%${normalizedCoachName}%`}`
+            sql`replace(replace(replace(${schedules.coachName}, '－', '-'), '—', '-'), ' ', '') ILIKE ${`%${normalizedCoachName}%`}`,
+            eq(schedules.coachName2, coachName),
+            sql`replace(replace(replace(${schedules.coachName2}, '－', '-'), '—', '-'), ' ', '') ILIKE ${`%${normalizedCoachName}%`}`
           ),
           between(schedules.date, startDate, endDate)
         )
@@ -281,22 +280,25 @@ export class DatabaseStorage implements IStorage {
     const coachTimeSlotMap = new Map<string, Map<string, string[]>>();
     
     daySchedules.forEach(schedule => {
-      if (!schedule.coachName) return;
-      
-      // 分析多教練格式：班級-教練1-教練2
       const coaches: string[] = [];
-      if (schedule.coachName.includes('-')) {
-        const parts = schedule.coachName.split('-');
-        // 跳過第一部分（班級名稱），其他部分是教練
-        for (let i = 1; i < parts.length; i++) {
-          const coach = parts[i].trim();
-          if (coach && coach !== '缺') {
-            coaches.push(coach);
+      if (schedule.coachName) {
+        if (schedule.coachName.includes('-')) {
+          const parts = schedule.coachName.split('-');
+          for (let i = 1; i < parts.length; i++) {
+            const coach = parts[i].trim();
+            if (coach && coach !== '缺') {
+              coaches.push(coach);
+            }
           }
+        } else {
+          coaches.push(schedule.coachName.trim());
         }
       }
+      if (schedule.coachName2) {
+        coaches.push(schedule.coachName2.trim());
+      }
+      if (coaches.length === 0) return;
       
-      // 為每個教練檢查時間衝突
       coaches.forEach(coachName => {
         if (!coachTimeSlotMap.has(coachName)) {
           coachTimeSlotMap.set(coachName, new Map());

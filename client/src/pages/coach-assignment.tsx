@@ -63,18 +63,23 @@ function CoachAssignmentContent() {
     mutationFn: async ({
       scheduleId,
       coachName,
+      coachName2,
     }: {
       scheduleId: string;
-      coachName: string;
+      coachName?: string;
+      coachName2?: string;
     }) => {
       const adminPassword = sessionStorage.getItem("admin-password") || "";
+      const body: any = {};
+      if (coachName !== undefined) body.coachName = coachName;
+      if (coachName2 !== undefined) body.coachName2 = coachName2;
       const res = await fetch(`/api/schedules/${scheduleId}/assign-coach`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "x-admin-password": adminPassword,
         },
-        body: JSON.stringify({ coachName }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -364,13 +369,16 @@ function CoachAssignmentContent() {
                                 {daySchedules.map((schedule) => {
                                   if (!schedule.className) return null;
                                   const hasCoach = !!schedule.coachName;
+                                  const hasCoach2 = !!schedule.coachName2;
+                                  const needsTwo = (schedule.coachCount || 1) >= 2;
                                   return (
                                     <div
                                       key={schedule.id}
                                       className="rounded p-1.5 space-y-1"
                                     >
-                                      <div className="bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded text-center truncate">
+                                      <div className="bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded text-center truncate flex items-center justify-center gap-1">
                                         {schedule.className}
+                                        {needsTwo && <span className="text-[9px] opacity-75">(2位)</span>}
                                       </div>
                                       <div className="relative">
                                         <Select
@@ -393,7 +401,7 @@ function CoachAssignmentContent() {
                                               {hasCoach && (
                                                 <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
                                               )}
-                                              <SelectValue placeholder="選擇教練" />
+                                              <SelectValue placeholder="教練1" />
                                             </div>
                                           </SelectTrigger>
                                           <SelectContent>
@@ -410,6 +418,46 @@ function CoachAssignmentContent() {
                                           </SelectContent>
                                         </Select>
                                       </div>
+                                      {needsTwo && (
+                                        <div className="relative">
+                                          <Select
+                                            value={schedule.coachName2 || ""}
+                                            onValueChange={(value) => {
+                                              assignCoachMutation.mutate({
+                                                scheduleId: schedule.id,
+                                                coachName2: value === "__clear__" ? "" : value,
+                                              });
+                                            }}
+                                          >
+                                            <SelectTrigger
+                                              className={`h-7 text-xs ${
+                                                hasCoach2
+                                                  ? "border-blue-400 bg-blue-50"
+                                                  : "border-orange-400 bg-orange-50"
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-1 w-full">
+                                                {hasCoach2 && (
+                                                  <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                                                )}
+                                                <SelectValue placeholder="教練2" />
+                                              </div>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {hasCoach2 && (
+                                                <SelectItem value="__clear__">
+                                                  <span className="text-gray-400">清除教練</span>
+                                                </SelectItem>
+                                              )}
+                                              {coaches.map((coach) => (
+                                                <SelectItem key={coach} value={coach}>
+                                                  {coach}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

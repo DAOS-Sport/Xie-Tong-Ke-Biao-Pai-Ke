@@ -83,6 +83,29 @@ function VenueScheduleEditContent() {
     }
   });
 
+  const updateCoachCountMutation = useMutation({
+    mutationFn: async ({ scheduleId, coachCount }: { scheduleId: string; coachCount: number }) => {
+      const adminPassword = sessionStorage.getItem("admin-password") || "";
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ coachCount }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
+    },
+    onError: (error) => {
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (scheduleData: {
       date: string;
@@ -90,6 +113,7 @@ function VenueScheduleEditContent() {
       timeSlotId: string;
       className: string;
       coachName: string;
+      coachCount?: number;
     }) => {
       if (!scheduleData.className) {
         const existingSchedule = schedules?.find(
@@ -451,16 +475,34 @@ function VenueScheduleEditContent() {
                                     <span className="flex-1 truncate">
                                       {schedule.className || "未命名"}
                                     </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteClass(schedule.id);
-                                      }}
-                                      className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 ml-1 transition-opacity"
-                                      data-testid={`button-delete-${schedule.id}`}
-                                    >
-                                      <i className="fas fa-times text-xs"></i>
-                                    </button>
+                                    <div className="flex items-center gap-0.5 ml-1">
+                                      <select
+                                        value={schedule.coachCount || 1}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          updateCoachCountMutation.mutate({
+                                            scheduleId: schedule.id,
+                                            coachCount: parseInt(e.target.value),
+                                          });
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-[10px] bg-blue-50 border border-blue-200 rounded px-0.5 py-0 cursor-pointer hover:bg-blue-100"
+                                        title="教練人數"
+                                      >
+                                        <option value={1}>1位</option>
+                                        <option value={2}>2位</option>
+                                      </select>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteClass(schedule.id);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
+                                        data-testid={`button-delete-${schedule.id}`}
+                                      >
+                                        <i className="fas fa-times text-xs"></i>
+                                      </button>
+                                    </div>
                                   </div>
                                 ))}
                                 <input

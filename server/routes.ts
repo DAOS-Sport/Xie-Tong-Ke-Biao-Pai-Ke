@@ -194,11 +194,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (password !== 'dream28559983') {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const { coachName } = req.body;
+      const { coachName, coachName2 } = req.body;
+      if (coachName2 !== undefined) {
+        const schedule = await storage.updateSchedule(req.params.id, { coachName2: coachName2 || null });
+        return res.json(schedule);
+      }
       const schedule = await storage.assignCoach(req.params.id, coachName || null);
       res.json(schedule);
     } catch (error) {
       res.status(500).json({ message: "Failed to assign coach" });
+    }
+  });
+
+  app.patch('/api/schedules/:id', async (req: any, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.query.password;
+      if (password !== 'dream28559983') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { coachCount, coachName, coachName2 } = req.body;
+      const updateData: any = {};
+      if (coachCount !== undefined) {
+        const count = parseInt(coachCount);
+        if (count !== 1 && count !== 2) return res.status(400).json({ message: "Coach count must be 1 or 2" });
+        updateData.coachCount = count;
+      }
+      if (coachName !== undefined) updateData.coachName = coachName;
+      if (coachName2 !== undefined) updateData.coachName2 = coachName2;
+      const schedule = await storage.updateSchedule(req.params.id, updateData);
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update schedule" });
     }
   });
 
