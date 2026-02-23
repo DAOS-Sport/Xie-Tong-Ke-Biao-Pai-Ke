@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud } from "lucide-react";
 import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -317,6 +317,92 @@ function CoachRulesSection() {
   );
 }
 
+function RagicSyncSection() {
+  const { data: syncStatus, refetch: refetchStatus } = useQuery<{
+    lastSyncTime: string | null;
+    lastSyncResult: { added: string[]; updated: string[]; total: number } | null;
+    isSyncing: boolean;
+  }>({
+    queryKey: ["/api/admin/ragic-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/ragic-status", {
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 60000,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/ragic-sync", {
+        method: "POST",
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/venue-infos"] });
+    },
+  });
+
+  const lastSync = syncStatus?.lastSyncTime
+    ? format(new Date(syncStatus.lastSyncTime), "yyyy/MM/dd HH:mm:ss")
+    : "尚未同步";
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Cloud className="h-4 w-4" />
+          Ragic 部門同步
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          自動從 Ragic 部門表同步場館資料（每 30 分鐘），新增不存在的場館並補填 Google 導航連結
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="text-sm space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">最後同步：</span>
+              <span className="font-medium">{lastSync}</span>
+            </div>
+            {syncStatus?.lastSyncResult && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>Ragic 部門數：{syncStatus.lastSyncResult.total}</span>
+                {syncStatus.lastSyncResult.added.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    新增 {syncStatus.lastSyncResult.added.length} 個場館
+                  </Badge>
+                )}
+                {syncStatus.lastSyncResult.updated.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    更新 {syncStatus.lastSyncResult.updated.length} 個導航連結
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || syncStatus?.isSyncing}
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+            {syncMutation.isPending ? "同步中..." : "手動同步"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function VenueInfoSection() {
   const { data: venues = [] } = useQuery<Venue[]>({
     queryKey: ["/api/venues"],
@@ -524,6 +610,8 @@ function VenueInfoSection() {
           </div>
         </CardContent>
       </Card>
+
+      <RagicSyncSection />
 
       <Card>
         <CardHeader className="pb-2">

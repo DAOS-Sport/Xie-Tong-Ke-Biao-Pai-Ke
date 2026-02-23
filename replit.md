@@ -79,6 +79,14 @@ Preferred communication style: Simple, everyday language.
   - Venue info management (video links, descriptions, Google Maps navigation)
   - Password-protected API endpoints (server-side validation)
   - Delete venue cascades: removes related schedules and venue info records
+- **Ragic Integration**: Auto-sync department data from Ragic
+  - API: `https://ap7.ragic.com/xinsheng/ragicforms4/7` (部門表)
+  - Auto-sync every 30 minutes + on app startup
+  - Syncs: 部門名稱 → venue name, google map → venueInfos.mapUrl
+  - Only additive: adds new venues, fills empty mapUrl; never deletes or overwrites
+  - Manual sync button in admin dashboard
+  - Endpoints: `GET /api/admin/ragic-status`, `POST /api/admin/ragic-sync`
+  - File: `server/ragic.ts`
 
 # External Dependencies
 

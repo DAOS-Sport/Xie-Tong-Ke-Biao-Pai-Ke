@@ -8,6 +8,7 @@ import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
 import { setupWeeklyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
+import { setupRagicSyncCron, syncRagicDepartments, getRagicSyncStatus } from "./ragic";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1224,6 +1225,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   setupWeeklyNotificationCron();
+
+  app.get('/api/admin/ragic-status', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.query?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    res.json(getRagicSyncStatus());
+  });
+
+  app.post('/api/admin/ragic-sync', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.body?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const result = await syncRagicDepartments();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Manual Ragic sync error:", error);
+      res.status(500).json({ message: "同步失敗", error: String(error) });
+    }
+  });
+
+  setupRagicSyncCron();
 
   return httpServer;
 }
