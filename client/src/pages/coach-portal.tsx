@@ -341,8 +341,6 @@ function CoachRulesCard() {
     },
   });
 
-  if (!data?.content) return null;
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -352,9 +350,13 @@ function CoachRulesCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-sm whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
-          {data.content}
-        </div>
+        {data?.content ? (
+          <div className="text-sm whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+            {data.content}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">尚未設定教練守則</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -375,7 +377,6 @@ function VenueInfoCard() {
   });
 
   const infosWithData = venueInfos.filter((v) => v.videoUrl || v.description);
-  if (infosWithData.length === 0) return null;
 
   return (
     <Card>
@@ -386,6 +387,9 @@ function VenueInfoCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {infosWithData.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">尚未設定場館資訊</p>
+        ) : (
         <div className="space-y-3">
           {infosWithData.map((info) => {
             const venue = venues.find((v) => v.name === info.venueName);
@@ -416,6 +420,7 @@ function VenueInfoCard() {
             );
           })}
         </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -474,8 +479,6 @@ function GoogleCalendarCard({
     URL.revokeObjectURL(url);
   };
 
-  if (mySchedules.length === 0) return null;
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -485,6 +488,9 @@ function GoogleCalendarCard({
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {mySchedules.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">本週無課程，無法匯出日曆</p>
+        ) : (
         <div className="space-y-3">
           <Button
             onClick={exportAllToICS}
@@ -525,6 +531,7 @@ function GoogleCalendarCard({
             </div>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   );
