@@ -125,19 +125,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async initializeVenues(): Promise<void> {
+    const expectedVenues = [
+      { name: "新北高中", color: "blue", order: 1 },
+      { name: "三重商工", color: "green", order: 2 },
+      { name: "三民高中", color: "purple", order: 3 },
+      { name: "福林國小", color: "yellow", order: 4 },
+      { name: "新莊國中", color: "orange", order: 5 },
+      { name: "清江國小", color: "teal", order: 6 },
+      { name: "松山國小", color: "red", order: 7 },
+    ];
+    const removedVenues = ["士東國小"];
+
     const existingVenues = await this.getVenues();
     if (existingVenues.length === 0) {
-      const defaultVenues = [
-        { name: "新北高中", color: "blue", order: 1 },
-        { name: "三重商工", color: "green", order: 2 },
-        { name: "三民高中", color: "purple", order: 3 },
-        { name: "福林國小", color: "yellow", order: 4 },
-        { name: "新莊國中", color: "orange", order: 5 },
-        { name: "清江國小", color: "teal", order: 6 },
-        { name: "松山國小", color: "red", order: 7 },
-      ];
-      
-      await db.insert(venues).values(defaultVenues);
+      await db.insert(venues).values(expectedVenues);
+    } else {
+      const existingNames = existingVenues.map(v => v.name);
+      const missing = expectedVenues.filter(v => !existingNames.includes(v.name));
+      if (missing.length > 0) {
+        await db.insert(venues).values(missing);
+        console.log(`✅ Added missing venues: ${missing.map(v => v.name).join(", ")}`);
+      }
+      for (const name of removedVenues) {
+        if (existingNames.includes(name)) {
+          await db.delete(venues).where(eq(venues.name, name));
+          console.log(`✅ Removed venue: ${name}`);
+        }
+      }
     }
   }
 
