@@ -11,7 +11,6 @@ import CoachView from "@/pages/coach-view";
 import Statistics from "@/pages/statistics";
 import VenueSchedule from "@/pages/venue-schedule";
 import VenueScheduleEdit from "@/pages/venue-schedule-edit";
-import FindCoach from "@/pages/find-coach";
 import TeacherPortal from "@/pages/teacher-portal";
 import MultiSchoolAdmin from "@/pages/multi-school-admin";
 import CoachPortal from "@/pages/coach-portal";
@@ -45,7 +44,6 @@ function Router() {
       <Route path="/admin/schedule" component={AdminSchedule} />
       <Route path="/coach" component={CoachView} />
       <Route path="/venue-schedule" component={VenueSchedule} />
-      <Route path="/find-coach" component={FindCoach} />
       
       {/* Multi-school teacher portal */}
       <Route path="/teacher-portal" component={TeacherPortal} />
