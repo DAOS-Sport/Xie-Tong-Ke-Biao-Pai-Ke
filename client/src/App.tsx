@@ -16,6 +16,7 @@ import MultiSchoolAdmin from "@/pages/multi-school-admin";
 import CoachPortal from "@/pages/coach-portal";
 import CoachApproval from "@/pages/coach-approval";
 import CoachAssignment from "@/pages/coach-assignment";
+import SchoolView from "@/pages/school-view";
 import PasswordProtect from "@/components/password-protect";
 
 // Protected AdminSchedule component
@@ -51,6 +52,9 @@ function Router() {
       
       {/* Multi-school admin */}
       <Route path="/multi-school-admin" component={MultiSchoolAdmin} />
+      
+      {/* Individual school/venue public pages */}
+      <Route path="/school/:venueName" component={SchoolView} />
       
       {/* Coach portal (front-end for coaches) */}
       <Route path="/coach-portal" component={CoachPortal} />

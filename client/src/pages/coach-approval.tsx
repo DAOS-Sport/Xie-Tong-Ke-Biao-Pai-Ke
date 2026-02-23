@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link } from "lucide-react";
 import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -331,33 +331,101 @@ function VenueInfoSection() {
     },
   });
 
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const baseUrl = window.location.origin;
+
+  const handleCopy = (venue: Venue) => {
+    const url = `${baseUrl}/school/${encodeURIComponent(venue.name)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(venue.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          場館資訊管理
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          為每個場館設定進入方式說明和影片連結，教練在前台可以查看
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {venues.map((venue) => {
-            const info = venueInfos.find((v) => v.venueName === venue.name);
-            return (
-              <VenueInfoEditor
-                key={venue.id}
-                venueName={venue.name}
-                venueColor={venue.color}
-                existingInfo={info}
-              />
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Link className="h-4 w-4" />
+            各學校專屬課表連結
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            每個學校有獨立的網址，可以直接分享給學校查看自己的課表
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {venues.map((venue) => {
+              const url = `${baseUrl}/school/${encodeURIComponent(venue.name)}`;
+              return (
+                <div
+                  key={venue.id}
+                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: `var(--venue-${venue.color})` }}
+                  />
+                  <span className="font-medium text-sm w-20 shrink-0">{venue.name}</span>
+                  <code className="flex-1 text-xs bg-gray-100 px-2 py-1.5 rounded font-mono text-gray-600 truncate">
+                    {url}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => handleCopy(venue)}
+                  >
+                    {copiedId === venue.id ? (
+                      <><CheckCircle className="h-3 w-3 mr-1 text-green-500" />已複製</>
+                    ) : (
+                      <><Copy className="h-3 w-3 mr-1" />複製</>
+                    )}
+                  </Button>
+                  <a
+                    href={`/school/${encodeURIComponent(venue.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="ghost" size="sm" className="shrink-0">
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            場館資訊管理
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            為每個場館設定進入方式說明、影片連結和導航，教練在前台可以查看
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {venues.map((venue) => {
+              const info = venueInfos.find((v) => v.venueName === venue.name);
+              return (
+                <VenueInfoEditor
+                  key={venue.id}
+                  venueName={venue.name}
+                  venueColor={venue.color}
+                  existingInfo={info}
+                />
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
