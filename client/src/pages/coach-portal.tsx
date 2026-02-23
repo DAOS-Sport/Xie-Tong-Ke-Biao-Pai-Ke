@@ -264,15 +264,6 @@ function LineRegistrationForm({
 
 function CoachSelectScreen({ onSuccess, lineError }: { onSuccess: (user: CoachUser) => void; lineError?: string }) {
   const { toast } = useToast();
-  const { data: approvedCoaches = [], isLoading } = useQuery<CoachUser[]>({
-    queryKey: ["/api/coach-portal/approved-coaches"],
-    queryFn: async () => {
-      const res = await fetch("/api/coach-portal/approved-coaches");
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
   const { data: lineStatus } = useQuery<{ configured: boolean }>({
     queryKey: ["/api/auth/line/status"],
   });
@@ -308,62 +299,24 @@ function CoachSelectScreen({ onSuccess, lineError }: { onSuccess: (user: CoachUs
           </div>
           <CardTitle className="text-xl">教練入口</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            請選擇登入方式
+            請使用 LINE 帳號登入
           </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {lineStatus?.configured && (
-              <>
-                <Button
-                  className="w-full h-12 text-base font-medium text-white"
-                  style={{ backgroundColor: "#06C755" }}
-                  onClick={handleLineLogin}
-                >
-                  <i className="fab fa-line mr-2 text-xl"></i>
-                  使用 LINE 帳號註冊 / 登入
-                </Button>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-muted-foreground">或選擇已審核的教練</span>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {!lineStatus?.configured && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center text-sm text-amber-700 mb-2">
-                <i className="fas fa-info-circle mr-1"></i>
-                LINE 登入尚未設定，請從下方選擇教練
-              </div>
-            )}
-
-            <p className="text-sm text-muted-foreground text-center">
-              已審核教練可直接選擇姓名進入
-            </p>
-
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">載入中...</div>
-            ) : approvedCoaches.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                目前尚無已審核通過的教練帳號
-              </div>
+            {lineStatus?.configured ? (
+              <Button
+                className="w-full h-12 text-base font-medium text-white"
+                style={{ backgroundColor: "#06C755" }}
+                onClick={handleLineLogin}
+              >
+                <i className="fab fa-line mr-2 text-xl"></i>
+                使用 LINE 帳號註冊 / 登入
+              </Button>
             ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {approvedCoaches.map((coach) => (
-                  <Button
-                    key={coach.id}
-                    variant="outline"
-                    className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-green-50 hover:border-green-300"
-                    onClick={() => onSuccess(coach)}
-                  >
-                    <User className="h-4 w-4 mr-3 text-green-500 shrink-0" />
-                    <span className="font-medium">{coach.name}</span>
-                  </Button>
-                ))}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center text-sm text-amber-700">
+                <i className="fas fa-info-circle mr-1"></i>
+                LINE 登入尚未設定，請聯繫管理員
               </div>
             )}
           </div>
