@@ -611,33 +611,33 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
-        {mySchedules.length > 0 && (
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                本週統計
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-2">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-center">
-                  <div className="text-2xl font-bold text-green-600">{mySchedules.length}</div>
-                  <div className="text-xs text-green-700">總堂數</div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {new Set(mySchedules.map(s => s.venueId)).size}
-                  </div>
-                  <div className="text-xs text-blue-700">場館數</div>
-                </div>
-                <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {Object.keys(schedulesByDate).filter(d => (schedulesByDate[d]?.length || 0) > 0).length}
-                  </div>
-                  <div className="text-xs text-purple-700">上課天數</div>
-                </div>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              本週統計
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-center">
+                <div className="text-2xl font-bold text-green-600">{mySchedules.length}</div>
+                <div className="text-xs text-green-700">總堂數</div>
               </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {new Set(mySchedules.map(s => s.venueId)).size}
+                </div>
+                <div className="text-xs text-blue-700">場館數</div>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {Object.keys(schedulesByDate).filter(d => (schedulesByDate[d]?.length || 0) > 0).length}
+                </div>
+                <div className="text-xs text-purple-700">上課天數</div>
+              </div>
+            </div>
+            {mySchedules.length > 0 ? (
               <div className="space-y-1.5">
                 {Object.entries(
                   mySchedules.reduce<Record<string, number>>((acc, s) => {
@@ -652,9 +652,11 @@ function ApprovedDashboard({
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="text-center text-sm text-muted-foreground py-2">本週尚無排課</div>
+            )}
+          </CardContent>
+        </Card>
 
         {todaySchedules.length > 0 && colleagues.length > 0 && (
           <Card>
@@ -735,29 +737,31 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
-        {coachRules?.content && (
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                教練守則
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-2">
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              教練守則
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            {coachRules?.content ? (
               <div className="text-sm whitespace-pre-wrap text-muted-foreground">{coachRules.content}</div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="text-center text-sm text-muted-foreground py-2">尚未設定教練守則</div>
+            )}
+          </CardContent>
+        </Card>
 
-        {venueInfos.length > 0 && (
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                場館資訊
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-2">
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              場館資訊
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            {venueInfos.length > 0 ? (
               <div className="space-y-3">
                 {venueInfos.map((info, i) => (
                   <div key={i} className="p-3 bg-gray-50 rounded-lg">
@@ -794,9 +798,11 @@ function ApprovedDashboard({
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="text-center text-sm text-muted-foreground py-2">尚未設定場館資訊</div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
