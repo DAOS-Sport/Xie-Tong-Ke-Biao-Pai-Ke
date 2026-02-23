@@ -74,8 +74,11 @@ Preferred communication style: Simple, everyday language.
 - **Admin Coach Approval (2.0)**: Dashboard for managing coach registrations
   - Approve/reject coach accounts
   - Coach rules editor
-  - Venue info management (video links, descriptions)
+  - **Venue management**: Admin can add/delete venues dynamically through UI (no hardcoding)
+  - New venues automatically get public URLs (/school/:venueName) and editable info sections
+  - Venue info management (video links, descriptions, Google Maps navigation)
   - Password-protected API endpoints (server-side validation)
+  - Delete venue cascades: removes related schedules and venue info records
 
 # External Dependencies
 
