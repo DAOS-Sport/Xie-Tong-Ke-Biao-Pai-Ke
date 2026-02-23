@@ -133,9 +133,8 @@ export class DatabaseStorage implements IStorage {
         { name: "三民高中", color: "purple", order: 3 },
         { name: "福林國小", color: "yellow", order: 4 },
         { name: "新莊國中", color: "orange", order: 5 },
-        { name: "士東國小", color: "pink", order: 6 },
-        { name: "清江國小", color: "teal", order: 7 },
-        { name: "松山國小", color: "red", order: 8 },
+        { name: "清江國小", color: "teal", order: 6 },
+        { name: "松山國小", color: "red", order: 7 },
       ];
       
       await db.insert(venues).values(defaultVenues);
