@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send } from "lucide-react";
 import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -31,7 +31,7 @@ const adminPassword = "dream28559983";
 
 function CoachApprovalContent() {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "rules" | "venues">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "rules" | "venues" | "notify">("users");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -75,11 +75,20 @@ function CoachApprovalContent() {
             <MapPin className="h-4 w-4 mr-1" />
             場館資訊
           </Button>
+          <Button
+            variant={activeTab === "notify" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("notify")}
+          >
+            <Bell className="h-4 w-4 mr-1" />
+            推播通知
+          </Button>
         </div>
 
         {activeTab === "users" && <CoachUsersSection />}
         {activeTab === "rules" && <CoachRulesSection />}
         {activeTab === "venues" && <VenueInfoSection />}
+        {activeTab === "notify" && <NotificationSection />}
       </main>
     </div>
   );
@@ -427,6 +436,77 @@ function VenueInfoEditor({
         </Button>
       </div>
     </div>
+  );
+}
+
+function NotificationSection() {
+  const [sendResult, setSendResult] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  const sendNotification = async () => {
+    setIsSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch("/api/admin/send-weekly-notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSendResult("推播已成功發送！");
+      } else {
+        setSendResult(`發送失敗：${data.message || "未知錯誤"}`);
+      }
+    } catch {
+      setSendResult("發送失敗：網路錯誤");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Bell className="h-5 w-5" />
+          LINE 推播通知
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm space-y-2">
+          <p className="font-medium text-blue-800">自動推播排程</p>
+          <p className="text-blue-700">
+            系統會在每週日晚上 20:00（台灣時間）自動發送 LINE 推播，通知每位教練下週排定的課程。
+          </p>
+          <p className="text-blue-600 text-xs">
+            條件：教練需已核准、已綁定 LINE 帳號、且帳號已連結排課系統中的教練名稱。
+          </p>
+        </div>
+
+        <div className="border rounded-lg p-4 space-y-3">
+          <p className="font-medium">手動發送推播</p>
+          <p className="text-sm text-muted-foreground">
+            點擊下方按鈕立即發送下週課程通知給所有符合條件的教練。
+          </p>
+          <Button
+            onClick={sendNotification}
+            disabled={isSending}
+            className="bg-green-500 hover:bg-green-600"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {isSending ? "發送中..." : "立即發送下週課程通知"}
+          </Button>
+          {sendResult && (
+            <p className={`text-sm mt-2 ${sendResult.includes("成功") ? "text-green-600" : "text-red-600"}`}>
+              {sendResult}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
