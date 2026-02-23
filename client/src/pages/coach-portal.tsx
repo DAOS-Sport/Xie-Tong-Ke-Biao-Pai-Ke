@@ -5,6 +5,8 @@ import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -21,6 +23,35 @@ function getWeekdayName(date: Date): string {
   return `週${names[date.getDay()]}`;
 }
 
+function useLineLoginParams() {
+  const [params, setParams] = useState<{
+    lineLogin?: string;
+    userId?: string;
+    token?: string;
+    error?: string;
+  }>({});
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const lineLogin = url.searchParams.get("lineLogin");
+    const userId = url.searchParams.get("userId");
+    const token = url.searchParams.get("token");
+    const error = url.searchParams.get("error");
+
+    if (lineLogin || error) {
+      setParams({
+        lineLogin: lineLogin || undefined,
+        userId: userId || undefined,
+        token: token || undefined,
+        error: error || undefined,
+      });
+      window.history.replaceState({}, "", "/coach-portal");
+    }
+  }, []);
+
+  return params;
+}
+
 export default function CoachPortal() {
   const [coachUser, setCoachUser] = useState<CoachUser | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -28,12 +59,21 @@ export default function CoachPortal() {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
 
+  const lineParams = useLineLoginParams();
+
   useEffect(() => {
     const savedId = sessionStorage.getItem("coach_portal_id");
     if (savedId) {
       setSessionId(savedId);
     }
   }, []);
+
+  useEffect(() => {
+    if (lineParams.lineLogin === "existing" && lineParams.userId) {
+      setSessionId(lineParams.userId);
+      sessionStorage.setItem("coach_portal_id", lineParams.userId);
+    }
+  }, [lineParams]);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CoachUser>({
     queryKey: ["/api/coach-portal/me", sessionId],
@@ -70,12 +110,25 @@ export default function CoachPortal() {
     );
   }
 
+  if (lineParams.lineLogin === "new" && lineParams.token) {
+    return (
+      <LineRegistrationForm
+        lineToken={lineParams.token}
+        onSuccess={(user) => {
+          setCoachUser(user);
+          setSessionId(user.id);
+          sessionStorage.setItem("coach_portal_id", user.id);
+        }}
+      />
+    );
+  }
+
   if (!coachUser || !sessionId) {
     return <CoachSelectScreen onSuccess={(user) => {
       setCoachUser(user);
       setSessionId(user.id);
       sessionStorage.setItem("coach_portal_id", user.id);
-    }} />;
+    }} lineError={lineParams.error} />;
   }
 
   return (
@@ -88,7 +141,129 @@ export default function CoachPortal() {
   );
 }
 
-function CoachSelectScreen({ onSuccess }: { onSuccess: (user: CoachUser) => void }) {
+function LineRegistrationForm({
+  lineToken,
+  onSuccess,
+}: {
+  lineToken: string;
+  onSuccess: (user: CoachUser) => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+
+  const { data: tokenInfo } = useQuery<{ lineName: string; linePicture: string }>({
+    queryKey: ["/api/auth/line/token-info", lineToken],
+    queryFn: async () => {
+      const res = await fetch(`/api/auth/line/token-info/${lineToken}`);
+      if (!res.ok) throw new Error("Token expired");
+      return res.json();
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (tokenInfo?.lineName && !name) {
+      setName(tokenInfo.lineName);
+    }
+  }, [tokenInfo]);
+
+  const registerMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/coach-portal/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineToken, name, phone, email }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "註冊失敗");
+      }
+      return res.json();
+    },
+    onSuccess: (user) => {
+      toast({ title: "註冊成功", description: "請等待管理員審核" });
+      onSuccess(user);
+    },
+    onError: (error: Error) => {
+      toast({ title: "註冊失敗", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          {tokenInfo?.linePicture ? (
+            <img
+              src={tokenInfo.linePicture}
+              alt="LINE 頭像"
+              className="mx-auto w-16 h-16 rounded-full mb-4 border-2 border-green-500"
+            />
+          ) : (
+            <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+              <User className="h-8 w-8 text-white" />
+            </div>
+          )}
+          <CardTitle className="text-xl">完成教練註冊</CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            LINE 登入成功！請填寫以下資料完成註冊
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="bg-green-50 rounded-lg p-3 text-center text-sm text-green-700">
+              <i className="fab fa-line mr-1"></i>
+              LINE 帳號已連結
+            </div>
+            <div>
+              <Label htmlFor="name">姓名 *</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="請輸入您的真實姓名"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">手機號碼</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="例：0912345678"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">電子信箱</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="例：coach@example.com"
+                className="mt-1"
+              />
+            </div>
+            <Button
+              className="w-full bg-green-500 hover:bg-green-600"
+              onClick={() => registerMutation.mutate()}
+              disabled={!name.trim() || registerMutation.isPending}
+            >
+              {registerMutation.isPending ? "註冊中..." : "送出註冊"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CoachSelectScreen({ onSuccess, lineError }: { onSuccess: (user: CoachUser) => void; lineError?: string }) {
+  const { toast } = useToast();
   const { data: approvedCoaches = [], isLoading } = useQuery<CoachUser[]>({
     queryKey: ["/api/coach-portal/approved-coaches"],
     queryFn: async () => {
@@ -97,6 +272,32 @@ function CoachSelectScreen({ onSuccess }: { onSuccess: (user: CoachUser) => void
       return res.json();
     },
   });
+
+  const { data: lineStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/auth/line/status"],
+  });
+
+  useEffect(() => {
+    if (lineError) {
+      const errorMessages: Record<string, string> = {
+        line_denied: "您取消了 LINE 登入",
+        no_code: "LINE 登入未完成",
+        line_not_configured: "LINE 登入尚未設定",
+        token_failed: "LINE 登入驗證失敗，請重試",
+        profile_failed: "無法取得 LINE 資料，請重試",
+        callback_failed: "LINE 登入過程發生錯誤，請重試",
+      };
+      toast({
+        title: "LINE 登入失敗",
+        description: errorMessages[lineError] || "未知錯誤，請重試",
+        variant: "destructive",
+      });
+    }
+  }, [lineError]);
+
+  const handleLineLogin = () => {
+    window.location.href = "/api/auth/line";
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
@@ -107,31 +308,65 @@ function CoachSelectScreen({ onSuccess }: { onSuccess: (user: CoachUser) => void
           </div>
           <CardTitle className="text-xl">教練入口</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            請選擇您的姓名以查看個人課表
+            請選擇登入方式
           </p>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">載入中...</div>
-          ) : approvedCoaches.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              目前尚無已審核通過的教練帳號
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {approvedCoaches.map((coach) => (
+          <div className="space-y-4">
+            {lineStatus?.configured && (
+              <>
                 <Button
-                  key={coach.id}
-                  variant="outline"
-                  className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-green-50 hover:border-green-300"
-                  onClick={() => onSuccess(coach)}
+                  className="w-full h-12 text-base font-medium text-white"
+                  style={{ backgroundColor: "#06C755" }}
+                  onClick={handleLineLogin}
                 >
-                  <User className="h-4 w-4 mr-3 text-green-500 shrink-0" />
-                  <span className="font-medium">{coach.name}</span>
+                  <i className="fab fa-line mr-2 text-xl"></i>
+                  使用 LINE 帳號註冊 / 登入
                 </Button>
-              ))}
-            </div>
-          )}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-muted-foreground">或選擇已審核的教練</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!lineStatus?.configured && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center text-sm text-amber-700 mb-2">
+                <i className="fas fa-info-circle mr-1"></i>
+                LINE 登入尚未設定，請從下方選擇教練
+              </div>
+            )}
+
+            <p className="text-sm text-muted-foreground text-center">
+              已審核教練可直接選擇姓名進入
+            </p>
+
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">載入中...</div>
+            ) : approvedCoaches.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                目前尚無已審核通過的教練帳號
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {approvedCoaches.map((coach) => (
+                  <Button
+                    key={coach.id}
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-green-50 hover:border-green-300"
+                    onClick={() => onSuccess(coach)}
+                  >
+                    <User className="h-4 w-4 mr-3 text-green-500 shrink-0" />
+                    <span className="font-medium">{coach.name}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -178,143 +413,238 @@ function ApprovedDashboard({
       map[d].push(s);
     }
     for (const key of Object.keys(map)) {
-      map[key].sort((a, b) => (a.timeSlot?.order || 0) - (b.timeSlot?.order || 0));
+      map[key].sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
     }
     return map;
   }, [mySchedules]);
 
   const todaySchedules = schedulesByDate[today] || [];
 
+  const { data: colleagues = [] } = useQuery<{
+    coachName: string;
+    phone: string;
+    venueName: string;
+  }[]>({
+    queryKey: ["/api/coach-portal/colleagues", coachName, today],
+    queryFn: async () => {
+      const venueIds = todaySchedules.map(s => s.venueId);
+      if (!venueIds.length) return [];
+      const res = await fetch(
+        `/api/coach-portal/colleagues?coachName=${encodeURIComponent(coachName)}&date=${today}&venueIds=${venueIds.join(",")}`
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: todaySchedules.length > 0,
+  });
+
+  const { data: coachRules } = useQuery<{ rules: string }>({
+    queryKey: ["/api/settings/coach-rules"],
+  });
+
+  const { data: venueInfos = [] } = useQuery<VenueInfo[]>({
+    queryKey: ["/api/settings/venue-info"],
+  });
+
+  const { data: availability = [] } = useQuery<CoachAvailability[]>({
+    queryKey: ["/api/coach-portal/availability", coachName, format(currentWeek, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/coach-portal/availability?coachName=${encodeURIComponent(coachName)}&weekStart=${format(currentWeek, "yyyy-MM-dd")}`
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { toast } = useToast();
+
+  const availabilityMutation = useMutation({
+    mutationFn: async (slots: { dayOfWeek: number; timeSlotOrder: number; available: boolean }[]) => {
+      const res = await fetch("/api/coach-portal/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coachName,
+          weekStart: format(currentWeek, "yyyy-MM-dd"),
+          slots,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability"] });
+      toast({ title: "可用時段已更新" });
+    },
+  });
+
+  const availabilitySet = useMemo(() => {
+    const set = new Set<string>();
+    availability.forEach(a => set.add(`${a.dayOfWeek}-${a.timeSlotOrder}`));
+    return set;
+  }, [availability]);
+
+  const toggleAvailability = (dayOfWeek: number, timeSlotOrder: number) => {
+    const key = `${dayOfWeek}-${timeSlotOrder}`;
+    const newSet = new Set(availabilitySet);
+    if (newSet.has(key)) {
+      newSet.delete(key);
+    } else {
+      newSet.add(key);
+    }
+
+    const slots: { dayOfWeek: number; timeSlotOrder: number; available: boolean }[] = [];
+    for (let d = 1; d <= 7; d++) {
+      for (let t = 1; t <= 7; t++) {
+        slots.push({ dayOfWeek: d, timeSlotOrder: t, available: newSet.has(`${d}-${t}`) });
+      }
+    }
+    availabilityMutation.mutate(slots);
+  };
+
+  const getVenueColor = (venueId: string | number) => {
+    const venue = venues.find(v => String(v.id) === String(venueId));
+    return venue?.color || "blue";
+  };
+
+  const getVenueBgClass = (color: string) => {
+    const map: Record<string, string> = {
+      blue: "bg-blue-100 border-blue-300 text-blue-800",
+      green: "bg-green-100 border-green-300 text-green-800",
+      purple: "bg-purple-100 border-purple-300 text-purple-800",
+      yellow: "bg-yellow-100 border-yellow-300 text-yellow-800",
+      pink: "bg-pink-100 border-pink-300 text-pink-800",
+      red: "bg-red-100 border-red-300 text-red-800",
+      orange: "bg-orange-100 border-orange-300 text-orange-800",
+      teal: "bg-teal-100 border-teal-300 text-teal-800",
+    };
+    return map[color] || "bg-gray-100 border-gray-300 text-gray-800";
+  };
+
+  const generateGoogleCalendarUrl = (schedule: ScheduleWithDetails) => {
+    const dateStr = typeof schedule.date === "string" ? schedule.date : format(new Date(schedule.date), "yyyy-MM-dd");
+    const startTime = schedule.timeSlot?.startTime || "08:00";
+    const endTime = schedule.timeSlot?.endTime || "09:00";
+    const [sy, sm, sd] = dateStr.split("-");
+    const [sh, smin] = startTime.split(":");
+    const [eh, emin] = endTime.split(":");
+    const dtStart = `${sy}${sm}${sd}T${sh}${smin}00`;
+    const dtEnd = `${sy}${sm}${sd}T${eh}${emin}00`;
+
+    const title = encodeURIComponent(`${schedule.className || "游泳課"} - ${schedule.venue?.name || ""}`);
+    const location = encodeURIComponent(schedule.venue?.name || "");
+    const details = encodeURIComponent(`教練: ${coachName}\n場館: ${schedule.venue?.name || ""}`);
+
+    return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&ctz=Asia/Taipei&location=${location}&details=${details}`;
+  };
+
+  const dayNames = ["一", "二", "三", "四", "五", "六", "日"];
+  const periodLabels = ["第1節", "第2節", "第3節", "第4節", "第5節", "第6節", "第7節"];
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-            <User className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <div className="font-semibold text-sm">{user.name}</div>
-            <div className="text-xs text-muted-foreground">教練</div>
+      <header className="bg-green-600 text-white shadow-md">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <User className="h-6 w-6" />
+              <div>
+                <h1 className="font-bold text-lg">{coachName} 教練</h1>
+                <p className="text-green-100 text-xs">
+                  {user.status === "approved" ? "已審核" : user.status === "pending" ? "待審核" : ""}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-green-700"
+              onClick={onLogout}
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              登出
+            </Button>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onLogout}>
-          <LogOut className="h-4 w-4" />
-        </Button>
       </header>
 
-      <main className="max-w-2xl mx-auto p-4 space-y-4">
-        {/* 今日課表摘要 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              今日課表 - {format(new Date(), "MM/dd (EEEE)", { locale: zhTW })}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {todaySchedules.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">今日無課程安排</p>
-            ) : (
-              <div className="space-y-2">
-                {todaySchedules.map((s) => (
-                  <TodayScheduleCard key={s.id} schedule={s} coachName={coachName} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {user.status === "pending" && (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="py-4 text-center">
+              <p className="text-amber-700 font-medium">
+                <i className="fas fa-clock mr-2"></i>
+                您的帳號正在等待管理員審核，審核通過後即可使用完整功能
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* 週課表 */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="py-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">個人週課表</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                我的課表
+              </CardTitle>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setCurrentWeek((prev) => addWeeks(prev, -1))}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => addWeeks(w, -1))}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[120px] text-center">
-                  {format(weekDays[0], "MM/dd")} - {format(weekDays[6], "MM/dd")}
+                <span className="text-sm font-medium min-w-32 text-center">
+                  {format(weekDays[0], "M/d", { locale: zhTW })} - {format(weekDays[6], "M/d", { locale: zhTW })}
                 </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setCurrentWeek((prev) => addWeeks(prev, 1))}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setCurrentWeek(w => addWeeks(w, 1))}>
                   <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() =>
-                    setCurrentWeek(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
-                  }
-                >
-                  本週
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="py-2">
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">載入中...</div>
+            ) : mySchedules.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">本週無排課</div>
             ) : (
-              <div className="space-y-1">
-                {weekDays.map((date) => {
-                  const dateStr = format(date, "yyyy-MM-dd");
-                  const daySchedules = schedulesByDate[dateStr] || [];
-                  const isToday = dateStr === today;
+              <div className="space-y-3">
+                {weekDays.map(day => {
+                  const dayStr = format(day, "yyyy-MM-dd");
+                  const daySchedules = schedulesByDate[dayStr] || [];
+                  if (!daySchedules.length) return null;
+                  const isToday = dayStr === today;
                   return (
-                    <div
-                      key={dateStr}
-                      className={`rounded-lg p-3 ${
-                        isToday ? "bg-green-50 border border-green-200" : "bg-white border"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-semibold ${isToday ? "text-green-700" : ""}`}>
-                          {format(date, "MM/dd")} ({getWeekdayName(date)})
-                          {isToday && (
-                            <Badge className="ml-2 bg-green-500 text-xs">今天</Badge>
-                          )}
+                    <div key={dayStr} className={`rounded-lg border p-3 ${isToday ? "border-green-400 bg-green-50" : ""}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-sm font-bold ${isToday ? "text-green-600" : ""}`}>
+                          {format(day, "M/d")} ({getWeekdayName(day)})
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {daySchedules.length} 堂課
-                        </span>
+                        {isToday && <Badge className="bg-green-500 text-xs">今天</Badge>}
+                        <Badge variant="outline" className="text-xs">{daySchedules.length} 堂</Badge>
                       </div>
-                      {daySchedules.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">無課程</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {daySchedules.map((s) => (
-                            <div
-                              key={s.id}
-                              className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1"
-                            >
-                              <span className="text-muted-foreground w-20 shrink-0">
-                                {s.timeSlot?.period} {s.timeSlot?.startTime}-{s.timeSlot?.endTime}
-                              </span>
-                              <span
-                                className="w-2 h-2 rounded-full shrink-0"
-                                style={{
-                                  backgroundColor: `var(--venue-${s.venue?.color})`,
-                                }}
-                              ></span>
-                              <span className="font-medium">{s.venue?.name}</span>
-                              {s.className && (
-                                <span className="text-muted-foreground">| {s.className}</span>
-                              )}
+                      <div className="space-y-1.5">
+                        {daySchedules.map(s => (
+                          <div key={s.id} className={`flex items-center gap-2 p-2 rounded border ${getVenueBgClass(getVenueColor(s.venueId))}`}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-medium">{s.timeSlot?.startTime}-{s.timeSlot?.endTime}</span>
+                                <span className="font-medium text-sm truncate">{s.className || "游泳課"}</span>
+                                <Badge variant="secondary" className="text-xs">{s.venue?.name}</Badge>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <a
+                              href={generateGoogleCalendarUrl(s)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0"
+                            >
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <Calendar className="h-3.5 w-3.5" />
+                              </Button>
+                            </a>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
@@ -323,158 +653,74 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
-        <CoachAvailabilityCard coachName={coachName} />
+        {todaySchedules.length > 0 && colleagues.length > 0 && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                今日同場館教練
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="space-y-2">
+                {colleagues.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <span className="font-medium text-sm">{c.coachName}</span>
+                      <Badge variant="outline" className="text-xs">{c.venueName}</Badge>
+                    </div>
+                    {c.phone && (
+                      <a href={`tel:${c.phone}`} className="text-green-600 text-sm flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {c.phone}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <CoachRulesCard />
-
-        <VenueInfoCard />
-
-        <GoogleCalendarCard schedules={mySchedules} coachName={coachName} />
-      </main>
-    </div>
-  );
-}
-
-function CoachAvailabilityCard({ coachName }: { coachName: string }) {
-  const { toast } = useToast();
-  const [availWeek, setAvailWeek] = useState(() =>
-    startOfWeek(new Date(), { weekStartsOn: 1 })
-  );
-  const weekStartStr = format(availWeek, "yyyy-MM-dd");
-  const availWeekDays = getWeekDays(availWeek);
-
-  const { data: existingAvailability = [], isLoading } = useQuery<CoachAvailability[]>({
-    queryKey: ["/api/coach-portal/availability", coachName, weekStartStr],
-    queryFn: async () => {
-      const res = await fetch(`/api/coach-portal/availability?coachName=${encodeURIComponent(coachName)}&weekStart=${weekStartStr}`);
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  const [checkedSlots, setCheckedSlots] = useState<Set<string>>(new Set());
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    const newSet = new Set<string>();
-    for (const a of existingAvailability) {
-      newSet.add(`${a.dayOfWeek}-${a.timeSlotOrder}`);
-    }
-    setCheckedSlots(newSet);
-    setInitialized(true);
-  }, [existingAvailability]);
-
-  const toggleSlot = useCallback((dayOfWeek: number, timeSlotOrder: number) => {
-    const key = `${dayOfWeek}-${timeSlotOrder}`;
-    setCheckedSlots(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const slots = Array.from(checkedSlots).map(k => {
-        const [d, t] = k.split("-").map(Number);
-        return { dayOfWeek: d, timeSlotOrder: t };
-      });
-      const res = await fetch("/api/coach-portal/availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coachName, weekStart: weekStartStr, slots }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability", coachName, weekStartStr] });
-      toast({ title: "已儲存", description: "可用時段已更新" });
-    },
-    onError: () => {
-      toast({ title: "儲存失敗", variant: "destructive" });
-    },
-  });
-
-  const selectAll = () => {
-    const all = new Set<string>();
-    for (let d = 1; d <= 7; d++) {
-      for (let t = 1; t <= 7; t++) {
-        all.add(`${d}-${t}`);
-      }
-    }
-    setCheckedSlots(all);
-  };
-
-  const clearAll = () => setCheckedSlots(new Set());
-
-  const dayLabels = ["一", "二", "三", "四", "五", "六", "日"];
-  const periodLabels = ["第1節", "第2節", "第3節", "第4節", "第5節", "第6節", "第7節"];
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CheckSquare className="h-4 w-4" />
-            可用時段填報
-          </CardTitle>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAvailWeek(prev => addWeeks(prev, -1))}>
-              <ChevronLeft className="h-3 w-3" />
-            </Button>
-            <span className="text-xs font-medium min-w-[100px] text-center">
-              {format(availWeekDays[0], "MM/dd")} - {format(availWeekDays[6], "MM/dd")}
-            </span>
-            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAvailWeek(prev => addWeeks(prev, 1))}>
-              <ChevronRight className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="text-center py-4 text-muted-foreground text-sm">載入中...</div>
-        ) : (
-          <>
-            <div className="flex gap-2 mb-3">
-              <Button variant="outline" size="sm" className="text-xs h-7" onClick={selectAll}>全選</Button>
-              <Button variant="outline" size="sm" className="text-xs h-7" onClick={clearAll}>清除</Button>
-            </div>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              可用時段 (本週)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-center text-xs">
                 <thead>
                   <tr>
-                    <th className="p-1 border text-center bg-gray-50 w-14"></th>
-                    {dayLabels.map((label, i) => (
-                      <th key={i} className="p-1 border text-center bg-gray-50 min-w-[40px]">
-                        <div>{label}</div>
-                        <div className="text-[10px] text-muted-foreground">{format(availWeekDays[i], "MM/dd")}</div>
-                      </th>
+                    <th className="p-1 text-muted-foreground"></th>
+                    {dayNames.map((d, i) => (
+                      <th key={i} className="p-1 font-medium">{d}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {periodLabels.map((period, tIdx) => (
-                    <tr key={tIdx}>
-                      <td className="p-1 border text-center bg-gray-50 font-medium">{period}</td>
-                      {dayLabels.map((_, dIdx) => {
-                        const dayOfWeek = dIdx + 1;
-                        const timeSlotOrder = tIdx + 1;
-                        const key = `${dayOfWeek}-${timeSlotOrder}`;
-                        const checked = checkedSlots.has(key);
+                  {periodLabels.map((label, ti) => (
+                    <tr key={ti}>
+                      <td className="p-1 text-muted-foreground text-xs">{label}</td>
+                      {dayNames.map((_, di) => {
+                        const dayOfWeek = di + 1;
+                        const timeSlotOrder = ti + 1;
+                        const isAvailable = availabilitySet.has(`${dayOfWeek}-${timeSlotOrder}`);
                         return (
-                          <td
-                            key={dIdx}
-                            className={`p-1 border text-center cursor-pointer select-none transition-colors ${checked ? "bg-green-100 hover:bg-green-200" : "bg-white hover:bg-gray-100"}`}
-                            onClick={() => toggleSlot(dayOfWeek, timeSlotOrder)}
-                          >
-                            {checked ? (
-                              <span className="text-green-600 font-bold">✓</span>
-                            ) : (
-                              <span className="text-gray-300">·</span>
-                            )}
+                          <td key={di} className="p-0.5">
+                            <button
+                              onClick={() => toggleAvailability(dayOfWeek, timeSlotOrder)}
+                              className={`w-8 h-8 rounded border transition-colors ${
+                                isAvailable
+                                  ? "bg-green-500 border-green-600 text-white"
+                                  : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+                              }`}
+                            >
+                              {isAvailable ? "✓" : ""}
+                            </button>
                           </td>
                         );
                       })}
@@ -483,288 +729,58 @@ function CoachAvailabilityCard({ coachName }: { coachName: string }) {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-muted-foreground">
-                已選 {checkedSlots.size} / 49 個時段
-              </span>
-              <Button
-                size="sm"
-                className="bg-green-500 hover:bg-green-600"
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
-              >
-                {saveMutation.isPending ? "儲存中..." : "儲存可用時段"}
-              </Button>
-            </div>
-          </>
+          </CardContent>
+        </Card>
+
+        {coachRules?.rules && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                教練守則
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="text-sm whitespace-pre-wrap text-muted-foreground">{coachRules.rules}</div>
+            </CardContent>
+          </Card>
         )}
-      </CardContent>
-    </Card>
-  );
-}
 
-function CoachRulesCard() {
-  const { data } = useQuery<{ content: string }>({
-    queryKey: ["/api/settings/coach-rules"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/coach-rules");
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <BookOpen className="h-4 w-4" />
-          教練守則
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data?.content ? (
-          <div className="text-sm whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
-            {data.content}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">尚未設定教練守則</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function VenueInfoCard() {
-  const { data: venueInfos = [] } = useQuery<VenueInfo[]>({
-    queryKey: ["/api/venue-infos"],
-    queryFn: async () => {
-      const res = await fetch("/api/venue-infos");
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  const { data: venues = [] } = useQuery<Venue[]>({
-    queryKey: ["/api/venues"],
-  });
-
-  const infosWithData = venueInfos.filter((v) => v.videoUrl || v.description);
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Video className="h-4 w-4" />
-          場館資訊
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {infosWithData.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">尚未設定場館資訊</p>
-        ) : (
-        <div className="space-y-3">
-          {infosWithData.map((info) => {
-            const venue = venues.find((v) => v.name === info.venueName);
-            return (
-              <div key={info.id} className="border rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: venue ? `var(--venue-${venue.color})` : '#666' }}
-                  />
-                  <span className="font-medium text-sm">{info.venueName}</span>
-                </div>
-                {info.description && (
-                  <p className="text-sm text-muted-foreground mb-2">{info.description}</p>
-                )}
-                {info.videoUrl && (
-                  <a
-                    href={info.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                  >
-                    <Video className="h-3 w-3" />
-                    觀看場館影片
-                  </a>
-                )}
+        {venueInfos.length > 0 && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                場館資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="space-y-3">
+                {venueInfos.map((info, i) => (
+                  <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">{info.venueName}</h4>
+                    {info.description && (
+                      <p className="text-xs text-muted-foreground mb-2">{info.description}</p>
+                    )}
+                    {info.videoUrl && (
+                      <a
+                        href={info.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 flex items-center gap-1"
+                      >
+                        <Video className="h-3 w-3" />
+                        觀看場館影片
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
-            );
-          })}
-        </div>
+            </CardContent>
+          </Card>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function GoogleCalendarCard({
-  schedules: mySchedules,
-  coachName,
-}: {
-  schedules: ScheduleWithDetails[];
-  coachName: string;
-}) {
-  const generateGoogleCalendarUrl = (schedule: ScheduleWithDetails) => {
-    const dateStr = typeof schedule.date === "string"
-      ? schedule.date
-      : format(new Date(schedule.date), "yyyy-MM-dd");
-    const startTime = schedule.timeSlot?.startTime?.replace(":", "") + "00";
-    const endTime = schedule.timeSlot?.endTime?.replace(":", "") + "00";
-    const dateFormatted = dateStr.replace(/-/g, "");
-
-    const title = encodeURIComponent(`${schedule.venue?.name} - ${schedule.className || "游泳課"}`);
-    const location = encodeURIComponent(schedule.venue?.name || "");
-    const details = encodeURIComponent(`教練：${coachName}\n節次：${schedule.timeSlot?.period}\n時間：${schedule.timeSlot?.startTime}-${schedule.timeSlot?.endTime}`);
-
-    return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateFormatted}T${startTime}/${dateFormatted}T${endTime}&location=${location}&details=${details}`;
-  };
-
-  const exportAllToICS = () => {
-    let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//SwimCoach//Schedule//TW\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n`;
-
-    for (const schedule of mySchedules) {
-      const dateStr = typeof schedule.date === "string"
-        ? schedule.date
-        : format(new Date(schedule.date), "yyyy-MM-dd");
-      const startTime = schedule.timeSlot?.startTime?.replace(":", "") + "00";
-      const endTime = schedule.timeSlot?.endTime?.replace(":", "") + "00";
-      const dateFormatted = dateStr.replace(/-/g, "");
-
-      icsContent += `BEGIN:VEVENT\n`;
-      icsContent += `DTSTART:${dateFormatted}T${startTime}\n`;
-      icsContent += `DTEND:${dateFormatted}T${endTime}\n`;
-      icsContent += `SUMMARY:${schedule.venue?.name} - ${schedule.className || "游泳課"}\n`;
-      icsContent += `LOCATION:${schedule.venue?.name || ""}\n`;
-      icsContent += `DESCRIPTION:教練：${coachName}\\n節次：${schedule.timeSlot?.period}\\n時間：${schedule.timeSlot?.startTime}-${schedule.timeSlot?.endTime}\n`;
-      icsContent += `END:VEVENT\n`;
-    }
-
-    icsContent += `END:VCALENDAR`;
-
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${coachName}_課表.ics`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          匯入 Google 日曆
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {mySchedules.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">本週無課程，無法匯出日曆</p>
-        ) : (
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">點擊下方課程即可直接加入 Google 日曆：</p>
-          <div className="space-y-1">
-            {mySchedules.map((s) => {
-              const dateStr = typeof s.date === "string"
-                ? s.date
-                : format(new Date(s.date), "yyyy-MM-dd");
-              return (
-                <a
-                  key={s.id}
-                  href={generateGoogleCalendarUrl(s)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm bg-gray-50 hover:bg-blue-50 border rounded-lg px-3 py-2.5 transition-colors"
-                >
-                  <Calendar className="h-4 w-4 text-blue-500 shrink-0" />
-                  <span className="text-muted-foreground w-16 shrink-0">{dateStr.slice(5)}</span>
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: `var(--venue-${s.venue?.color})` }}
-                  />
-                  <span className="font-medium">{s.venue?.name}</span>
-                  <span className="text-muted-foreground">{s.timeSlot?.startTime}-{s.timeSlot?.endTime}</span>
-                  <ExternalLink className="h-3 w-3 text-blue-400 ml-auto shrink-0" />
-                </a>
-              );
-            })}
-          </div>
-        </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TodayScheduleCard({
-  schedule,
-  coachName,
-}: {
-  schedule: ScheduleWithDetails;
-  coachName: string;
-}) {
-  const dateStr = typeof schedule.date === "string"
-    ? schedule.date
-    : format(new Date(schedule.date), "yyyy-MM-dd");
-
-  const { data: colleagues = [] } = useQuery<{ name: string; phone: string | null }[]>({
-    queryKey: [
-      "/api/coach-portal/colleagues",
-      coachName,
-      dateStr,
-      schedule.venueId,
-      schedule.timeSlotId,
-    ],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/coach-portal/colleagues?coachName=${encodeURIComponent(coachName)}&date=${dateStr}&venueId=${schedule.venueId}&timeSlotId=${schedule.timeSlotId}`
-      );
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  return (
-    <div className="border rounded-lg p-3 bg-white">
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: `var(--venue-${schedule.venue?.color})` }}
-        />
-        <span className="font-medium text-sm">{schedule.venue?.name}</span>
-        <span className="text-xs text-muted-foreground ml-auto">
-          {schedule.timeSlot?.period} | {schedule.timeSlot?.startTime}-{schedule.timeSlot?.endTime}
-        </span>
-      </div>
-      {schedule.className && (
-        <div className="text-xs text-muted-foreground mb-2">班級：{schedule.className}</div>
-      )}
-      {colleagues.length > 0 && (
-        <div className="border-t pt-2 mt-2">
-          <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            同場教練
-          </div>
-          <div className="space-y-1">
-            {colleagues.map((c, i) => (
-              <div key={i} className="flex items-center justify-between text-xs">
-                <span>{c.name}</span>
-                {c.phone && (
-                  <a
-                    href={`tel:${c.phone}`}
-                    className="flex items-center gap-1 text-green-600 hover:text-green-700"
-                  >
-                    <Phone className="h-3 w-3" />
-                    {c.phone}
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </main>
     </div>
   );
 }
