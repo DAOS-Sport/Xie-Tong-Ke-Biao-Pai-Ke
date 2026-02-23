@@ -504,7 +504,7 @@ function ApprovedDashboard({
   };
 
   const dayNames = ["一", "二", "三", "四", "五", "六", "日"];
-  const periodLabels = ["第1節", "第2節", "第3節", "第4節", "第5節", "第6節", "第7節"];
+  const periodLabels = ["第1節 08-09", "第2節 09-10", "第3節 10-11", "第4節 11-12", "第5節 13-14", "第6節 14-15", "第7節 15-16"];
 
   return (
     <div className="min-h-screen bg-gray-50">
