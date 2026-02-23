@@ -102,6 +102,18 @@ function CoachAssignmentContent() {
     return conflicting;
   };
 
+  const getCoach1Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }): Set<string> => {
+    const conflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+    if (schedule.coachName2) conflicts.add(schedule.coachName2);
+    return conflicts;
+  };
+
+  const getCoach2Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }): Set<string> => {
+    const conflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+    if (schedule.coachName) conflicts.add(schedule.coachName);
+    return conflicts;
+  };
+
   const getAssignedCoachesForSlot = (date: string, timeSlotId: string): Set<string> => {
     const assigned = new Set<string>();
     allSchedules.forEach((s) => {
@@ -546,7 +558,8 @@ function CoachAssignmentContent() {
                                       const hasCoach = !!schedule.coachName;
                                       const hasCoach2 = !!schedule.coachName2;
                                       const needsTwo = (schedule.coachCount || 1) >= 2;
-                                      const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+                                      const coach1Conflicts = getCoach1Conflicts(schedule);
+                                      const coach2Conflicts = getCoach2Conflicts(schedule);
                                       const available = getAvailableCoaches(dayOfWeek, timeSlot.order);
 
                                       const isMissing = !hasCoach || (needsTwo && !hasCoach2);
@@ -597,7 +610,7 @@ function CoachAssignmentContent() {
                                                   <div className="px-2 py-1 text-[10px] text-green-600 font-medium border-b">✅ 可用教練</div>
                                                 )}
                                                 {coaches.filter(c => available.has(c)).map((coach) => {
-                                                  const isConflict = conflicting.has(coach);
+                                                  const isConflict = coach1Conflicts.has(coach);
                                                   return (
                                                     <SelectItem
                                                       key={coach}
@@ -613,7 +626,7 @@ function CoachAssignmentContent() {
                                                   <div className="px-2 py-1 text-[10px] text-gray-400 font-medium border-b border-t">其他教練</div>
                                                 )}
                                                 {coaches.filter(c => !available.has(c)).map((coach) => {
-                                                  const isConflict = conflicting.has(coach);
+                                                  const isConflict = coach1Conflicts.has(coach);
                                                   return (
                                                     <SelectItem
                                                       key={coach}
@@ -663,7 +676,7 @@ function CoachAssignmentContent() {
                                                     <div className="px-2 py-1 text-[10px] text-green-600 font-medium border-b">✅ 可用教練</div>
                                                   )}
                                                   {coaches.filter(c => available.has(c)).map((coach) => {
-                                                    const isConflict = conflicting.has(coach);
+                                                    const isConflict = coach2Conflicts.has(coach);
                                                     return (
                                                       <SelectItem
                                                         key={coach}
@@ -679,7 +692,7 @@ function CoachAssignmentContent() {
                                                     <div className="px-2 py-1 text-[10px] text-gray-400 font-medium border-b border-t">其他教練</div>
                                                   )}
                                                   {coaches.filter(c => !available.has(c)).map((coach) => {
-                                                    const isConflict = conflicting.has(coach);
+                                                    const isConflict = coach2Conflicts.has(coach);
                                                     return (
                                                       <SelectItem
                                                         key={coach}
