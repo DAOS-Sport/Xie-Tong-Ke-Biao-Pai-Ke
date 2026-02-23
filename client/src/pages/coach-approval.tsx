@@ -372,11 +372,13 @@ function VenueInfoEditor({
 }) {
   const [videoUrl, setVideoUrl] = useState(existingInfo?.videoUrl || "");
   const [description, setDescription] = useState(existingInfo?.description || "");
+  const [mapUrl, setMapUrl] = useState(existingInfo?.mapUrl || "");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setVideoUrl(existingInfo?.videoUrl || "");
     setDescription(existingInfo?.description || "");
+    setMapUrl(existingInfo?.mapUrl || "");
   }, [existingInfo]);
 
   const saveMutation = useMutation({
@@ -384,7 +386,7 @@ function VenueInfoEditor({
       const res = await fetch(`/api/admin/venue-infos/${encodeURIComponent(venueName)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
-        body: JSON.stringify({ videoUrl, description }),
+        body: JSON.stringify({ videoUrl, description, mapUrl }),
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -413,6 +415,15 @@ function VenueInfoEditor({
             value={videoUrl}
             onChange={(e) => setVideoUrl(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..."
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground">Google 導航連結</label>
+          <Input
+            value={mapUrl}
+            onChange={(e) => setMapUrl(e.target.value)}
+            placeholder="https://maps.google.com/..."
             className="text-sm"
           />
         </div>

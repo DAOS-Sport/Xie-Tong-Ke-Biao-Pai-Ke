@@ -1061,11 +1061,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/admin/venue-infos/:venueName', requireAdminPassword, async (req, res) => {
     try {
       const { venueName } = req.params;
-      const { videoUrl, description } = req.body;
+      const { videoUrl, description, mapUrl } = req.body;
       const info = await storage.upsertVenueInfo(
         decodeURIComponent(venueName),
         videoUrl || null,
-        description || null
+        description || null,
+        mapUrl || null
       );
       res.json(info);
     } catch (error) {

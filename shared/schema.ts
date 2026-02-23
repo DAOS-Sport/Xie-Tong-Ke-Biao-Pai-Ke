@@ -130,6 +130,7 @@ export const venueInfos = pgTable("venue_infos", {
   venueName: varchar("venue_name").notNull().unique(),
   videoUrl: text("video_url"),
   description: text("description"),
+  mapUrl: text("map_url"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

@@ -75,7 +75,7 @@ export interface IStorage {
   // Venue info
   getAllVenueInfos(): Promise<VenueInfo[]>;
   getVenueInfo(venueName: string): Promise<VenueInfo | undefined>;
-  upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null): Promise<VenueInfo>;
+  upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null, mapUrl?: string | null): Promise<VenueInfo>;
 
   // Schedule locking (two-phase scheduling)
   lockSchedules(venueId: string, startDate: string, endDate: string): Promise<void>;
@@ -714,13 +714,13 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null): Promise<VenueInfo> {
+  async upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null, mapUrl?: string | null): Promise<VenueInfo> {
     const [result] = await db
       .insert(venueInfos)
-      .values({ venueName, videoUrl, description, updatedAt: new Date() })
+      .values({ venueName, videoUrl, description, mapUrl: mapUrl ?? null, updatedAt: new Date() })
       .onConflictDoUpdate({
         target: venueInfos.venueName,
-        set: { videoUrl, description, updatedAt: new Date() },
+        set: { videoUrl, description, mapUrl: mapUrl ?? null, updatedAt: new Date() },
       })
       .returning();
     return result;

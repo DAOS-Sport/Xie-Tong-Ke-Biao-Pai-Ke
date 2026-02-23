@@ -715,18 +715,32 @@ function ApprovedDashboard({
                     {info.description && (
                       <p className="text-xs text-muted-foreground mb-2">{info.description}</p>
                     )}
-                    {info.videoUrl && (
-                      <a
-                        href={info.videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 flex items-center gap-1"
-                      >
-                        <Video className="h-3 w-3" />
-                        觀看場館影片
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
+                    <div className="flex gap-3 flex-wrap">
+                      {info.videoUrl && (
+                        <a
+                          href={info.videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 flex items-center gap-1"
+                        >
+                          <Video className="h-3 w-3" />
+                          觀看場館影片
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                      {info.mapUrl && (
+                        <a
+                          href={info.mapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-600 flex items-center gap-1"
+                        >
+                          <MapPin className="h-3 w-3" />
+                          Google 導航
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
