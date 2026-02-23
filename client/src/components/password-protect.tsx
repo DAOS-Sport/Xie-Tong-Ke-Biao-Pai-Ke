@@ -18,13 +18,15 @@ export default function PasswordProtect({ children, requiredPassword = "dream285
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // Check if already authorized in this session
     const stored = sessionStorage.getItem("admin_authorized");
     if (stored === "true") {
       setIsAuthorized(true);
+      if (!sessionStorage.getItem("admin-password")) {
+        sessionStorage.setItem("admin-password", requiredPassword);
+      }
     }
     setIsLoading(false);
-  }, []);
+  }, [requiredPassword]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -182,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing parameters" });
       }
       const locked = await storage.getScheduleLockStatus(venueId, startDate, endDate);
-      res.json({ locked });
+      res.json({ isLocked: locked });
     } catch (error) {
       res.status(500).json({ message: "Failed to check lock status" });
     }
