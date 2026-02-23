@@ -33,6 +33,8 @@ export interface IStorage {
   // Venue operations
   getVenues(): Promise<Venue[]>;
   initializeVenues(): Promise<void>;
+  createVenue(name: string, color: string): Promise<Venue>;
+  deleteVenue(id: string): Promise<void>;
   
   // Time slot operations
   getTimeSlots(): Promise<TimeSlot[]>;
@@ -124,40 +126,36 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(venues).orderBy(venues.order);
   }
 
-  async initializeVenues(): Promise<void> {
-    const expectedVenues = [
-      { name: "新北高中", color: "blue", order: 1 },
-      { name: "三重商工", color: "green", order: 2 },
-      { name: "三民高中", color: "purple", order: 3 },
-      { name: "福林國小", color: "yellow", order: 4 },
-      { name: "新莊國中", color: "orange", order: 5 },
-      { name: "清江國小", color: "teal", order: 6 },
-      { name: "松山國小", color: "red", order: 7 },
-    ];
-    const removedVenues = ["士東國小"];
+  async createVenue(name: string, color: string): Promise<Venue> {
+    const existing = await this.getVenues();
+    const maxOrder = existing.length > 0 ? Math.max(...existing.map(v => v.order)) : 0;
+    const [venue] = await db.insert(venues).values({ name, color, order: maxOrder + 1 }).returning();
+    return venue;
+  }
 
+  async deleteVenue(id: string): Promise<void> {
+    const venue = await db.select().from(venues).where(eq(venues.id, id));
+    if (venue.length > 0) {
+      await db.delete(venueInfos).where(eq(venueInfos.venueName, venue[0].name));
+    }
+    await db.delete(schedules).where(eq(schedules.venueId, id));
+    await db.delete(venues).where(eq(venues.id, id));
+  }
+
+  async initializeVenues(): Promise<void> {
     const existingVenues = await this.getVenues();
     if (existingVenues.length === 0) {
-      await db.insert(venues).values(expectedVenues);
-    } else {
-      const existingNames = existingVenues.map(v => v.name);
-      const missing = expectedVenues.filter(v => !existingNames.includes(v.name));
-      if (missing.length > 0) {
-        await db.insert(venues).values(missing);
-        console.log(`✅ Added missing venues: ${missing.map(v => v.name).join(", ")}`);
-      }
-      for (const name of removedVenues) {
-        const venueToRemove = existingVenues.find(v => v.name === name);
-        if (venueToRemove) {
-          try {
-            await db.delete(schedules).where(eq(schedules.venueId, venueToRemove.id));
-            await db.delete(venues).where(eq(venues.id, venueToRemove.id));
-            console.log(`✅ Removed venue and its schedules: ${name}`);
-          } catch (e) {
-            console.log(`⚠️ Could not remove venue ${name}: ${e}`);
-          }
-        }
-      }
+      const defaultVenues = [
+        { name: "新北高中", color: "blue", order: 1 },
+        { name: "三重商工", color: "green", order: 2 },
+        { name: "三民高中", color: "purple", order: 3 },
+        { name: "福林國小", color: "yellow", order: 4 },
+        { name: "新莊國中", color: "orange", order: 5 },
+        { name: "清江國小", color: "teal", order: 6 },
+        { name: "松山國小", color: "red", order: 7 },
+      ];
+      await db.insert(venues).values(defaultVenues);
+      console.log("✅ Default venues initialized");
     }
   }
 

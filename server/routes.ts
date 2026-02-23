@@ -77,6 +77,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create venue
+  app.post('/api/admin/venues', async (req, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.body?.password;
+      if (password !== 'dream0935314711') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { name, color } = req.body;
+      if (!name || !color) {
+        return res.status(400).json({ message: "Name and color are required" });
+      }
+      const existingVenues = await storage.getVenues();
+      if (existingVenues.some(v => v.name === name)) {
+        return res.status(400).json({ message: "場館名稱已存在" });
+      }
+      const venue = await storage.createVenue(name, color);
+      res.json(venue);
+    } catch (error) {
+      console.error("Error creating venue:", error);
+      res.status(500).json({ message: "Failed to create venue" });
+    }
+  });
+
+  // Delete venue
+  app.delete('/api/admin/venues/:id', async (req, res) => {
+    try {
+      const password = req.headers['x-admin-password'] as string;
+      if (password !== 'dream0935314711') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      await storage.deleteVenue(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting venue:", error);
+      res.status(500).json({ message: "Failed to delete venue" });
+    }
+  });
+
   // Time slots
   app.get('/api/time-slots', async (req, res) => {
     try {

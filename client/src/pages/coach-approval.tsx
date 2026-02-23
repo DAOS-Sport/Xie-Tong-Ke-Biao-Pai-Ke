@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -332,7 +332,23 @@ function VenueInfoSection() {
   });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [newVenueName, setNewVenueName] = useState("");
+  const [newVenueColor, setNewVenueColor] = useState("blue");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const baseUrl = window.location.origin;
+
+  const colorOptions = [
+    { value: "blue", label: "藍色", hex: "#3b82f6" },
+    { value: "green", label: "綠色", hex: "#22c55e" },
+    { value: "purple", label: "紫色", hex: "#a855f7" },
+    { value: "yellow", label: "黃色", hex: "#eab308" },
+    { value: "orange", label: "橘色", hex: "#f97316" },
+    { value: "teal", label: "青色", hex: "#14b8a6" },
+    { value: "red", label: "紅色", hex: "#ef4444" },
+    { value: "pink", label: "粉色", hex: "#ec4899" },
+    { value: "indigo", label: "靛色", hex: "#6366f1" },
+    { value: "cyan", label: "天藍", hex: "#06b6d4" },
+  ];
 
   const handleCopy = (venue: Venue) => {
     const url = `${baseUrl}/school/${encodeURIComponent(venue.name)}`;
@@ -342,19 +358,101 @@ function VenueInfoSection() {
     });
   };
 
+  const addVenueMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/venues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ name: newVenueName.trim(), color: newVenueColor }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setNewVenueName("");
+      setNewVenueColor("blue");
+      queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/venue-infos"] });
+    },
+  });
+
+  const deleteVenueMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/venues/${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      setDeletingId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/venue-infos"] });
+    },
+  });
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Link className="h-4 w-4" />
-            各學校專屬課表連結
+            <Plus className="h-4 w-4" />
+            場館管理
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            每個學校有獨立的網址，可以直接分享給學校查看自己的課表
+            新增或刪除場館，新增後會自動產生專屬網址和可編輯的場館資料
           </p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-2 flex-wrap">
+            <div className="flex-1 min-w-[160px]">
+              <label className="text-xs text-muted-foreground mb-1 block">場館名稱</label>
+              <Input
+                value={newVenueName}
+                onChange={(e) => setNewVenueName(e.target.value)}
+                placeholder="例如：中正國小"
+                className="text-sm"
+              />
+            </div>
+            <div className="w-32">
+              <label className="text-xs text-muted-foreground mb-1 block">顏色</label>
+              <Select value={newVenueColor} onValueChange={setNewVenueColor}>
+                <SelectTrigger className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colorOptions.find(c => c.value === newVenueColor)?.hex }} />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {colorOptions.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.hex }} />
+                        {c.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => addVenueMutation.mutate()}
+              disabled={!newVenueName.trim() || addVenueMutation.isPending}
+              className="bg-blue-500 hover:bg-blue-600"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              {addVenueMutation.isPending ? "新增中..." : "新增場館"}
+            </Button>
+          </div>
+          {addVenueMutation.isError && (
+            <p className="text-sm text-red-600">{(addVenueMutation.error as Error).message}</p>
+          )}
+
           <div className="space-y-2">
             {venues.map((venue) => {
               const url = `${baseUrl}/school/${encodeURIComponent(venue.name)}`;
@@ -365,7 +463,7 @@ function VenueInfoSection() {
                 >
                   <div
                     className="w-3 h-3 rounded-full shrink-0"
-                    style={{ backgroundColor: `var(--venue-${venue.color})` }}
+                    style={{ backgroundColor: colorOptions.find(c => c.value === venue.color)?.hex || "#888" }}
                   />
                   <span className="font-medium text-sm w-20 shrink-0">{venue.name}</span>
                   <code className="flex-1 text-xs bg-gray-100 px-2 py-1.5 rounded font-mono text-gray-600 truncate">
@@ -392,6 +490,34 @@ function VenueInfoSection() {
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </a>
+                  {deletingId === venue.id ? (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteVenueMutation.mutate(venue.id)}
+                        disabled={deleteVenueMutation.isPending}
+                      >
+                        {deleteVenueMutation.isPending ? "刪除中..." : "確認刪除"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeletingId(null)}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => setDeletingId(venue.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               );
             })}
