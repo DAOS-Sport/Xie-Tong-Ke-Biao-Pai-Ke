@@ -343,6 +343,13 @@ function ApprovedDashboard({
   const endDate = format(weekDays[6], "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
 
+  const [availWeek, setAvailWeek] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+  const availWeekDays = getWeekDays(availWeek);
+  const availStartDate = format(availWeekDays[0], "yyyy-MM-dd");
+  const availEndDate = format(availWeekDays[6], "yyyy-MM-dd");
+
   const { data: mySchedules = [], isLoading } = useQuery<ScheduleWithDetails[]>({
     queryKey: ["/api/coach-portal/my-schedule", coachName, startDate, endDate],
     queryFn: async () => {
@@ -405,15 +412,32 @@ function ApprovedDashboard({
   });
 
   const { data: availability = [] } = useQuery<CoachAvailability[]>({
-    queryKey: ["/api/coach-portal/availability", coachName, format(currentWeek, "yyyy-MM-dd")],
+    queryKey: ["/api/coach-portal/availability", coachName, format(availWeek, "yyyy-MM-dd")],
     queryFn: async () => {
       const res = await fetch(
-        `/api/coach-portal/availability?coachName=${encodeURIComponent(coachName)}&weekStart=${format(currentWeek, "yyyy-MM-dd")}`
+        `/api/coach-portal/availability?coachName=${encodeURIComponent(coachName)}&weekStart=${format(availWeek, "yyyy-MM-dd")}`
       );
       if (!res.ok) return [];
       return res.json();
     },
   });
+
+  const { data: assignedSlots = [] } = useQuery<{ dayOfWeek: number; timeSlotOrder: number }[]>({
+    queryKey: ["/api/coach-portal/assigned-slots", coachName, availStartDate, availEndDate],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/coach-portal/assigned-slots?coachName=${encodeURIComponent(coachName)}&startDate=${availStartDate}&endDate=${availEndDate}`
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const assignedSet = useMemo(() => {
+    const set = new Set<string>();
+    assignedSlots.forEach(s => set.add(`${s.dayOfWeek}-${s.timeSlotOrder}`));
+    return set;
+  }, [assignedSlots]);
 
   const { toast } = useToast();
   const [localAvailSet, setLocalAvailSet] = useState<Set<string>>(new Set());
@@ -422,8 +446,9 @@ function ApprovedDashboard({
   useEffect(() => {
     const set = new Set<string>();
     availability.forEach(a => set.add(`${a.dayOfWeek}-${a.timeSlotOrder}`));
+    assignedSlots.forEach(s => set.add(`${s.dayOfWeek}-${s.timeSlotOrder}`));
     setLocalAvailSet(set);
-  }, [availability]);
+  }, [availability, assignedSlots]);
 
   const saveAvailability = useCallback((newSet: Set<string>) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -440,7 +465,7 @@ function ApprovedDashboard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             coachName,
-            weekStart: format(currentWeek, "yyyy-MM-dd"),
+            weekStart: format(availWeek, "yyyy-MM-dd"),
             slots,
           }),
         });
@@ -451,10 +476,14 @@ function ApprovedDashboard({
         toast({ title: "儲存失敗，請重試", variant: "destructive" });
       }
     }, 600);
-  }, [coachName, currentWeek, toast]);
+  }, [coachName, availWeek, toast]);
 
   const toggleAvailability = (dayOfWeek: number, timeSlotOrder: number) => {
     const key = `${dayOfWeek}-${timeSlotOrder}`;
+    if (assignedSet.has(key)) {
+      toast({ title: "此時段已被排課，無法取消", variant: "destructive" });
+      return;
+    }
     setLocalAvailSet(prev => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
@@ -696,12 +725,31 @@ function ApprovedDashboard({
 
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckSquare className="h-4 w-4" />
-              可用時段 (本週)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckSquare className="h-4 w-4" />
+                可用時段
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setAvailWeek(w => addWeeks(w, -1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-32 text-center">
+                  {format(availWeekDays[0], "M/d", { locale: zhTW })} - {format(availWeekDays[6], "M/d", { locale: zhTW })}
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setAvailWeek(w => addWeeks(w, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="py-2">
+            {assignedSet.size > 0 && (
+              <div className="mb-2 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-green-500 border border-green-600"></span> 可用</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-blue-500 border border-blue-600"></span> 已排課 (不可取消)</span>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-center text-xs">
                 <thead>
@@ -719,18 +767,24 @@ function ApprovedDashboard({
                       {dayNames.map((_, di) => {
                         const dayOfWeek = di + 1;
                         const timeSlotOrder = ti + 1;
-                        const isAvailable = localAvailSet.has(`${dayOfWeek}-${timeSlotOrder}`);
+                        const key = `${dayOfWeek}-${timeSlotOrder}`;
+                        const isAvailable = localAvailSet.has(key);
+                        const isAssigned = assignedSet.has(key);
                         return (
                           <td key={di} className="p-0.5">
                             <button
                               onClick={() => toggleAvailability(dayOfWeek, timeSlotOrder)}
+                              disabled={isAssigned}
                               className={`w-8 h-8 rounded border transition-colors ${
-                                isAvailable
+                                isAssigned
+                                  ? "bg-blue-500 border-blue-600 text-white cursor-not-allowed"
+                                  : isAvailable
                                   ? "bg-green-500 border-green-600 text-white"
                                   : "bg-gray-100 border-gray-200 hover:bg-gray-200"
                               }`}
+                              title={isAssigned ? "已排課，不可取消" : ""}
                             >
-                              {isAvailable ? "✓" : ""}
+                              {isAssigned ? "🔒" : isAvailable ? "✓" : ""}
                             </button>
                           </td>
                         );

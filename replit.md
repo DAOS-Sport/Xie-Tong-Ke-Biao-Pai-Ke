@@ -63,7 +63,8 @@ Preferred communication style: Simple, everyday language.
   - Coach rules display (admin-editable)
   - Venue info with video links
   - Google Calendar export (.ics download + per-event links)
-  - Weekly availability matrix (7x7 checkbox grid: Mon-Sun, periods 1-7)
+  - Weekly availability matrix (7x7 checkbox grid: Mon-Sun, periods 1-7) with week navigation
+  - Assigned slots locked (blue 🔒): cannot uncheck if coach is scheduled for that slot
 - **Coach Availability Matching**: Availability-aware coach assignment system
   - Coaches fill weekly availability via 7x7 matrix in coach portal
   - Admin coach assignment UI shows available coaches with ✅ markers, grouped separately

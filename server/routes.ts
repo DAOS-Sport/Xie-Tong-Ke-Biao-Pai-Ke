@@ -1149,21 +1149,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { coachName, weekStart, slots } = req.body as {
         coachName: string;
         weekStart: string;
-        slots: { dayOfWeek: number; timeSlotOrder: number }[];
+        slots: { dayOfWeek: number; timeSlotOrder: number; available?: boolean }[];
       };
       if (!coachName || !weekStart || !Array.isArray(slots)) {
         return res.status(400).json({ message: "Missing coachName, weekStart, or slots" });
       }
-      for (const slot of slots) {
+      const availableSlots = slots.filter(s => s.available !== false);
+      for (const slot of availableSlots) {
         if (slot.dayOfWeek < 1 || slot.dayOfWeek > 7 || slot.timeSlotOrder < 1 || slot.timeSlotOrder > 7) {
           return res.status(400).json({ message: "dayOfWeek must be 1-7, timeSlotOrder must be 1-7" });
         }
       }
-      await storage.upsertCoachAvailability(coachName, weekStart, slots);
+      await storage.upsertCoachAvailability(coachName, weekStart, availableSlots);
       res.json({ success: true });
     } catch (error) {
       console.error('Error saving coach availability:', error);
       res.status(500).json({ message: "Failed to save coach availability" });
+    }
+  });
+
+  app.get('/api/coach-portal/assigned-slots', async (req, res) => {
+    try {
+      const { coachName, startDate, endDate } = req.query as {
+        coachName: string;
+        startDate: string;
+        endDate: string;
+      };
+      if (!coachName || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing parameters" });
+      }
+      const scheduleList = await storage.getCoachSchedules(coachName, startDate, endDate);
+      const assignedSlots = scheduleList.map(s => {
+        const dateObj = new Date(s.date + 'T00:00:00');
+        let dayOfWeek = dateObj.getDay();
+        dayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+        return { dayOfWeek, timeSlotOrder: s.timeSlot.order };
+      });
+      res.json(assignedSlots);
+    } catch (error) {
+      console.error('Error fetching assigned slots:', error);
+      res.status(500).json({ message: "Failed to fetch assigned slots" });
     }
   });
 
