@@ -140,6 +140,7 @@ export async function initializeSchoolSchema(schoolCode: string) {
         time_slot_id VARCHAR NOT NULL,
         class_name VARCHAR,
         coach_name VARCHAR,
+        is_class_locked BOOLEAN NOT NULL DEFAULT false,
         notes TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()

@@ -74,6 +74,12 @@ export interface IStorage {
   getAllVenueInfos(): Promise<VenueInfo[]>;
   getVenueInfo(venueName: string): Promise<VenueInfo | undefined>;
   upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null): Promise<VenueInfo>;
+
+  // Schedule locking (two-phase scheduling)
+  lockSchedules(venueId: string, startDate: string, endDate: string): Promise<void>;
+  unlockSchedules(venueId: string, startDate: string, endDate: string): Promise<void>;
+  assignCoach(scheduleId: string, coachName: string | null): Promise<Schedule>;
+  getScheduleLockStatus(venueId: string, startDate: string, endDate: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -159,6 +165,7 @@ export class DatabaseStorage implements IStorage {
         timeSlotId: schedules.timeSlotId,
         className: schedules.className,
         coachName: schedules.coachName,
+        isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
         createdAt: schedules.createdAt,
         updatedAt: schedules.updatedAt,
@@ -180,6 +187,7 @@ export class DatabaseStorage implements IStorage {
         timeSlotId: schedules.timeSlotId,
         className: schedules.className,
         coachName: schedules.coachName,
+        isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
         createdAt: schedules.createdAt,
         updatedAt: schedules.updatedAt,
@@ -232,6 +240,7 @@ export class DatabaseStorage implements IStorage {
         timeSlotId: schedules.timeSlotId,
         className: schedules.className,
         coachName: schedules.coachName,
+        isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
         createdAt: schedules.createdAt,
         updatedAt: schedules.updatedAt,
@@ -426,6 +435,7 @@ export class DatabaseStorage implements IStorage {
         timeSlotId: schedules.timeSlotId,
         className: schedules.className,
         coachName: schedules.coachName,
+        isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
         createdAt: schedules.createdAt,
         updatedAt: schedules.updatedAt,
@@ -468,6 +478,7 @@ export class DatabaseStorage implements IStorage {
           timeSlotId: result.timeSlotId,
           className: result.className,
           coachName: result.coachName,
+          isClassLocked: result.isClassLocked,
           notes: result.notes,
           createdAt: result.createdAt,
           updatedAt: result.updatedAt,
@@ -503,6 +514,7 @@ export class DatabaseStorage implements IStorage {
         timeSlotId: schedules.timeSlotId,
         className: schedules.className,
         coachName: schedules.coachName,
+        isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
         createdAt: schedules.createdAt,
         updatedAt: schedules.updatedAt,
@@ -544,6 +556,7 @@ export class DatabaseStorage implements IStorage {
           timeSlotId: result.timeSlotId,
           className: result.className,
           coachName: result.coachName,
+          isClassLocked: result.isClassLocked,
           notes: result.notes,
           createdAt: result.createdAt,
           updatedAt: result.updatedAt,
@@ -697,6 +710,53 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result;
+  }
+
+  async lockSchedules(venueId: string, startDate: string, endDate: string): Promise<void> {
+    await db
+      .update(schedules)
+      .set({ isClassLocked: true, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schedules.venueId, venueId),
+          between(schedules.date, startDate, endDate)
+        )
+      );
+  }
+
+  async unlockSchedules(venueId: string, startDate: string, endDate: string): Promise<void> {
+    await db
+      .update(schedules)
+      .set({ isClassLocked: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schedules.venueId, venueId),
+          between(schedules.date, startDate, endDate)
+        )
+      );
+  }
+
+  async assignCoach(scheduleId: string, coachName: string | null): Promise<Schedule> {
+    const [result] = await db
+      .update(schedules)
+      .set({ coachName, updatedAt: new Date() })
+      .where(eq(schedules.id, scheduleId))
+      .returning();
+    return result;
+  }
+
+  async getScheduleLockStatus(venueId: string, startDate: string, endDate: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.venueId, venueId),
+          between(schedules.date, startDate, endDate)
+        )
+      );
+    if (result.length === 0) return false;
+    return result.every(s => s.isClassLocked);
   }
 
 }

@@ -136,6 +136,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Schedule lock/unlock (two-phase scheduling)
+  app.post('/api/schedules/lock', async (req: any, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.query.password;
+      if (password !== 'dream28559983') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { venueId, startDate, endDate } = req.body;
+      if (!venueId || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing venueId, startDate, or endDate" });
+      }
+      await storage.lockSchedules(venueId, startDate, endDate);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to lock schedules" });
+    }
+  });
+
+  app.post('/api/schedules/unlock', async (req: any, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.query.password;
+      if (password !== 'dream28559983') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { venueId, startDate, endDate } = req.body;
+      if (!venueId || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing venueId, startDate, or endDate" });
+      }
+      await storage.unlockSchedules(venueId, startDate, endDate);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unlock schedules" });
+    }
+  });
+
+  app.get('/api/schedules/lock-status', async (req: any, res) => {
+    try {
+      const { venueId, startDate, endDate } = req.query as {
+        venueId: string;
+        startDate: string;
+        endDate: string;
+      };
+      if (!venueId || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing parameters" });
+      }
+      const locked = await storage.getScheduleLockStatus(venueId, startDate, endDate);
+      res.json({ locked });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check lock status" });
+    }
+  });
+
+  app.put('/api/schedules/:id/assign-coach', async (req: any, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.query.password;
+      if (password !== 'dream28559983') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { coachName } = req.body;
+      const schedule = await storage.assignCoach(req.params.id, coachName || null);
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign coach" });
+    }
+  });
+
   // Coach-specific routes
   app.get('/api/coach-schedules', async (req: any, res) => {
     try {

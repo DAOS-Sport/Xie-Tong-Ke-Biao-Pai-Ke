@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   index,
   jsonb,
   pgTable,
@@ -62,6 +63,7 @@ export const schedules = pgTable("schedules", {
   timeSlotId: varchar("time_slot_id").notNull().references(() => timeSlots.id),
   className: varchar("class_name"),
   coachName: varchar("coach_name"),
+  isClassLocked: boolean("is_class_locked").notNull().default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
