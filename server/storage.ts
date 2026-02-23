@@ -5,6 +5,8 @@ import {
   schedules,
   coachRegistrations,
   coachUsers,
+  systemSettings,
+  venueInfos,
   type User,
   type UpsertUser,
   type Venue,
@@ -15,6 +17,8 @@ import {
   type InsertCoachRegistrationType,
   type CoachUser,
   type InsertCoachUserType,
+  type SystemSetting,
+  type VenueInfo,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, between, desc, sql, like, or, ilike } from "drizzle-orm";
@@ -61,6 +65,15 @@ export interface IStorage {
   getPendingCoachUsers(): Promise<CoachUser[]>;
   getApprovedCoachUsers(): Promise<CoachUser[]>;
   getColleaguesForCoach(coachName: string, date: string, venueId: string, timeSlotId: string): Promise<{ name: string; phone: string | null }[]>;
+  
+  // System settings
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<void>;
+  
+  // Venue info
+  getAllVenueInfos(): Promise<VenueInfo[]>;
+  getVenueInfo(venueName: string): Promise<VenueInfo | undefined>;
+  upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null): Promise<VenueInfo>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -642,6 +655,48 @@ export class DatabaseStorage implements IStorage {
     }
 
     return colleagues;
+  }
+
+  async getSetting(key: string): Promise<string | null> {
+    const [result] = await db
+      .select()
+      .from(systemSettings)
+      .where(eq(systemSettings.key, key));
+    return result?.value ?? null;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await db
+      .insert(systemSettings)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: { value, updatedAt: new Date() },
+      });
+  }
+
+  async getAllVenueInfos(): Promise<VenueInfo[]> {
+    return await db.select().from(venueInfos).orderBy(venueInfos.venueName);
+  }
+
+  async getVenueInfo(venueName: string): Promise<VenueInfo | undefined> {
+    const [result] = await db
+      .select()
+      .from(venueInfos)
+      .where(eq(venueInfos.venueName, venueName));
+    return result;
+  }
+
+  async upsertVenueInfo(venueName: string, videoUrl: string | null, description: string | null): Promise<VenueInfo> {
+    const [result] = await db
+      .insert(venueInfos)
+      .values({ venueName, videoUrl, description, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: venueInfos.venueName,
+        set: { videoUrl, description, updatedAt: new Date() },
+      })
+      .returning();
+    return result;
   }
 
 }

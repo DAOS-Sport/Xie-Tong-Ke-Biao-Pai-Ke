@@ -113,6 +113,22 @@ export const teacherFeedbacks = pgTable("teacher_feedbacks", {
   unique().on(table.scheduleId, table.teacherName),
 ]);
 
+// 系統設定表 - 存儲教練守則等設定
+export const systemSettings = pgTable("system_settings", {
+  key: varchar("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// 場館資訊表 - 存儲場館影片連結等資訊
+export const venueInfos = pgTable("venue_infos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  venueName: varchar("venue_name").notNull().unique(),
+  videoUrl: text("video_url"),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],
@@ -171,6 +187,9 @@ export type InsertTeacherFeedback = typeof teacherFeedbacks.$inferInsert;
 export type TeacherFeedback = typeof teacherFeedbacks.$inferSelect;
 export type CoachUser = typeof coachUsers.$inferSelect;
 export type InsertCoachUser = typeof coachUsers.$inferInsert;
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type VenueInfo = typeof venueInfos.$inferSelect;
+export type InsertVenueInfo = typeof venueInfos.$inferInsert;
 
 export const insertScheduleSchema = createInsertSchema(schedules).omit({
   id: true,

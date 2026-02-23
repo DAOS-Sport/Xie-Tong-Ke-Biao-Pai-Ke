@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -20,16 +22,67 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save } from "lucide-react";
 import { useLocation } from "wouter";
-import type { CoachUser } from "@shared/schema";
+import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
+
+const adminPassword = "dream28559983";
 
 function CoachApprovalContent() {
   const [, navigate] = useLocation();
-  const [filter, setFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"users" | "rules" | "venues">("users");
 
-  const adminPassword = "dream28559983";
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-5xl mx-auto p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => navigate("/venue-schedule-edit")}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              返回排課
+            </Button>
+            <h1 className="text-lg font-bold">教練管理後台</h1>
+          </div>
+        </div>
+
+        <div className="flex gap-2 border-b pb-2">
+          <Button
+            variant={activeTab === "users" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("users")}
+          >
+            <Users className="h-4 w-4 mr-1" />
+            教練審核
+          </Button>
+          <Button
+            variant={activeTab === "rules" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("rules")}
+          >
+            <BookOpen className="h-4 w-4 mr-1" />
+            教練守則
+          </Button>
+          <Button
+            variant={activeTab === "venues" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("venues")}
+          >
+            <MapPin className="h-4 w-4 mr-1" />
+            場館資訊
+          </Button>
+        </div>
+
+        {activeTab === "users" && <CoachUsersSection />}
+        {activeTab === "rules" && <CoachRulesSection />}
+        {activeTab === "venues" && <VenueInfoSection />}
+      </main>
+    </div>
+  );
+}
+
+function CoachUsersSection() {
+  const [filter, setFilter] = useState<string>("all");
 
   const { data: coachUsers = [], isLoading } = useQuery<CoachUser[]>({
     queryKey: ["/api/admin/coach-users", filter],
@@ -78,112 +131,297 @@ function CoachApprovalContent() {
   const pendingCount = coachUsers.filter((u) => u.status === "pending").length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-5xl mx-auto p-4 space-y-4">
+    <Card>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate("/venue-schedule-edit")}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              返回排課
-            </Button>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              教練帳號審核
-              {pendingCount > 0 && (
-                <Badge className="bg-red-500 text-xs">{pendingCount} 待審</Badge>
-              )}
-            </h1>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">教練列表</CardTitle>
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部</SelectItem>
-                  <SelectItem value="pending">待審核</SelectItem>
-                  <SelectItem value="approved">已通過</SelectItem>
-                  <SelectItem value="rejected">已拒絕</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">載入中...</div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">目前無教練資料</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>姓名</TableHead>
-                      <TableHead>電話</TableHead>
-                      <TableHead>信箱</TableHead>
-                      <TableHead>狀態</TableHead>
-                      <TableHead>註冊時間</TableHead>
-                      <TableHead>操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.phone || "-"}</TableCell>
-                        <TableCell>{user.email || "-"}</TableCell>
-                        <TableCell>{statusBadge(user.status)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {user.createdAt
-                            ? format(new Date(user.createdAt), "yyyy/MM/dd HH:mm")
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {user.status !== "approved" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
-                                onClick={() =>
-                                  approveMutation.mutate({ id: user.id, status: "approved" })
-                                }
-                                disabled={approveMutation.isPending}
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                通過
-                              </Button>
-                            )}
-                            {user.status !== "rejected" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
-                                onClick={() =>
-                                  approveMutation.mutate({ id: user.id, status: "rejected" })
-                                }
-                                disabled={approveMutation.isPending}
-                              >
-                                <XCircle className="h-3 w-3 mr-1" />
-                                拒絕
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+          <CardTitle className="text-base flex items-center gap-2">
+            教練列表
+            {pendingCount > 0 && (
+              <Badge className="bg-red-500 text-xs">{pendingCount} 待審</Badge>
             )}
-          </CardContent>
-        </Card>
-      </main>
+          </CardTitle>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="pending">待審核</SelectItem>
+              <SelectItem value="approved">已通過</SelectItem>
+              <SelectItem value="rejected">已拒絕</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">載入中...</div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">目前無教練資料</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>電話</TableHead>
+                  <TableHead>信箱</TableHead>
+                  <TableHead>狀態</TableHead>
+                  <TableHead>註冊時間</TableHead>
+                  <TableHead>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.phone || "-"}</TableCell>
+                    <TableCell>{user.email || "-"}</TableCell>
+                    <TableCell>{statusBadge(user.status)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {user.createdAt
+                        ? format(new Date(user.createdAt), "yyyy/MM/dd HH:mm")
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {user.status !== "approved" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                            onClick={() =>
+                              approveMutation.mutate({ id: user.id, status: "approved" })
+                            }
+                            disabled={approveMutation.isPending}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            通過
+                          </Button>
+                        )}
+                        {user.status !== "rejected" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={() =>
+                              approveMutation.mutate({ id: user.id, status: "rejected" })
+                            }
+                            disabled={approveMutation.isPending}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            拒絕
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CoachRulesSection() {
+  const [content, setContent] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const { data, isLoading } = useQuery<{ content: string }>({
+    queryKey: ["/api/settings/coach-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/coach-rules");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (data?.content !== undefined) {
+      setContent(data.content);
+    }
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/settings/coach-rules", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/coach-rules"] });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <BookOpen className="h-4 w-4" />
+          教練守則編輯
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          編輯教練守則內容，教練在前台可以查看
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">載入中...</div>
+        ) : (
+          <div className="space-y-4">
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="請輸入教練守則內容...&#10;&#10;例如：&#10;1. 請於上課前15分鐘到達場館&#10;2. 穿著整齊的教練服裝&#10;3. 確保學生安全..."
+              className="min-h-[300px] font-mono text-sm"
+            />
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                <Save className="h-4 w-4 mr-1" />
+                {saveMutation.isPending ? "儲存中..." : "儲存守則"}
+              </Button>
+              {saved && (
+                <span className="text-sm text-green-600">已儲存</span>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function VenueInfoSection() {
+  const { data: venues = [] } = useQuery<Venue[]>({
+    queryKey: ["/api/venues"],
+  });
+
+  const { data: venueInfos = [] } = useQuery<VenueInfo[]>({
+    queryKey: ["/api/venue-infos"],
+    queryFn: async () => {
+      const res = await fetch("/api/venue-infos");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <MapPin className="h-4 w-4" />
+          場館資訊管理
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          為每個場館設定進入方式說明和影片連結，教練在前台可以查看
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {venues.map((venue) => {
+            const info = venueInfos.find((v) => v.venueName === venue.name);
+            return (
+              <VenueInfoEditor
+                key={venue.id}
+                venueName={venue.name}
+                venueColor={venue.color}
+                existingInfo={info}
+              />
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VenueInfoEditor({
+  venueName,
+  venueColor,
+  existingInfo,
+}: {
+  venueName: string;
+  venueColor: string;
+  existingInfo?: VenueInfo;
+}) {
+  const [videoUrl, setVideoUrl] = useState(existingInfo?.videoUrl || "");
+  const [description, setDescription] = useState(existingInfo?.description || "");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setVideoUrl(existingInfo?.videoUrl || "");
+    setDescription(existingInfo?.description || "");
+  }, [existingInfo]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/admin/venue-infos/${encodeURIComponent(venueName)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ videoUrl, description }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      queryClient.invalidateQueries({ queryKey: ["/api/venue-infos"] });
+    },
+  });
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: `var(--venue-${venueColor})` }}
+        />
+        <span className="font-medium text-sm">{venueName}</span>
+        {saved && <span className="text-xs text-green-600 ml-auto">已儲存</span>}
+      </div>
+      <div className="space-y-2">
+        <div>
+          <label className="text-xs text-muted-foreground">影片連結 (YouTube 等)</label>
+          <Input
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className="text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground">進入方式說明</label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="例如：從正門進入，右轉到底即可到達游泳池..."
+            className="text-sm min-h-[60px]"
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="bg-green-500 hover:bg-green-600"
+        >
+          <Save className="h-3 w-3 mr-1" />
+          {saveMutation.isPending ? "儲存中..." : "儲存"}
+        </Button>
+      </div>
     </div>
   );
 }

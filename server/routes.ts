@@ -768,6 +768,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === 系統設定 API ===
+
+  // 取得教練守則（公開）
+  app.get('/api/settings/coach-rules', async (req, res) => {
+    try {
+      const value = await storage.getSetting('coach_rules');
+      res.json({ content: value || '' });
+    } catch (error) {
+      console.error('Error fetching coach rules:', error);
+      res.status(500).json({ message: "查詢教練守則失敗" });
+    }
+  });
+
+  // 更新教練守則（需密碼）
+  app.put('/api/admin/settings/coach-rules', requireAdminPassword, async (req, res) => {
+    try {
+      const { content } = req.body;
+      if (typeof content !== 'string') {
+        return res.status(400).json({ message: "內容格式無效" });
+      }
+      await storage.setSetting('coach_rules', content);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating coach rules:', error);
+      res.status(500).json({ message: "更新教練守則失敗" });
+    }
+  });
+
+  // === 場館資訊 API ===
+
+  // 取得所有場館資訊（公開）
+  app.get('/api/venue-infos', async (req, res) => {
+    try {
+      const infos = await storage.getAllVenueInfos();
+      res.json(infos);
+    } catch (error) {
+      console.error('Error fetching venue infos:', error);
+      res.status(500).json({ message: "查詢場館資訊失敗" });
+    }
+  });
+
+  // 更新場館資訊（需密碼）
+  app.put('/api/admin/venue-infos/:venueName', requireAdminPassword, async (req, res) => {
+    try {
+      const { venueName } = req.params;
+      const { videoUrl, description } = req.body;
+      const info = await storage.upsertVenueInfo(
+        decodeURIComponent(venueName),
+        videoUrl || null,
+        description || null
+      );
+      res.json(info);
+    } catch (error) {
+      console.error('Error updating venue info:', error);
+      res.status(500).json({ message: "更新場館資訊失敗" });
+    }
+  });
+
   const httpServer = createServer(app);
   // 部署環境診斷端點
   app.get('/api/deployment-test', async (req, res) => {

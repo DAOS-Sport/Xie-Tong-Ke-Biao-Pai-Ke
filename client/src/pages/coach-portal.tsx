@@ -5,8 +5,8 @@ import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut } from "lucide-react";
-import type { CoachUser, Schedule, Venue, TimeSlot } from "@shared/schema";
+import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar } from "lucide-react";
+import type { CoachUser, Schedule, Venue, TimeSlot, VenueInfo } from "@shared/schema";
 
 type ScheduleWithDetails = Schedule & { venue: Venue; timeSlot: TimeSlot };
 
@@ -320,8 +320,213 @@ function ApprovedDashboard({
             )}
           </CardContent>
         </Card>
+
+        <CoachRulesCard />
+
+        <VenueInfoCard />
+
+        <GoogleCalendarCard schedules={mySchedules} coachName={coachName} />
       </main>
     </div>
+  );
+}
+
+function CoachRulesCard() {
+  const { data } = useQuery<{ content: string }>({
+    queryKey: ["/api/settings/coach-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/coach-rules");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  if (!data?.content) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <BookOpen className="h-4 w-4" />
+          教練守則
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-sm whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+          {data.content}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VenueInfoCard() {
+  const { data: venueInfos = [] } = useQuery<VenueInfo[]>({
+    queryKey: ["/api/venue-infos"],
+    queryFn: async () => {
+      const res = await fetch("/api/venue-infos");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const { data: venues = [] } = useQuery<Venue[]>({
+    queryKey: ["/api/venues"],
+  });
+
+  const infosWithData = venueInfos.filter((v) => v.videoUrl || v.description);
+  if (infosWithData.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Video className="h-4 w-4" />
+          場館資訊
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {infosWithData.map((info) => {
+            const venue = venues.find((v) => v.name === info.venueName);
+            return (
+              <div key={info.id} className="border rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: venue ? `var(--venue-${venue.color})` : '#666' }}
+                  />
+                  <span className="font-medium text-sm">{info.venueName}</span>
+                </div>
+                {info.description && (
+                  <p className="text-sm text-muted-foreground mb-2">{info.description}</p>
+                )}
+                {info.videoUrl && (
+                  <a
+                    href={info.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    <Video className="h-3 w-3" />
+                    觀看場館影片
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GoogleCalendarCard({
+  schedules: mySchedules,
+  coachName,
+}: {
+  schedules: ScheduleWithDetails[];
+  coachName: string;
+}) {
+  const generateGoogleCalendarUrl = (schedule: ScheduleWithDetails) => {
+    const dateStr = typeof schedule.date === "string"
+      ? schedule.date
+      : format(new Date(schedule.date), "yyyy-MM-dd");
+    const startTime = schedule.timeSlot?.startTime?.replace(":", "") + "00";
+    const endTime = schedule.timeSlot?.endTime?.replace(":", "") + "00";
+    const dateFormatted = dateStr.replace(/-/g, "");
+
+    const title = encodeURIComponent(`${schedule.venue?.name} - ${schedule.className || "游泳課"}`);
+    const location = encodeURIComponent(schedule.venue?.name || "");
+    const details = encodeURIComponent(`教練：${coachName}\n節次：${schedule.timeSlot?.period}\n時間：${schedule.timeSlot?.startTime}-${schedule.timeSlot?.endTime}`);
+
+    return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateFormatted}T${startTime}/${dateFormatted}T${endTime}&location=${location}&details=${details}`;
+  };
+
+  const exportAllToICS = () => {
+    let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//SwimCoach//Schedule//TW\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n`;
+
+    for (const schedule of mySchedules) {
+      const dateStr = typeof schedule.date === "string"
+        ? schedule.date
+        : format(new Date(schedule.date), "yyyy-MM-dd");
+      const startTime = schedule.timeSlot?.startTime?.replace(":", "") + "00";
+      const endTime = schedule.timeSlot?.endTime?.replace(":", "") + "00";
+      const dateFormatted = dateStr.replace(/-/g, "");
+
+      icsContent += `BEGIN:VEVENT\n`;
+      icsContent += `DTSTART:${dateFormatted}T${startTime}\n`;
+      icsContent += `DTEND:${dateFormatted}T${endTime}\n`;
+      icsContent += `SUMMARY:${schedule.venue?.name} - ${schedule.className || "游泳課"}\n`;
+      icsContent += `LOCATION:${schedule.venue?.name || ""}\n`;
+      icsContent += `DESCRIPTION:教練：${coachName}\\n節次：${schedule.timeSlot?.period}\\n時間：${schedule.timeSlot?.startTime}-${schedule.timeSlot?.endTime}\n`;
+      icsContent += `END:VEVENT\n`;
+    }
+
+    icsContent += `END:VCALENDAR`;
+
+    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${coachName}_課表.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (mySchedules.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          匯入 Google 日曆
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <Button
+            onClick={exportAllToICS}
+            className="w-full bg-blue-500 hover:bg-blue-600"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            下載本週全部課表 (.ics)
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            下載 .ics 檔後可匯入 Google 日曆、Apple 日曆等
+          </p>
+          <div className="border-t pt-3">
+            <p className="text-xs text-muted-foreground mb-2">或逐堂加入 Google 日曆：</p>
+            <div className="space-y-1">
+              {mySchedules.map((s) => {
+                const dateStr = typeof s.date === "string"
+                  ? s.date
+                  : format(new Date(s.date), "yyyy-MM-dd");
+                return (
+                  <a
+                    key={s.id}
+                    href={generateGoogleCalendarUrl(s)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs bg-gray-50 hover:bg-blue-50 rounded px-3 py-2 transition-colors"
+                  >
+                    <Calendar className="h-3 w-3 text-blue-500 shrink-0" />
+                    <span className="text-muted-foreground w-16 shrink-0">{dateStr.slice(5)}</span>
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: `var(--venue-${s.venue?.color})` }}
+                    />
+                    <span className="font-medium">{s.venue?.name}</span>
+                    <span className="text-muted-foreground">{s.timeSlot?.startTime}-{s.timeSlot?.endTime}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
