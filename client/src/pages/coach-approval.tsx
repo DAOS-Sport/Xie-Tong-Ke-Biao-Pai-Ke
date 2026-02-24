@@ -109,6 +109,15 @@ function CoachUsersSection() {
     },
   });
 
+  const { data: venuePrefsMap = {} } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/admin/coach-venue-preferences"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/coach-venue-preferences?password=${adminPassword}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+  });
+
   const approveMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await fetch(`/api/admin/coach-users/${id}/status`, {
@@ -179,6 +188,7 @@ function CoachUsersSection() {
                   <TableHead>姓名</TableHead>
                   <TableHead>電話</TableHead>
                   <TableHead>信箱</TableHead>
+                  <TableHead>可排課地點</TableHead>
                   <TableHead>狀態</TableHead>
                   <TableHead>註冊時間</TableHead>
                   <TableHead>操作</TableHead>
@@ -190,6 +200,19 @@ function CoachUsersSection() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.phone || "-"}</TableCell>
                     <TableCell>{user.email || "-"}</TableCell>
+                    <TableCell>
+                      {venuePrefsMap[user.name]?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {venuePrefsMap[user.name].map(v => (
+                            <Badge key={v} variant="outline" className="text-xs px-1.5 py-0">
+                              {v}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">未設定</span>
+                      )}
+                    </TableCell>
                     <TableCell>{statusBadge(user.status)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {user.createdAt

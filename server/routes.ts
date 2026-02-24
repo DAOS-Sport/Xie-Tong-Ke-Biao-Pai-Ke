@@ -1168,6 +1168,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/coach-portal/venue-preferences', async (req, res) => {
+    try {
+      const { coachName } = req.query as { coachName: string };
+      if (!coachName) {
+        return res.status(400).json({ message: "Missing coachName" });
+      }
+      const prefs = await storage.getCoachVenuePreferences(coachName);
+      res.json(prefs.map(p => p.venueName));
+    } catch (error) {
+      console.error('Error fetching coach venue preferences:', error);
+      res.status(500).json({ message: "Failed to fetch venue preferences" });
+    }
+  });
+
+  app.post('/api/coach-portal/venue-preferences', async (req, res) => {
+    try {
+      const { coachName, venueNames } = req.body as { coachName: string; venueNames: string[] };
+      if (!coachName || !Array.isArray(venueNames)) {
+        return res.status(400).json({ message: "Missing coachName or venueNames" });
+      }
+      await storage.setCoachVenuePreferences(coachName, venueNames);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving coach venue preferences:', error);
+      res.status(500).json({ message: "Failed to save venue preferences" });
+    }
+  });
+
+  app.get('/api/admin/coach-venue-preferences', async (req, res) => {
+    try {
+      const password = req.headers['x-admin-password'] || req.query?.password;
+      if (password !== 'dream0935314711') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const allPrefs = await storage.getAllCoachVenuePreferences();
+      const grouped: Record<string, string[]> = {};
+      allPrefs.forEach(p => {
+        if (!grouped[p.coachName]) grouped[p.coachName] = [];
+        grouped[p.coachName].push(p.venueName);
+      });
+      res.json(grouped);
+    } catch (error) {
+      console.error('Error fetching all venue preferences:', error);
+      res.status(500).json({ message: "Failed to fetch venue preferences" });
+    }
+  });
+
   app.get('/api/coach-portal/assigned-slots', async (req, res) => {
     try {
       const { coachName, startDate, endDate } = req.query as {

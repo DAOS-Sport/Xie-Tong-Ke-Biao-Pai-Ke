@@ -134,6 +134,15 @@ export const venueInfos = pgTable("venue_infos", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const coachVenuePreferences = pgTable("coach_venue_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachName: varchar("coach_name").notNull(),
+  venueName: varchar("venue_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique().on(table.coachName, table.venueName),
+]);
+
 export const coachAvailability = pgTable("coach_availability", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   coachName: varchar("coach_name").notNull(),
@@ -243,3 +252,4 @@ export type InsertCoachUserType = z.infer<typeof insertCoachUserSchema>;
 
 export type CoachAvailability = typeof coachAvailability.$inferSelect;
 export type InsertCoachAvailability = typeof coachAvailability.$inferInsert;
+export type CoachVenuePreference = typeof coachVenuePreferences.$inferSelect;

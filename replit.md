@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
   - `schedules` - Class bookings linking coaches to venues and time slots (coachCount: 1-2, coachName2 for second coach)
   - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, status, linkedCoachName)
   - `coach_availability` - Coach weekly availability slots (coachName, weekStart, dayOfWeek 1-7, timeSlotOrder 1-7)
+  - `coach_venue_preferences` - Coach venue preferences (coachName, venueName, unique constraint)
   - `sessions` - Authentication session storage (required for Replit Auth)
 
 ## Authentication & Authorization
@@ -65,6 +66,7 @@ Preferred communication style: Simple, everyday language.
   - Google Calendar export (.ics download + per-event links)
   - Weekly availability matrix (7x7 checkbox grid: Mon-Sun, periods 1-7) with week navigation
   - Assigned slots locked (blue 🔒): cannot uncheck if coach is scheduled for that slot
+  - Venue preferences: coaches select which venues they can work at (checkbox grid)
 - **Coach Availability Matching**: Availability-aware coach assignment system
   - Coaches fill weekly availability via 7x7 matrix in coach portal
   - Admin coach assignment UI shows available coaches with ✅ markers, grouped separately

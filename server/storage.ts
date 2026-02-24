@@ -8,6 +8,7 @@ import {
   systemSettings,
   venueInfos,
   coachAvailability,
+  coachVenuePreferences,
   type User,
   type UpsertUser,
   type Venue,
@@ -21,6 +22,7 @@ import {
   type SystemSetting,
   type VenueInfo,
   type CoachAvailability,
+  type CoachVenuePreference,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, between, desc, sql, like, or, ilike } from "drizzle-orm";
@@ -89,6 +91,11 @@ export interface IStorage {
   getCoachAvailabilityByWeek(weekStart: string): Promise<CoachAvailability[]>;
   getCoachAvailabilityForCoach(coachName: string, weekStart: string): Promise<CoachAvailability[]>;
   upsertCoachAvailability(coachName: string, weekStart: string, slots: { dayOfWeek: number; timeSlotOrder: number }[]): Promise<void>;
+
+  // Coach venue preferences
+  getCoachVenuePreferences(coachName: string): Promise<CoachVenuePreference[]>;
+  getAllCoachVenuePreferences(): Promise<CoachVenuePreference[]>;
+  setCoachVenuePreferences(coachName: string, venueNames: string[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -829,6 +836,28 @@ export class DatabaseStorage implements IStorage {
           dayOfWeek: s.dayOfWeek,
           timeSlotOrder: s.timeSlotOrder,
         }))
+      );
+    }
+  }
+
+  async getCoachVenuePreferences(coachName: string): Promise<CoachVenuePreference[]> {
+    return await db
+      .select()
+      .from(coachVenuePreferences)
+      .where(eq(coachVenuePreferences.coachName, coachName));
+  }
+
+  async getAllCoachVenuePreferences(): Promise<CoachVenuePreference[]> {
+    return await db.select().from(coachVenuePreferences);
+  }
+
+  async setCoachVenuePreferences(coachName: string, venueNames: string[]): Promise<void> {
+    await db
+      .delete(coachVenuePreferences)
+      .where(eq(coachVenuePreferences.coachName, coachName));
+    if (venueNames.length > 0) {
+      await db.insert(coachVenuePreferences).values(
+        venueNames.map(venueName => ({ coachName, venueName }))
       );
     }
   }

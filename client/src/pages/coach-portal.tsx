@@ -439,7 +439,54 @@ function ApprovedDashboard({
     return set;
   }, [assignedSlots]);
 
+  const { data: venuePreferences = [] } = useQuery<string[]>({
+    queryKey: ["/api/coach-portal/venue-preferences", coachName],
+    queryFn: async () => {
+      const res = await fetch(`/api/coach-portal/venue-preferences?coachName=${encodeURIComponent(coachName)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const { toast } = useToast();
+
+  const [localVenuePrefs, setLocalVenuePrefs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalVenuePrefs(new Set(venuePreferences));
+  }, [venuePreferences]);
+
+  const venuePrefDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveVenuePreferences = useCallback((newSet: Set<string>) => {
+    if (venuePrefDebounceRef.current) clearTimeout(venuePrefDebounceRef.current);
+    venuePrefDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/coach-portal/venue-preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coachName, venueNames: Array.from(newSet) }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/venue-preferences", coachName] });
+      } catch {
+        toast({ title: "儲存失敗，請重試", variant: "destructive" });
+      }
+    }, 600);
+  }, [coachName, toast]);
+
+  const toggleVenuePreference = (venueName: string) => {
+    setLocalVenuePrefs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(venueName)) {
+        newSet.delete(venueName);
+      } else {
+        newSet.add(venueName);
+      }
+      saveVenuePreferences(newSet);
+      return newSet;
+    });
+  };
   const [localAvailSet, setLocalAvailSet] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -722,6 +769,46 @@ function ApprovedDashboard({
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              可排課地點
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            <p className="text-xs text-muted-foreground mb-3">請勾選您可以前往上課的場館</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {venues.map(venue => {
+                const isSelected = localVenuePrefs.has(venue.name);
+                return (
+                  <button
+                    key={venue.id}
+                    onClick={() => toggleVenuePreference(venue.name)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-colors text-left ${
+                      isSelected
+                        ? "bg-green-50 border-green-400 text-green-800"
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                      isSelected ? "bg-green-500 border-green-600 text-white" : "border-gray-300"
+                    }`}>
+                      {isSelected ? "✓" : ""}
+                    </span>
+                    <span className="truncate">{venue.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {localVenuePrefs.size > 0 && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                已選 {localVenuePrefs.size} 個場館
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="py-3">
