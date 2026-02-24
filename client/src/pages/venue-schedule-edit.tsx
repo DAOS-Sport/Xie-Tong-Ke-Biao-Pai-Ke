@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import PasswordProtect from "@/components/password-protect";
@@ -39,6 +39,8 @@ function VenueScheduleEditContent() {
     date: string;
     timeSlotId: string;
   } | null>(null);
+  const [showCopyWeek, setShowCopyWeek] = useState(false);
+  const [copySourceWeek, setCopySourceWeek] = useState<Date>(() => subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1));
 
   const { data: venues } = useQuery<Venue[]>({
     queryKey: ["/api/venues"],
@@ -202,6 +204,39 @@ function VenueScheduleEditContent() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const copyWeekMutation = useMutation({
+    mutationFn: async () => {
+      const adminPassword = sessionStorage.getItem("admin-password") || "";
+      const sourceStart = format(copySourceWeek, "yyyy-MM-dd");
+      const sourceEnd = format(addDays(copySourceWeek, 6), "yyyy-MM-dd");
+      const targetStart = format(currentWeek, "yyyy-MM-dd");
+      const res = await fetch("/api/schedules/copy-week", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({
+          sourceStartDate: sourceStart,
+          sourceEndDate: sourceEnd,
+          targetStartDate: targetStart,
+          venueId: selectedVenue,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
+      toast({ title: "複製成功", description: `已複製 ${data.copied} 筆課程` });
+      setShowCopyWeek(false);
+    },
+    onError: (error) => {
+      toast({ title: "複製失敗", description: error.message, variant: "destructive" });
     },
   });
 
@@ -381,8 +416,55 @@ function VenueScheduleEditContent() {
             >
               本週
             </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCopySourceWeek(subWeeks(currentWeek, 1));
+                setShowCopyWeek(!showCopyWeek);
+              }}
+              className="text-xs sm:text-sm px-3 sm:px-4"
+            >
+              <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              複製週課表
+            </Button>
           </div>
         </div>
+
+        {showCopyWeek && selectedVenue && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <span className="text-sm font-medium whitespace-nowrap">從哪一週複製：</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopySourceWeek(w => subWeeks(w, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-48 text-center">
+                  {format(copySourceWeek, "yyyy/MM/dd", { locale: zhTW })} - {format(addDays(copySourceWeek, 4), "MM/dd", { locale: zhTW })}
+                </span>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopySourceWeek(w => addWeeks(w, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <span className="text-sm text-muted-foreground">→ 複製到目前顯示的週</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => copyWeekMutation.mutate()}
+                  disabled={copyWeekMutation.isPending || format(copySourceWeek, "yyyy-MM-dd") === format(currentWeek, "yyyy-MM-dd")}
+                >
+                  {copyWeekMutation.isPending ? "複製中..." : "確認複製"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowCopyWeek(false)}>
+                  取消
+                </Button>
+              </div>
+            </div>
+            {format(copySourceWeek, "yyyy-MM-dd") === format(currentWeek, "yyyy-MM-dd") && (
+              <p className="text-xs text-red-500 mt-2">不能複製到同一週</p>
+            )}
+          </div>
+        )}
 
         {selectedVenueData && (
           <Card>

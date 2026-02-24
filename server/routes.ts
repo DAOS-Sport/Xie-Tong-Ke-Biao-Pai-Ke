@@ -176,6 +176,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/schedules/copy-week', async (req: any, res) => {
+    try {
+      const password = req.headers['x-admin-password'] as string;
+      if (password !== 'dream0935314711') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const { sourceStartDate, sourceEndDate, targetStartDate, venueId } = req.body;
+      if (!sourceStartDate || !sourceEndDate || !targetStartDate || !venueId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      const sourceSchedules = await storage.getSchedulesByDateRange(sourceStartDate, sourceEndDate);
+      const venueSchedules = sourceSchedules.filter(s => s.venueId === venueId && s.className);
+
+      let copied = 0;
+      const sourceStart = new Date(sourceStartDate + 'T00:00:00');
+      const targetStart = new Date(targetStartDate + 'T00:00:00');
+
+      for (const schedule of venueSchedules) {
+        const scheduleDate = new Date(schedule.date + 'T00:00:00');
+        const dayOffset = Math.round((scheduleDate.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
+        const targetDate = addDays(targetStart, dayOffset);
+        const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+
+        await storage.upsertSchedule({
+          date: targetDateStr,
+          venueId: schedule.venueId,
+          timeSlotId: schedule.timeSlotId,
+          className: schedule.className,
+          coachName: null,
+          coachName2: null,
+          coachCount: schedule.coachCount,
+        });
+        copied++;
+      }
+
+      res.json({ success: true, copied });
+    } catch (error) {
+      console.error("Error copying week:", error);
+      res.status(500).json({ message: "Failed to copy week" });
+    }
+  });
+
   // Schedule lock/unlock (two-phase scheduling)
   app.post('/api/schedules/lock', async (req: any, res) => {
     try {
