@@ -50,7 +50,18 @@ const EXCLUDED_VENUES = new Set([
   "行銷事業處", "數位轉型發展處", "人力資源處", "營運管理處",
 ]);
 
+async function cleanupExcludedVenues(): Promise<void> {
+  const existingVenues = await storage.getVenues();
+  for (const venue of existingVenues) {
+    if (EXCLUDED_VENUES.has(venue.name)) {
+      await storage.deleteVenue(venue.id);
+      console.log(`[Ragic] Cleaned up excluded venue: "${venue.name}"`);
+    }
+  }
+}
+
 async function syncVenues(): Promise<{ added: string[]; updated: string[]; total: number }> {
+  await cleanupExcludedVenues();
   const departments = (await fetchRagicRecords(RAGIC_DEPT_API_URL)).filter(r => r["部門名稱"]);
   const existingVenues = await storage.getVenues();
   const existingVenueNames = new Set(existingVenues.map(v => v.name));

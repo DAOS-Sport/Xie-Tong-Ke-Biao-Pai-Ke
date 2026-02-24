@@ -144,6 +144,7 @@ export class DatabaseStorage implements IStorage {
     const venue = await db.select().from(venues).where(eq(venues.id, id));
     if (venue.length > 0) {
       await db.delete(venueInfos).where(eq(venueInfos.venueName, venue[0].name));
+      await db.delete(coachVenuePreferences).where(eq(coachVenuePreferences.venueName, venue[0].name));
     }
     await db.delete(schedules).where(eq(schedules.venueId, id));
     await db.delete(venues).where(eq(venues.id, id));
