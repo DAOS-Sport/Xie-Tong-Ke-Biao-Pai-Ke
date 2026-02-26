@@ -1,19 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Check, Users, Zap, BarChart3, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Users, Zap, BarChart3, AlertTriangle, ChevronDown, X, Search } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import PasswordProtect from "@/components/password-protect";
@@ -24,6 +17,160 @@ import {
   getExtendedWeekdayNames,
   getExtendedWeekEnd,
 } from "@/utils/special-workdays";
+
+interface CoachSearchSelectProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  coaches: string[];
+  available: Set<string>;
+  conflicts: Set<string>;
+  placeholder: string;
+  triggerClassName?: string;
+  hasValue?: boolean;
+}
+
+function CoachSearchSelect({
+  value,
+  onValueChange,
+  coaches,
+  available,
+  conflicts,
+  placeholder,
+  triggerClassName = "",
+  hasValue = false,
+}: CoachSearchSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSearch("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const filtered = (list: string[]) =>
+    search.trim() === ""
+      ? list
+      : list.filter((c) => c.toLowerCase().includes(search.toLowerCase()));
+
+  const availableList = filtered(coaches.filter((c) => available.has(c)));
+  const otherList = filtered(coaches.filter((c) => !available.has(c)));
+
+  const handleSelect = (coach: string) => {
+    onValueChange(coach);
+    setOpen(false);
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onValueChange("__clear__");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full h-7 text-xs px-2 rounded border flex items-center justify-between gap-1 ${triggerClassName}`}
+      >
+        <div className="flex items-center gap-1 min-w-0">
+          {hasValue && <Check className="h-3 w-3 flex-shrink-0 text-green-600" />}
+          <span className={`truncate ${value ? "" : "text-gray-400"}`}>
+            {value || placeholder}
+          </span>
+        </div>
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          {value && (
+            <span
+              onClick={handleClear}
+              className="rounded hover:bg-gray-200 p-0.5 cursor-pointer"
+            >
+              <X className="h-2.5 w-2.5 text-gray-400" />
+            </span>
+          )}
+          <ChevronDown className="h-3 w-3 text-gray-400" />
+        </div>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-white border border-gray-200 rounded shadow-lg">
+          <div className="p-1.5 border-b flex items-center gap-1">
+            <Search className="h-3 w-3 text-gray-400 flex-shrink-0" />
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜尋教練..."
+              className="flex-1 text-xs outline-none bg-transparent"
+              onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {availableList.length > 0 && (
+              <>
+                <div className="px-2 py-0.5 text-[10px] text-green-600 font-medium bg-green-50">✅ 可用教練</div>
+                {availableList.map((coach) => {
+                  const isConflict = conflicts.has(coach);
+                  return (
+                    <button
+                      key={coach}
+                      type="button"
+                      disabled={isConflict}
+                      onClick={() => !isConflict && handleSelect(coach)}
+                      className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 flex items-center gap-1 ${
+                        isConflict ? "opacity-40 line-through cursor-not-allowed" : ""
+                      } ${value === coach ? "bg-blue-50 font-medium" : ""}`}
+                    >
+                      ✅ {coach}{isConflict ? " (衝突)" : ""}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+            {otherList.length > 0 && (
+              <>
+                <div className="px-2 py-0.5 text-[10px] text-gray-400 font-medium bg-gray-50 border-t">其他教練</div>
+                {otherList.map((coach) => {
+                  const isConflict = conflicts.has(coach);
+                  return (
+                    <button
+                      key={coach}
+                      type="button"
+                      disabled={isConflict}
+                      onClick={() => !isConflict && handleSelect(coach)}
+                      className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 text-gray-500 ${
+                        isConflict ? "opacity-40 line-through cursor-not-allowed" : ""
+                      } ${value === coach ? "bg-blue-50 font-medium" : ""}`}
+                    >
+                      {coach}{isConflict ? " (衝突)" : ""}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+            {availableList.length === 0 && otherList.length === 0 && (
+              <div className="px-2 py-3 text-xs text-gray-400 text-center">無符合結果</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CoachAssignmentContent() {
   const { user } = useAuth();
@@ -564,137 +711,37 @@ function CoachAssignmentContent() {
                                             {schedule.className}
                                             {needsTwo && <span className="text-[9px] opacity-75">(2位)</span>}
                                           </div>
-                                          <div className="relative">
-                                            <Select
-                                              value={schedule.coachName || ""}
+                                          <CoachSearchSelect
+                                            value={schedule.coachName || ""}
+                                            onValueChange={(value) => {
+                                              assignCoachMutation.mutate({
+                                                scheduleId: schedule.id,
+                                                coachName: value === "__clear__" ? "" : value,
+                                              });
+                                            }}
+                                            coaches={coaches}
+                                            available={available}
+                                            conflicts={coach1Conflicts}
+                                            placeholder="教練1"
+                                            hasValue={hasCoach}
+                                            triggerClassName={hasCoach ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"}
+                                          />
+                                          {needsTwo && (
+                                            <CoachSearchSelect
+                                              value={schedule.coachName2 || ""}
                                               onValueChange={(value) => {
                                                 assignCoachMutation.mutate({
                                                   scheduleId: schedule.id,
-                                                  coachName: value === "__clear__" ? "" : value,
+                                                  coachName2: value === "__clear__" ? "" : value,
                                                 });
                                               }}
-                                            >
-                                              <SelectTrigger
-                                                className={`h-7 text-xs ${
-                                                  hasCoach
-                                                    ? "border-green-400 bg-green-50"
-                                                    : "border-red-400 bg-red-50"
-                                                }`}
-                                              >
-                                                <div className="flex items-center gap-1 w-full">
-                                                  {hasCoach && (
-                                                    <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                                  )}
-                                                  <SelectValue placeholder="教練1" />
-                                                </div>
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {hasCoach && (
-                                                  <SelectItem value="__clear__">
-                                                    <span className="text-gray-400">清除教練</span>
-                                                  </SelectItem>
-                                                )}
-                                                {available.size > 0 && (
-                                                  <div className="px-2 py-1 text-[10px] text-green-600 font-medium border-b">✅ 可用教練</div>
-                                                )}
-                                                {coaches.filter(c => available.has(c)).map((coach) => {
-                                                  const isConflict = coach1Conflicts.has(coach);
-                                                  return (
-                                                    <SelectItem
-                                                      key={coach}
-                                                      value={coach}
-                                                      disabled={isConflict}
-                                                      className={isConflict ? "opacity-40 line-through" : ""}
-                                                    >
-                                                      ✅ {coach}{isConflict ? " (衝突)" : ""}
-                                                    </SelectItem>
-                                                  );
-                                                })}
-                                                {coaches.filter(c => !available.has(c)).length > 0 && (
-                                                  <div className="px-2 py-1 text-[10px] text-gray-400 font-medium border-b border-t">其他教練</div>
-                                                )}
-                                                {coaches.filter(c => !available.has(c)).map((coach) => {
-                                                  const isConflict = coach1Conflicts.has(coach);
-                                                  return (
-                                                    <SelectItem
-                                                      key={coach}
-                                                      value={coach}
-                                                      disabled={isConflict}
-                                                      className={isConflict ? "opacity-40 line-through" : "text-gray-500"}
-                                                    >
-                                                      {coach}{isConflict ? " (衝突)" : ""}
-                                                    </SelectItem>
-                                                  );
-                                                })}
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                          {needsTwo && (
-                                            <div className="relative">
-                                              <Select
-                                                value={schedule.coachName2 || ""}
-                                                onValueChange={(value) => {
-                                                  assignCoachMutation.mutate({
-                                                    scheduleId: schedule.id,
-                                                    coachName2: value === "__clear__" ? "" : value,
-                                                  });
-                                                }}
-                                              >
-                                                <SelectTrigger
-                                                  className={`h-7 text-xs ${
-                                                    hasCoach2
-                                                      ? "border-blue-400 bg-blue-50"
-                                                      : "border-amber-400 bg-amber-50"
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center gap-1 w-full">
-                                                    {hasCoach2 && (
-                                                      <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
-                                                    )}
-                                                    <SelectValue placeholder="教練2" />
-                                                  </div>
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  {hasCoach2 && (
-                                                    <SelectItem value="__clear__">
-                                                      <span className="text-gray-400">清除教練</span>
-                                                    </SelectItem>
-                                                  )}
-                                                  {available.size > 0 && (
-                                                    <div className="px-2 py-1 text-[10px] text-green-600 font-medium border-b">✅ 可用教練</div>
-                                                  )}
-                                                  {coaches.filter(c => available.has(c)).map((coach) => {
-                                                    const isConflict = coach2Conflicts.has(coach);
-                                                    return (
-                                                      <SelectItem
-                                                        key={coach}
-                                                        value={coach}
-                                                        disabled={isConflict}
-                                                        className={isConflict ? "opacity-40 line-through" : ""}
-                                                      >
-                                                        ✅ {coach}{isConflict ? " (衝突)" : ""}
-                                                      </SelectItem>
-                                                    );
-                                                  })}
-                                                  {coaches.filter(c => !available.has(c)).length > 0 && (
-                                                    <div className="px-2 py-1 text-[10px] text-gray-400 font-medium border-b border-t">其他教練</div>
-                                                  )}
-                                                  {coaches.filter(c => !available.has(c)).map((coach) => {
-                                                    const isConflict = coach2Conflicts.has(coach);
-                                                    return (
-                                                      <SelectItem
-                                                        key={coach}
-                                                        value={coach}
-                                                        disabled={isConflict}
-                                                        className={isConflict ? "opacity-40 line-through" : "text-gray-500"}
-                                                      >
-                                                        {coach}{isConflict ? " (衝突)" : ""}
-                                                      </SelectItem>
-                                                    );
-                                                  })}
-                                                </SelectContent>
-                                              </Select>
-                                            </div>
+                                              coaches={coaches}
+                                              available={available}
+                                              conflicts={coach2Conflicts}
+                                              placeholder="教練2"
+                                              hasValue={hasCoach2}
+                                              triggerClassName={hasCoach2 ? "border-blue-400 bg-blue-50" : "border-amber-400 bg-amber-50"}
+                                            />
                                           )}
                                         </div>
                                       );
