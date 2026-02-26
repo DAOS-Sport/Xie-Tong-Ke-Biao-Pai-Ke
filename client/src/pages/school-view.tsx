@@ -97,16 +97,29 @@ export default function SchoolView() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header
-        className="shadow-sm"
-        style={{ backgroundColor: venueColor }}
+        className="shadow-sm border-b-4"
+        style={{
+          backgroundColor: `color-mix(in srgb, ${venueColor} 15%, white)`,
+          borderBottomColor: venueColor,
+        }}
       >
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <i className="fas fa-swimming-pool text-white text-xl"></i>
+              <i
+                className="fas fa-swimming-pool text-xl"
+                style={{ color: `color-mix(in srgb, ${venueColor} 80%, black)` }}
+              ></i>
               <div>
-                <h1 className="text-xl font-bold text-white">{venue.name}</h1>
-                <p className="text-white/80 text-sm">游泳課課表</p>
+                <h1
+                  className="text-2xl font-bold"
+                  style={{ color: `color-mix(in srgb, ${venueColor} 80%, black)` }}
+                >
+                  {venue.name}
+                </h1>
+                <p className="text-sm" style={{ color: `color-mix(in srgb, ${venueColor} 60%, #666)` }}>
+                  游泳課課表
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -115,7 +128,12 @@ export default function SchoolView() {
                   href={venueInfo.mapUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-2 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1 text-xs px-3 py-2 rounded-lg transition-colors border"
+                  style={{
+                    color: `color-mix(in srgb, ${venueColor} 80%, black)`,
+                    borderColor: `color-mix(in srgb, ${venueColor} 50%, white)`,
+                    backgroundColor: `color-mix(in srgb, ${venueColor} 10%, white)`,
+                  }}
                 >
                   <MapPin className="h-3.5 w-3.5" />
                   導航
@@ -126,7 +144,12 @@ export default function SchoolView() {
                   href={venueInfo.videoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-2 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1 text-xs px-3 py-2 rounded-lg transition-colors border"
+                  style={{
+                    color: `color-mix(in srgb, ${venueColor} 80%, black)`,
+                    borderColor: `color-mix(in srgb, ${venueColor} 50%, white)`,
+                    backgroundColor: `color-mix(in srgb, ${venueColor} 10%, white)`,
+                  }}
                 >
                   <Video className="h-3.5 w-3.5" />
                   場館影片
