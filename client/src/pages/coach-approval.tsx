@@ -96,6 +96,7 @@ function CoachApprovalContent() {
 
 function CoachUsersSection() {
   const [filter, setFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const [editingUser, setEditingUser] = useState<{ id: string; name: string } | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -164,9 +165,13 @@ function CoachUsersSection() {
     }
   };
 
-  const filteredUsers = filter === "all"
-    ? coachUsers
-    : coachUsers.filter((u) => u.status === filter);
+  const filteredUsers = coachUsers
+    .filter((u) => filter === "all" || u.status === filter)
+    .filter((u) => {
+      if (!search.trim()) return true;
+      const q = search.trim();
+      return u.name.includes(q) || (u.phone || "").includes(q) || (u.email || "").includes(q);
+    });
 
   const pendingCount = coachUsers.filter((u) => u.status === "pending").length;
 
@@ -193,6 +198,14 @@ function CoachUsersSection() {
             </SelectContent>
           </Select>
         </div>
+        <div className="mt-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜尋姓名、電話、信箱..."
+            className="h-8 text-sm"
+          />
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -207,6 +220,7 @@ function CoachUsersSection() {
                   <TableHead>姓名</TableHead>
                   <TableHead>電話</TableHead>
                   <TableHead>信箱</TableHead>
+                  <TableHead>LINE 綁定</TableHead>
                   <TableHead>可排課地點</TableHead>
                   <TableHead>狀態</TableHead>
                   <TableHead>註冊時間</TableHead>
@@ -219,6 +233,17 @@ function CoachUsersSection() {
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.phone || "-"}</TableCell>
                     <TableCell>{user.email || "-"}</TableCell>
+                    <TableCell>
+                      {user.lineId ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
+                          ✅ 已綁定
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-2 py-0.5">
+                          未綁定
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {venuePrefsMap[user.name]?.length ? (
                         <div className="flex flex-wrap gap-1">
