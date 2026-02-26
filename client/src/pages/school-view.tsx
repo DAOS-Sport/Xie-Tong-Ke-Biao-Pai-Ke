@@ -188,8 +188,8 @@ export default function SchoolView() {
                       className="border border-gray-200 p-2 w-20 sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] text-sm"
                       style={{ backgroundColor: venueColor, color: 'white' }}
                     >
-                      <div className="font-bold text-xs leading-tight mb-0.5">{venue.name}</div>
-                      <div className="text-[11px] opacity-80">節次</div>
+                      <div className="font-bold text-sm leading-tight mb-0.5">{venue.name}</div>
+                      <div className="text-xs opacity-80">節次</div>
                     </th>
                     {getExtendedWeekDays(currentWeek).map((date, index) => {
                       const weekDayNames = getExtendedWeekdayNames(currentWeek);
@@ -200,14 +200,14 @@ export default function SchoolView() {
                           className={`border border-gray-200 p-2 min-w-28 ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}
                         >
                           <div className="text-center">
-                            <div className={`font-semibold text-sm ${isToday ? 'text-blue-600' : ''}`}>
+                            <div className={`font-semibold text-base ${isToday ? 'text-blue-600' : ''}`}>
                               {weekDayNames[index]}
                             </div>
-                            <div className={`text-xs ${isToday ? 'text-blue-500' : 'text-gray-500'}`}>
+                            <div className={`text-sm ${isToday ? 'text-blue-500' : 'text-gray-500'}`}>
                               {format(date, "MM/dd")}
                             </div>
                             {isToday && (
-                              <div className="text-[10px] text-blue-500 font-medium">今天</div>
+                              <div className="text-xs text-blue-500 font-medium">今天</div>
                             )}
                           </div>
                         </th>
@@ -222,8 +222,8 @@ export default function SchoolView() {
                         className="border border-gray-200 p-2 text-center sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
                         style={{ backgroundColor: venueColor, color: 'white' }}
                       >
-                        <div className="font-medium text-sm">{timeSlot.period}</div>
-                        <div className="text-[10px] opacity-80">
+                        <div className="font-medium text-base">{timeSlot.period}</div>
+                        <div className="text-xs opacity-80">
                           {timeSlot.startTime}-{timeSlot.endTime}
                         </div>
                       </td>
@@ -241,7 +241,7 @@ export default function SchoolView() {
                               {daySchedules.map((schedule, idx) => (
                                 <div
                                   key={`${schedule.id}-${idx}`}
-                                  className="text-xs p-1.5 rounded"
+                                  className="text-sm p-2 rounded"
                                   style={{
                                     backgroundColor: `color-mix(in srgb, ${venueColor} 15%, white)`,
                                     border: `1px solid color-mix(in srgb, ${venueColor} 30%, white)`,
@@ -251,7 +251,7 @@ export default function SchoolView() {
                                     {schedule.className || '游泳課'}
                                   </div>
                                   {schedule.coachName && (
-                                    <div className="text-gray-600 text-[11px]">
+                                    <div className="text-gray-600 text-xs">
                                       {schedule.coachName}
                                       {schedule.coachName2 && ` / ${schedule.coachName2}`}
                                     </div>
