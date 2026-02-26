@@ -10,7 +10,7 @@ const VENUE_COLORS = ["blue", "green", "purple", "yellow", "orange", "teal", "re
 let lastSyncTime: string | null = null;
 let lastSyncResult: {
   venues: { added: string[]; updated: string[]; total: number };
-  coaches: { added: number; total: number; lineIdsSynced: number };
+  coaches: { added: number; total: number; lineIdsSynced: number; employeeIdsSynced: number };
 } | null = null;
 let isSyncing = false;
 
@@ -116,24 +116,35 @@ function isCoachRole(record: RagicRecord): boolean {
   return false;
 }
 
-async function fetchPersonalLineIds(): Promise<Map<string, string>> {
+interface PersonalInfo {
+  lineId: string | null;
+  employeeId: string | null;
+}
+
+async function fetchPersonalInfo(): Promise<Map<string, PersonalInfo>> {
   const records = await fetchRagicRecords(RAGIC_EMPLOYEE_API_URL, 500);
-  const lineIdMap = new Map<string, string>();
+  const infoMap = new Map<string, PersonalInfo>();
   for (const r of records) {
     const name = r["姓名"] as string;
     const personalLineId = r["個人LINE ID"] as string;
-    if (name && personalLineId && personalLineId.startsWith("U")) {
-      lineIdMap.set(name, personalLineId);
+    const employeeId = r["員工編號"] as string;
+    if (name) {
+      infoMap.set(name, {
+        lineId: (personalLineId && personalLineId.startsWith("U")) ? personalLineId : null,
+        employeeId: employeeId || null,
+      });
     }
   }
-  console.log(`[Ragic] Fetched ${lineIdMap.size} personal LINE IDs from employee form`);
-  return lineIdMap;
+  const lineIdCount = [...infoMap.values()].filter(v => v.lineId).length;
+  const empIdCount = [...infoMap.values()].filter(v => v.employeeId).length;
+  console.log(`[Ragic] Fetched personal info: ${lineIdCount} LINE IDs, ${empIdCount} employee IDs`);
+  return infoMap;
 }
 
-async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSynced: number }> {
-  const [allRecords, personalLineIds] = await Promise.all([
+async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSynced: number; employeeIdsSynced: number }> {
+  const [allRecords, personalInfoMap] = await Promise.all([
     fetchRagicRecords(RAGIC_COACH_API_URL, 500),
-    fetchPersonalLineIds(),
+    fetchPersonalInfo(),
   ]);
 
   const EXCLUDED_NAMES = ["(測試帳號)教練"];
@@ -144,12 +155,15 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
 
   let added = 0;
   let lineIdsSynced = 0;
+  let employeeIdsSynced = 0;
 
   for (const coach of activeCoaches) {
     const name = coach["姓名"] as string;
     const phone = (coach["手機"] as string) || null;
     const email = (coach["E-mail"] as string) || null;
-    const personalLineId = personalLineIds.get(name) || null;
+    const info = personalInfoMap.get(name);
+    const personalLineId = info?.lineId || null;
+    const employeeId = info?.employeeId || null;
 
     const existing = existingByName.get(name);
 
@@ -162,28 +176,32 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
         role: "coach",
         lineId: personalLineId,
         linkedCoachName: name,
+        employeeId,
       });
-      existingByName.set(name, { name, lineId: personalLineId } as any);
+      existingByName.set(name, { name, lineId: personalLineId, employeeId } as any);
       added++;
-      if (personalLineId) {
+      if (personalLineId) lineIdsSynced++;
+      if (employeeId) employeeIdsSynced++;
+      console.log(`[Ragic] Added coach "${name}"${personalLineId ? " with LINE ID" : ""}${employeeId ? ` (${employeeId})` : ""}`);
+    } else {
+      if (personalLineId && existing.lineId !== personalLineId) {
+        await storage.updateCoachUserLineId(existing.id, personalLineId);
         lineIdsSynced++;
-        console.log(`[Ragic] Added coach "${name}" with personal LINE ID`);
+        console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
       }
-    } else if (personalLineId && existing.lineId !== personalLineId) {
-      await storage.updateCoachUserLineId(existing.id, personalLineId);
-      lineIdsSynced++;
-      console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
+      if (employeeId && !existing.employeeId) {
+        await storage.updateCoachEmployeeId(existing.id, employeeId);
+        employeeIdsSynced++;
+        console.log(`[Ragic] Synced employee ID for coach "${name}": ${employeeId}`);
+      }
     }
   }
 
-  if (added > 0) {
-    console.log(`[Ragic] Added ${added} new coaches`);
-  }
-  if (lineIdsSynced > 0) {
-    console.log(`[Ragic] Synced ${lineIdsSynced} LINE IDs total`);
-  }
+  if (added > 0) console.log(`[Ragic] Added ${added} new coaches`);
+  if (lineIdsSynced > 0) console.log(`[Ragic] Synced ${lineIdsSynced} LINE IDs total`);
+  if (employeeIdsSynced > 0) console.log(`[Ragic] Synced ${employeeIdsSynced} employee IDs total`);
 
-  return { added, total: activeCoaches.length, lineIdsSynced };
+  return { added, total: activeCoaches.length, lineIdsSynced, employeeIdsSynced };
 }
 
 export async function syncRagicAll(): Promise<typeof lastSyncResult> {

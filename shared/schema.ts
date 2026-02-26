@@ -78,6 +78,7 @@ export const coachUsers = pgTable("coach_users", {
   name: varchar("name").notNull(),
   phone: varchar("phone"),
   email: varchar("email"),
+  employeeId: varchar("employee_id"), // 員工帳號（從 Ragic 同步）
   status: varchar("status").notNull().default("pending"), // pending / approved / rejected
   role: varchar("role").notNull().default("coach"), // admin / coach
   linkedCoachName: varchar("linked_coach_name"), // 對應排課系統中的教練名稱

@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
   - `venues` - Swimming pool locations with color coding (8 venues including 清江國小, 松山國小)
   - `timeSlots` - Available time periods for scheduling
   - `schedules` - Class bookings linking coaches to venues and time slots (coachCount: 1-2, coachName2 for second coach)
-  - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, status, linkedCoachName)
+  - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, employeeId, status, linkedCoachName)
   - `coach_availability` - Coach weekly availability slots (coachName, weekStart, dayOfWeek 1-7, timeSlotOrder 1-7)
   - `coach_venue_preferences` - Coach venue preferences (coachName, venueName, unique constraint)
   - `sessions` - Authentication session storage (required for Replit Auth)
@@ -89,7 +89,8 @@ Preferred communication style: Simple, everyday language.
   - Auto-sync daily at 03:00 Asia/Taipei + on app startup
   - Syncs: 部門名稱 → venue name, google map → venueInfos.mapUrl
   - **LINE ID sync**: 從員工表單(ragicforms4/20004)的「個人LINE ID」欄位(field 1003633)同步教練 LINE ID，用於推播通知
-  - Syncs: 教練姓名/手機/Email → coachUsers (only 在職 + 應徵職務含「教練」, auto-approved)
+  - **Employee ID sync**: 從員工表單(ragicforms4/20004)的「員工編號」欄位同步員工編號到 coachUsers.employeeId（僅在欄位為空時補填）
+  - Syncs: 教練姓名/手機/Email/員工編號 → coachUsers (only 在職 + 應徵職務含「教練」, auto-approved)
   - Excluded names: "(測試帳號)教練"
   - Only additive: adds new venues, fills empty mapUrl; never deletes or overwrites
   - Coach list sorted: 陳柏榮 always first, then alphabetical

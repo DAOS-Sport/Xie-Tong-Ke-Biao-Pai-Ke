@@ -218,6 +218,7 @@ function CoachUsersSection() {
               <TableHeader>
                 <TableRow>
                   <TableHead>姓名</TableHead>
+                  <TableHead>員編</TableHead>
                   <TableHead>電話</TableHead>
                   <TableHead>信箱</TableHead>
                   <TableHead>LINE 綁定</TableHead>
@@ -231,6 +232,7 @@ function CoachUsersSection() {
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground font-mono">{user.employeeId || "-"}</TableCell>
                     <TableCell>{user.phone || "-"}</TableCell>
                     <TableCell>{user.email || "-"}</TableCell>
                     <TableCell>
@@ -430,7 +432,7 @@ function RagicSyncSection() {
     lastSyncTime: string | null;
     lastSyncResult: {
       venues: { added: string[]; updated: string[]; total: number };
-      coaches: { added: number; total: number; lineIdsSynced: number };
+      coaches: { added: number; total: number; lineIdsSynced: number; employeeIdsSynced: number };
     } | null;
     isSyncing: boolean;
   }>({
@@ -508,6 +510,11 @@ function RagicSyncSection() {
                 {sr.coaches.lineIdsSynced > 0 && (
                   <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
                     同步 {sr.coaches.lineIdsSynced} 筆 LINE ID
+                  </Badge>
+                )}
+                {sr.coaches.employeeIdsSynced > 0 && (
+                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                    同步 {sr.coaches.employeeIdsSynced} 筆員編
                   </Badge>
                 )}
               </div>
