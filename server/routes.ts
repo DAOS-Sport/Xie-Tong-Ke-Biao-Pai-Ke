@@ -991,6 +991,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 用姓名連結 LINE ID（新流程：教練自行輸入姓名，與 Ragic DB 核對）
+  app.post('/api/coach-portal/link-by-name', async (req, res) => {
+    try {
+      const { lineToken, name } = req.body;
+      if (!lineToken || !name?.trim()) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+      const tokenData = lineLoginTokens.get(lineToken);
+      if (!tokenData || Date.now() > tokenData.expiresAt) {
+        lineLoginTokens.delete(lineToken);
+        return res.status(400).json({ message: "LINE 登入已過期，請重新登入" });
+      }
+      const trimmedName = name.trim();
+
+      // Check if LINE ID already linked
+      const existingByLine = await storage.getCoachUserByLineId(tokenData.lineId);
+      if (existingByLine) {
+        lineLoginTokens.delete(lineToken);
+        return res.json(existingByLine);
+      }
+
+      // Find coach by name in our DB (synced from Ragic)
+      const allCoaches = await storage.getAllCoachUsers();
+      const matched = allCoaches.find(c => c.name === trimmedName && c.status === 'approved');
+
+      if (matched) {
+        const updated = await storage.updateCoachUserLineId(matched.id, tokenData.lineId);
+        lineLoginTokens.delete(lineToken);
+        return res.json(updated);
+      }
+
+      // Not found in DB → notify 陳柏榮 via LINE push
+      const CHEN_BO_RONG_LINE_ID = "U8fd0e4be4e44a1304f9fa2e9855f4559";
+      const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      if (channelAccessToken) {
+        await fetch("https://api.line.me/v2/bot/message/push", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${channelAccessToken}`,
+          },
+          body: JSON.stringify({
+            to: CHEN_BO_RONG_LINE_ID,
+            messages: [{
+              type: "text",
+              text: `【教練登入通知】\n教練「${trimmedName}」嘗試登入教練前台，但在 Ragic 資料庫中查無此名字。\n請確認該教練是否已建檔，或協助手動設定。`,
+            }],
+          }),
+        }).catch(err => console.error("[LINE] Failed to notify 陳柏榮:", err));
+      }
+
+      return res.status(404).json({
+        message: `查無「${trimmedName}」的教練資料，已通知管理員，請稍候或聯繫陳柏榮。`
+      });
+    } catch (error) {
+      console.error('Error linking by name:', error);
+      res.status(500).json({ message: "連結失敗" });
+    }
+  });
+
   app.post('/api/coach-portal/register', async (req, res) => {
     try {
       const { lineToken, name, phone, email } = req.body;

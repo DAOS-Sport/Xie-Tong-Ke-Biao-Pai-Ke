@@ -161,8 +161,8 @@ function LineLinkNameForm({
   demoMode?: { lineName: string; linePicture: string };
 }) {
   const { toast } = useToast();
-  const [selectedId, setSelectedId] = useState("");
-  const [search, setSearch] = useState("");
+  const [inputName, setInputName] = useState("");
+  const [confirming, setConfirming] = useState(false);
 
   const { data: tokenInfoRaw } = useQuery<{ lineName: string; linePicture: string }>({
     queryKey: ["/api/auth/line/token-info", lineToken],
@@ -177,25 +177,13 @@ function LineLinkNameForm({
 
   const tokenInfo = demoMode ?? tokenInfoRaw;
 
-  const { data: coaches = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ["/api/coach-portal/linkable-coaches"],
-    queryFn: async () => {
-      const res = await fetch("/api/coach-portal/linkable-coaches");
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-  });
-
-  const filtered = coaches.filter(c =>
-    search.trim() === "" || c.name.includes(search.trim())
-  );
-
   const linkMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/coach-portal/link-existing", {
+      if (demoMode) throw new Error("示範模式，無法實際連結");
+      const res = await fetch("/api/coach-portal/link-by-name", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineToken, coachUserId: selectedId }),
+        body: JSON.stringify({ lineToken, name: inputName.trim() }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -208,31 +196,25 @@ function LineLinkNameForm({
       onSuccess(user);
     },
     onError: (error: Error) => {
-      toast({ title: "連結失敗", description: error.message, variant: "destructive" });
+      setConfirming(false);
+      toast({ title: "找不到教練資料", description: error.message, variant: "destructive" });
     },
   });
-
-  const lineNameMatchesCoach = coaches.some(c => c.name === tokenInfo?.lineName);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           {tokenInfo?.linePicture ? (
-            <img
-              src={tokenInfo.linePicture}
-              alt="LINE 頭像"
-              className="mx-auto w-16 h-16 rounded-full mb-4 border-2 border-green-500"
-            />
+            <img src={tokenInfo.linePicture} alt="LINE 頭像"
+              className="mx-auto w-16 h-16 rounded-full mb-4 border-2 border-green-500" />
           ) : (
             <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
               <User className="h-8 w-8 text-white" />
             </div>
           )}
-          <CardTitle className="text-xl">請選擇您的姓名</CardTitle>
-          <p className="text-sm text-muted-foreground mt-2">
-            LINE 登入成功！請從下方名單中選擇您的真實姓名
-          </p>
+          <CardTitle className="text-xl">請輸入您的姓名</CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">LINE 登入成功！請輸入您的本名以完成身分綁定</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -241,67 +223,77 @@ function LineLinkNameForm({
               您的 LINE 名稱：<strong>{tokenInfo?.lineName || "載入中..."}</strong>
             </div>
 
-            {tokenInfo && !lineNameMatchesCoach && (
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
-                <div className="flex items-start gap-2">
-                  <span className="text-lg leading-none mt-0.5">⚠️</span>
-                  <div>
-                    <p className="font-bold">請使用本人真實姓名（非 LINE 暱稱）</p>
-                    <p className="mt-1">您的 LINE 名稱「<strong>{tokenInfo.lineName}</strong>」不在教練名單中。</p>
-                    <p className="mt-1 text-red-700 font-medium">請輸入您戶籍上的全名，否則將無法領取薪資。</p>
-                  </div>
+            <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-800">
+              <div className="flex items-start gap-2">
+                <span className="text-base leading-none mt-0.5">⚠️</span>
+                <div>
+                  <p className="font-bold">務必核對身分證姓名，請不要有錯字</p>
+                  <p className="mt-1">若有輸入失誤，請再聯繫管理員協助更正。</p>
+                  <p className="mt-1 font-medium">請使用本人的姓名（戶籍全名），否則將無法領取薪資。</p>
                 </div>
               </div>
-            )}
+            </div>
 
             <div>
-              <Label>搜尋姓名 <span className="text-red-500 text-xs">（請使用本人姓名）</span></Label>
+              <Label htmlFor="real-name">您的真實姓名</Label>
               <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="請輸入您的真實姓名搜尋..."
-                className="mt-1"
+                id="real-name"
+                value={inputName}
+                onChange={(e) => setInputName(e.target.value)}
+                placeholder="請輸入您的戶籍全名..."
+                className="mt-1 text-base"
+                onKeyDown={(e) => { if (e.key === "Enter" && inputName.trim().length >= 2) setConfirming(true); }}
               />
             </div>
-            <div className="border rounded-lg max-h-60 overflow-y-auto">
-              {filtered.length === 0 ? (
-                <div className="text-center py-6 px-4 space-y-2">
-                  <p className="text-sm text-gray-500">找不到符合的名字</p>
-                  {search.trim() !== "" && (
-                    <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700 text-left">
-                      <p className="font-bold">⚠️ 找不到「{search}」</p>
-                      <p className="mt-1">請確認您輸入的是戶籍姓名（非 LINE 暱稱）。若確認無誤，請聯繫管理員。</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                filtered.map(coach => (
-                  <button
-                    key={coach.id}
-                    type="button"
-                    onClick={() => setSelectedId(coach.id)}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b last:border-b-0 transition-colors ${
-                      selectedId === coach.id ? "bg-green-50 text-green-700 font-medium" : ""
-                    }`}
-                  >
-                    {selectedId === coach.id && "✓ "}{coach.name}
-                  </button>
-                ))
-              )}
-            </div>
+
             <Button
               className="w-full bg-green-500 hover:bg-green-600"
-              onClick={() => linkMutation.mutate()}
-              disabled={!selectedId || linkMutation.isPending}
+              onClick={() => setConfirming(true)}
+              disabled={inputName.trim().length < 2}
             >
-              {linkMutation.isPending ? "連結中..." : "確認，這是我"}
+              下一步：確認姓名
             </Button>
-            <p className="text-xs text-center text-gray-400">
-              若名單中找不到您，請聯繫管理員
-            </p>
+            <p className="text-xs text-center text-gray-400">若無法登入，請聯繫管理員陳柏榮</p>
           </div>
         </CardContent>
       </Card>
+
+      {confirming && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-lg">確認您的姓名</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                <p className="text-sm text-gray-500 mb-1">您輸入的姓名是：</p>
+                <p className="text-2xl font-bold text-gray-800">{inputName.trim()}</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">
+                <p>⚠️ 請仔細核對您的身分證姓名，確認無誤後再送出。若姓名有誤將無法領取薪資。</p>
+              </div>
+              <p className="text-sm text-center text-gray-600">這是您的本人姓名嗎？</p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setConfirming(false)}
+                  disabled={linkMutation.isPending}
+                >
+                  返回修改
+                </Button>
+                <Button
+                  className="flex-1 bg-green-500 hover:bg-green-600"
+                  onClick={() => linkMutation.mutate()}
+                  disabled={linkMutation.isPending}
+                >
+                  {linkMutation.isPending ? "驗證中..." : "確認，這是我"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
