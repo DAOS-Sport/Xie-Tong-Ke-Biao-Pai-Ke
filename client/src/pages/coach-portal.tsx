@@ -112,7 +112,7 @@ export default function CoachPortal() {
 
   if (lineParams.lineLogin === "new" && lineParams.token) {
     return (
-      <LineRegistrationForm
+      <LineLinkNameForm
         lineToken={lineParams.token}
         onSuccess={(user) => {
           setCoachUser(user);
@@ -141,7 +141,7 @@ export default function CoachPortal() {
   );
 }
 
-function LineRegistrationForm({
+function LineLinkNameForm({
   lineToken,
   onSuccess,
 }: {
@@ -149,9 +149,8 @@ function LineRegistrationForm({
   onSuccess: (user: CoachUser) => void;
 }) {
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [search, setSearch] = useState("");
 
   const { data: tokenInfo } = useQuery<{ lineName: string; linePicture: string }>({
     queryKey: ["/api/auth/line/token-info", lineToken],
@@ -163,31 +162,38 @@ function LineRegistrationForm({
     retry: false,
   });
 
-  useEffect(() => {
-    if (tokenInfo?.lineName && !name) {
-      setName(tokenInfo.lineName);
-    }
-  }, [tokenInfo]);
+  const { data: coaches = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/coach-portal/linkable-coaches"],
+    queryFn: async () => {
+      const res = await fetch("/api/coach-portal/linkable-coaches");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
 
-  const registerMutation = useMutation({
+  const filtered = coaches.filter(c =>
+    search.trim() === "" || c.name.includes(search.trim())
+  );
+
+  const linkMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/coach-portal/register", {
+      const res = await fetch("/api/coach-portal/link-existing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineToken, name, phone, email }),
+        body: JSON.stringify({ lineToken, coachUserId: selectedId }),
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || "註冊失敗");
+        throw new Error(data.message || "連結失敗");
       }
       return res.json();
     },
     onSuccess: (user) => {
-      toast({ title: "註冊成功", description: "請等待管理員審核" });
+      toast({ title: "連結成功", description: "歡迎回來！" });
       onSuccess(user);
     },
     onError: (error: Error) => {
-      toast({ title: "註冊失敗", description: error.message, variant: "destructive" });
+      toast({ title: "連結失敗", description: error.message, variant: "destructive" });
     },
   });
 
@@ -206,55 +212,54 @@ function LineRegistrationForm({
               <User className="h-8 w-8 text-white" />
             </div>
           )}
-          <CardTitle className="text-xl">完成教練註冊</CardTitle>
+          <CardTitle className="text-xl">請選擇您的姓名</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            LINE 登入成功！請填寫以下資料完成註冊
+            LINE 登入成功！請從下方名單中選擇您的姓名
           </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="bg-green-50 rounded-lg p-3 text-center text-sm text-green-700">
               <i className="fab fa-line mr-1"></i>
-              LINE 帳號已連結
+              已連結 LINE 帳號：{tokenInfo?.lineName || "載入中..."}
             </div>
             <div>
-              <Label htmlFor="name">姓名 *</Label>
+              <Label>搜尋姓名</Label>
               <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="請輸入您的真實姓名"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="輸入姓名搜尋..."
                 className="mt-1"
               />
             </div>
-            <div>
-              <Label htmlFor="phone">手機號碼</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="例：0912345678"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">電子信箱</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="例：coach@example.com"
-                className="mt-1"
-              />
+            <div className="border rounded-lg max-h-60 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-6">找不到符合的名字</p>
+              ) : (
+                filtered.map(coach => (
+                  <button
+                    key={coach.id}
+                    type="button"
+                    onClick={() => setSelectedId(coach.id)}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-b last:border-b-0 transition-colors ${
+                      selectedId === coach.id ? "bg-green-50 text-green-700 font-medium" : ""
+                    }`}
+                  >
+                    {selectedId === coach.id && "✓ "}{coach.name}
+                  </button>
+                ))
+              )}
             </div>
             <Button
               className="w-full bg-green-500 hover:bg-green-600"
-              onClick={() => registerMutation.mutate()}
-              disabled={!name.trim() || registerMutation.isPending}
+              onClick={() => linkMutation.mutate()}
+              disabled={!selectedId || linkMutation.isPending}
             >
-              {registerMutation.isPending ? "註冊中..." : "送出註冊"}
+              {linkMutation.isPending ? "連結中..." : "確認，這是我"}
             </Button>
+            <p className="text-xs text-center text-gray-400">
+              若名單中找不到您，請聯繫管理員
+            </p>
           </div>
         </CardContent>
       </Card>

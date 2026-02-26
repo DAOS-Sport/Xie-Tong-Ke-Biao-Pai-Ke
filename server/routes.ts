@@ -946,6 +946,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 教練註冊（LINE 登入後填寫資料）
+  // 取得可連結的已審核教練名單（給第一次 LINE 登入用）
+  app.get('/api/coach-portal/linkable-coaches', async (req, res) => {
+    try {
+      const approved = await storage.getApprovedCoachUsers();
+      // Return coaches that don't yet have a LINE ID (so they still need linking)
+      const linkable = approved
+        .filter(c => !c.lineId)
+        .map(c => ({ id: c.id, name: c.name }));
+      res.json(linkable);
+    } catch (error) {
+      res.status(500).json({ message: "查詢失敗" });
+    }
+  });
+
+  // 將 LINE ID 連結到現有已審核教練帳號
+  app.post('/api/coach-portal/link-existing', async (req, res) => {
+    try {
+      const { lineToken, coachUserId } = req.body;
+      if (!lineToken || !coachUserId) {
+        return res.status(400).json({ message: "缺少必要參數" });
+      }
+      const tokenData = lineLoginTokens.get(lineToken);
+      if (!tokenData || Date.now() > tokenData.expiresAt) {
+        lineLoginTokens.delete(lineToken);
+        return res.status(400).json({ message: "LINE 登入已過期，請重新登入" });
+      }
+      // Check if this LINE ID is already used
+      const existing = await storage.getCoachUserByLineId(tokenData.lineId);
+      if (existing) {
+        lineLoginTokens.delete(lineToken);
+        return res.json(existing);
+      }
+      // Update the coach's lineId
+      const updated = await storage.updateCoachUserLineId(coachUserId, tokenData.lineId);
+      if (!updated) {
+        return res.status(404).json({ message: "找不到教練帳號" });
+      }
+      lineLoginTokens.delete(lineToken);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error linking LINE to coach:', error);
+      res.status(500).json({ message: "連結失敗" });
+    }
+  });
+
   app.post('/api/coach-portal/register', async (req, res) => {
     try {
       const { lineToken, name, phone, email } = req.body;

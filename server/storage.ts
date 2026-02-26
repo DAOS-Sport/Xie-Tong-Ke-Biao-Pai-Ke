@@ -67,6 +67,7 @@ export interface IStorage {
   getCoachUserById(id: string): Promise<CoachUser | undefined>;
   createCoachUser(data: InsertCoachUserType): Promise<CoachUser>;
   updateCoachUserStatus(id: string, status: string): Promise<CoachUser>;
+  updateCoachUserLineId(id: string, lineId: string): Promise<CoachUser | undefined>;
   getAllCoachUsers(): Promise<CoachUser[]>;
   getPendingCoachUsers(): Promise<CoachUser[]>;
   getApprovedCoachUsers(): Promise<CoachUser[]>;
@@ -659,6 +660,15 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(coachUsers)
       .set({ status, updatedAt: new Date() })
+      .where(eq(coachUsers.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateCoachUserLineId(id: string, lineId: string): Promise<CoachUser | undefined> {
+    const [user] = await db
+      .update(coachUsers)
+      .set({ lineId, updatedAt: new Date() })
       .where(eq(coachUsers.id, id))
       .returning();
     return user;
