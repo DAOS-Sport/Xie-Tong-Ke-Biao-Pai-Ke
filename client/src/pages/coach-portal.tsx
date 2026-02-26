@@ -197,6 +197,8 @@ function LineLinkNameForm({
     },
   });
 
+  const lineNameMatchesCoach = coaches.some(c => c.name === tokenInfo?.lineName);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -214,27 +216,49 @@ function LineLinkNameForm({
           )}
           <CardTitle className="text-xl">請選擇您的姓名</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            LINE 登入成功！請從下方名單中選擇您的姓名
+            LINE 登入成功！請從下方名單中選擇您的真實姓名
           </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="bg-green-50 rounded-lg p-3 text-center text-sm text-green-700">
               <i className="fab fa-line mr-1"></i>
-              已連結 LINE 帳號：{tokenInfo?.lineName || "載入中..."}
+              您的 LINE 名稱：<strong>{tokenInfo?.lineName || "載入中..."}</strong>
             </div>
+
+            {tokenInfo && !lineNameMatchesCoach && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg leading-none mt-0.5">⚠️</span>
+                  <div>
+                    <p className="font-bold">請使用本人真實姓名（非 LINE 暱稱）</p>
+                    <p className="mt-1">您的 LINE 名稱「<strong>{tokenInfo.lineName}</strong>」不在教練名單中。</p>
+                    <p className="mt-1 text-red-700 font-medium">請輸入您戶籍上的全名，否則將無法領取薪資。</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
-              <Label>搜尋姓名</Label>
+              <Label>搜尋姓名 <span className="text-red-500 text-xs">（請使用本人姓名）</span></Label>
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="輸入姓名搜尋..."
+                placeholder="請輸入您的真實姓名搜尋..."
                 className="mt-1"
               />
             </div>
             <div className="border rounded-lg max-h-60 overflow-y-auto">
               {filtered.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-6">找不到符合的名字</p>
+                <div className="text-center py-6 px-4 space-y-2">
+                  <p className="text-sm text-gray-500">找不到符合的名字</p>
+                  {search.trim() !== "" && (
+                    <div className="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700 text-left">
+                      <p className="font-bold">⚠️ 找不到「{search}」</p>
+                      <p className="mt-1">請確認您輸入的是戶籍姓名（非 LINE 暱稱）。若確認無誤，請聯繫管理員。</p>
+                    </div>
+                  )}
+                </div>
               ) : (
                 filtered.map(coach => (
                   <button
