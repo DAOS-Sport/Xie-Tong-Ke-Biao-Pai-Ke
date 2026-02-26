@@ -186,7 +186,10 @@ export default function SchoolView() {
                   <tr>
                     <th
                       className="border border-gray-200 p-2 w-20 sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] text-sm"
-                      style={{ backgroundColor: venueColor, color: 'white' }}
+                      style={{
+                        backgroundColor: `color-mix(in srgb, ${venueColor} 20%, white)`,
+                        color: `color-mix(in srgb, ${venueColor} 80%, black)`,
+                      }}
                     >
                       <div className="font-bold text-sm leading-tight mb-0.5">{venue.name}</div>
                       <div className="text-xs opacity-80">節次</div>
@@ -220,7 +223,10 @@ export default function SchoolView() {
                     <tr key={timeSlot.id}>
                       <td
                         className="border border-gray-200 p-2 text-center sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
-                        style={{ backgroundColor: venueColor, color: 'white' }}
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${venueColor} 20%, white)`,
+                          color: `color-mix(in srgb, ${venueColor} 80%, black)`,
+                        }}
                       >
                         <div className="font-medium text-base">{timeSlot.period}</div>
                         <div className="text-xs opacity-80">
