@@ -9,7 +9,7 @@ const VENUE_COLORS = ["blue", "green", "purple", "yellow", "orange", "teal", "re
 let lastSyncTime: string | null = null;
 let lastSyncResult: {
   venues: { added: string[]; updated: string[]; total: number };
-  coaches: { added: number; total: number };
+  coaches: { added: number; total: number; lineIdsSynced: number };
 } | null = null;
 let isSyncing = false;
 
@@ -115,45 +115,64 @@ function isCoachRole(record: RagicRecord): boolean {
   return false;
 }
 
-async function syncCoaches(): Promise<{ added: number; total: number }> {
+function extractLineId(record: RagicRecord): string | null {
+  const lineKey = Object.keys(record).find(k => k.startsWith("400Line"));
+  const lineUrl = lineKey ? (record[lineKey] as string) : "";
+  if (!lineUrl) return null;
+  const match = lineUrl.match(/\/chat\/(U[a-f0-9]+)/);
+  return match ? match[1] : null;
+}
+
+async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSynced: number }> {
   const allRecords = await fetchRagicRecords(RAGIC_COACH_API_URL, 500);
   const EXCLUDED_NAMES = ["(測試帳號)教練"];
   const activeCoaches = allRecords.filter(r => r["姓名"] && r["在職狀態"] === "在職" && isCoachRole(r) && !EXCLUDED_NAMES.includes(r["姓名"] as string));
 
   const existingCoaches = await storage.getAllCoachUsers();
-  const existingNames = new Set(existingCoaches.map(c => c.name));
+  const existingByName = new Map(existingCoaches.map(c => [c.name, c]));
 
   let added = 0;
+  let lineIdsSynced = 0;
 
   for (const coach of activeCoaches) {
     const name = coach["姓名"] as string;
-
-    if (existingNames.has(name)) {
-      continue;
-    }
-
     const phone = (coach["手機"] as string) || null;
     const email = (coach["E-mail"] as string) || null;
+    const ragicLineId = extractLineId(coach);
 
-    await storage.createCoachUser({
-      name,
-      phone,
-      email,
-      status: "approved",
-      role: "coach",
-      lineId: null,
-      linkedCoachName: name,
-    });
+    const existing = existingByName.get(name);
 
-    existingNames.add(name);
-    added++;
+    if (!existing) {
+      await storage.createCoachUser({
+        name,
+        phone,
+        email,
+        status: "approved",
+        role: "coach",
+        lineId: ragicLineId || null,
+        linkedCoachName: name,
+      });
+      existingByName.set(name, { name, lineId: ragicLineId } as any);
+      added++;
+      if (ragicLineId) {
+        lineIdsSynced++;
+        console.log(`[Ragic] Added coach "${name}" with LINE ID`);
+      }
+    } else if (ragicLineId && (!existing.lineId || existing.lineId.startsWith("line_"))) {
+      await storage.updateCoachUserLineId(existing.id, ragicLineId);
+      lineIdsSynced++;
+      console.log(`[Ragic] Synced LINE ID for coach "${name}" (was: ${existing.lineId || "empty"})`);
+    }
   }
 
   if (added > 0) {
-    console.log(`Ragic sync: added ${added} coaches`);
+    console.log(`[Ragic] Added ${added} new coaches`);
+  }
+  if (lineIdsSynced > 0) {
+    console.log(`[Ragic] Synced ${lineIdsSynced} LINE IDs total`);
   }
 
-  return { added, total: activeCoaches.length };
+  return { added, total: activeCoaches.length, lineIdsSynced };
 }
 
 export async function syncRagicAll(): Promise<typeof lastSyncResult> {
@@ -175,7 +194,7 @@ export async function syncRagicAll(): Promise<typeof lastSyncResult> {
     lastSyncTime = new Date().toISOString();
     lastSyncResult = result;
 
-    console.log(`Ragic sync completed: ${venueResult.total} departments (${venueResult.added.length} new), ${coachResult.total} active coaches (${coachResult.added} new)`);
+    console.log(`Ragic sync completed: ${venueResult.total} departments (${venueResult.added.length} new), ${coachResult.total} active coaches (${coachResult.added} new, ${coachResult.lineIdsSynced} LINE IDs synced)`);
     return result;
   } catch (error) {
     console.error("Ragic sync error:", error);

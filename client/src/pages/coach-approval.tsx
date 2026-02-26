@@ -345,7 +345,7 @@ function RagicSyncSection() {
     lastSyncTime: string | null;
     lastSyncResult: {
       venues: { added: string[]; updated: string[]; total: number };
-      coaches: { added: number; total: number };
+      coaches: { added: number; total: number; lineIdsSynced: number };
     } | null;
     isSyncing: boolean;
   }>({
@@ -418,6 +418,11 @@ function RagicSyncSection() {
                 {sr.coaches.added > 0 && (
                   <Badge variant="secondary" className="text-xs">
                     新增 {sr.coaches.added} 教練
+                  </Badge>
+                )}
+                {sr.coaches.lineIdsSynced > 0 && (
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                    同步 {sr.coaches.lineIdsSynced} 筆 LINE ID
                   </Badge>
                 )}
               </div>
