@@ -188,7 +188,8 @@ export default function SchoolView() {
                       className="border border-gray-200 p-2 w-20 sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] text-sm"
                       style={{ backgroundColor: venueColor, color: 'white' }}
                     >
-                      節次
+                      <div className="font-bold text-xs leading-tight mb-0.5">{venue.name}</div>
+                      <div className="text-[11px] opacity-80">節次</div>
                     </th>
                     {getExtendedWeekDays(currentWeek).map((date, index) => {
                       const weekDayNames = getExtendedWeekdayNames(currentWeek);
