@@ -3,6 +3,7 @@ import { storage } from "./storage";
 
 const RAGIC_DEPT_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/7";
 const RAGIC_COACH_API_URL = "https://ap7.ragic.com/xinsheng/general-information/23";
+const RAGIC_EMPLOYEE_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/20004";
 
 const VENUE_COLORS = ["blue", "green", "purple", "yellow", "orange", "teal", "red", "pink"];
 
@@ -115,16 +116,26 @@ function isCoachRole(record: RagicRecord): boolean {
   return false;
 }
 
-function extractLineId(record: RagicRecord): string | null {
-  const lineKey = Object.keys(record).find(k => k.startsWith("400Line"));
-  const lineUrl = lineKey ? (record[lineKey] as string) : "";
-  if (!lineUrl) return null;
-  const match = lineUrl.match(/\/chat\/(U[a-f0-9]+)/);
-  return match ? match[1] : null;
+async function fetchPersonalLineIds(): Promise<Map<string, string>> {
+  const records = await fetchRagicRecords(RAGIC_EMPLOYEE_API_URL, 500);
+  const lineIdMap = new Map<string, string>();
+  for (const r of records) {
+    const name = r["姓名"] as string;
+    const personalLineId = r["個人LINE ID"] as string;
+    if (name && personalLineId && personalLineId.startsWith("U")) {
+      lineIdMap.set(name, personalLineId);
+    }
+  }
+  console.log(`[Ragic] Fetched ${lineIdMap.size} personal LINE IDs from employee form`);
+  return lineIdMap;
 }
 
 async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSynced: number }> {
-  const allRecords = await fetchRagicRecords(RAGIC_COACH_API_URL, 500);
+  const [allRecords, personalLineIds] = await Promise.all([
+    fetchRagicRecords(RAGIC_COACH_API_URL, 500),
+    fetchPersonalLineIds(),
+  ]);
+
   const EXCLUDED_NAMES = ["(測試帳號)教練"];
   const activeCoaches = allRecords.filter(r => r["姓名"] && r["在職狀態"] === "在職" && isCoachRole(r) && !EXCLUDED_NAMES.includes(r["姓名"] as string));
 
@@ -138,7 +149,7 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
     const name = coach["姓名"] as string;
     const phone = (coach["手機"] as string) || null;
     const email = (coach["E-mail"] as string) || null;
-    const ragicLineId = extractLineId(coach);
+    const personalLineId = personalLineIds.get(name) || null;
 
     const existing = existingByName.get(name);
 
@@ -149,19 +160,19 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
         email,
         status: "approved",
         role: "coach",
-        lineId: ragicLineId || null,
+        lineId: personalLineId,
         linkedCoachName: name,
       });
-      existingByName.set(name, { name, lineId: ragicLineId } as any);
+      existingByName.set(name, { name, lineId: personalLineId } as any);
       added++;
-      if (ragicLineId) {
+      if (personalLineId) {
         lineIdsSynced++;
-        console.log(`[Ragic] Added coach "${name}" with LINE ID`);
+        console.log(`[Ragic] Added coach "${name}" with personal LINE ID`);
       }
-    } else if (ragicLineId && (!existing.lineId || existing.lineId.startsWith("line_"))) {
-      await storage.updateCoachUserLineId(existing.id, ragicLineId);
+    } else if (personalLineId && existing.lineId !== personalLineId) {
+      await storage.updateCoachUserLineId(existing.id, personalLineId);
       lineIdsSynced++;
-      console.log(`[Ragic] Synced LINE ID for coach "${name}" (was: ${existing.lineId || "empty"})`);
+      console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
     }
   }
 
