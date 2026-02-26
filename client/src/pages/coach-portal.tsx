@@ -123,6 +123,16 @@ export default function CoachPortal() {
     );
   }
 
+  if (new URLSearchParams(window.location.search).get("demo") === "warning") {
+    return (
+      <LineLinkNameForm
+        lineToken="__demo__"
+        demoMode={{ lineName: "少文", linePicture: "" }}
+        onSuccess={() => {}}
+      />
+    );
+  }
+
   if (!coachUser || !sessionId) {
     return <CoachSelectScreen onSuccess={(user) => {
       setCoachUser(user);
@@ -144,15 +154,17 @@ export default function CoachPortal() {
 function LineLinkNameForm({
   lineToken,
   onSuccess,
+  demoMode,
 }: {
   lineToken: string;
   onSuccess: (user: CoachUser) => void;
+  demoMode?: { lineName: string; linePicture: string };
 }) {
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
 
-  const { data: tokenInfo } = useQuery<{ lineName: string; linePicture: string }>({
+  const { data: tokenInfoRaw } = useQuery<{ lineName: string; linePicture: string }>({
     queryKey: ["/api/auth/line/token-info", lineToken],
     queryFn: async () => {
       const res = await fetch(`/api/auth/line/token-info/${lineToken}`);
@@ -160,7 +172,10 @@ function LineLinkNameForm({
       return res.json();
     },
     retry: false,
+    enabled: !demoMode,
   });
+
+  const tokenInfo = demoMode ?? tokenInfoRaw;
 
   const { data: coaches = [] } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["/api/coach-portal/linkable-coaches"],
