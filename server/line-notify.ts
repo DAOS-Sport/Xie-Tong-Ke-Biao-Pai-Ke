@@ -125,6 +125,8 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
         }
       }
 
+      message += `\n---\n請教練務必於課前準時抵達場館，主動向授課老師致意，並請確實熟悉「教練守則」。\n\n自本學期起，協同課程費用修正如下：\n• 單節課 250元\n• 兩節課合併 500元`;
+
       const success = await sendLinePushMessage(lineId, message);
       if (success) {
         sentCount++;
