@@ -1191,6 +1191,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 更新教練姓名（管理員）
+  app.put('/api/admin/coach-users/:id/name', requireAdminPassword, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: "姓名不得為空" });
+      }
+      const user = await storage.updateCoachUserName(id, name.trim());
+      if (!user) return res.status(404).json({ message: "找不到教練" });
+      res.json(user);
+    } catch (error) {
+      console.error('Error updating coach user name:', error);
+      res.status(500).json({ message: "更新姓名失敗" });
+    }
+  });
+
   // 取得已通過審核的教練列表（公開，供前台選擇）
   app.get('/api/coach-portal/approved-coaches', async (req, res) => {
     try {

@@ -96,6 +96,8 @@ function CoachApprovalContent() {
 
 function CoachUsersSection() {
   const [filter, setFilter] = useState<string>("all");
+  const [editingUser, setEditingUser] = useState<{ id: string; name: string } | null>(null);
+  const [editName, setEditName] = useState("");
 
   const { data: coachUsers = [], isLoading } = useQuery<CoachUser[]>({
     queryKey: ["/api/admin/coach-users", filter],
@@ -133,6 +135,22 @@ function CoachUsersSection() {
     },
   });
 
+  const editNameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await fetch(`/api/admin/coach-users/${id}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("更新失敗");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
+      setEditingUser(null);
+    },
+  });
+
   const statusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -153,6 +171,7 @@ function CoachUsersSection() {
   const pendingCount = coachUsers.filter((u) => u.status === "pending").length;
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
@@ -220,7 +239,15 @@ function CoachUsersSection() {
                         : "-"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+                          onClick={() => { setEditingUser({ id: user.id, name: user.name }); setEditName(user.name); }}
+                        >
+                          ✏️ 改名
+                        </Button>
                         {user.status !== "approved" && (
                           <Button
                             size="sm"
@@ -259,6 +286,39 @@ function CoachUsersSection() {
         )}
       </CardContent>
     </Card>
+
+    {editingUser && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+          <h3 className="font-bold text-lg">修改教練姓名</h3>
+          <p className="text-sm text-gray-500">原本姓名：<strong>{editingUser.name}</strong></p>
+          <div>
+            <label className="text-sm font-medium">新姓名</label>
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="請輸入正確的戶籍姓名"
+              className="mt-1"
+              onKeyDown={(e) => { if (e.key === "Enter" && editName.trim()) editNameMutation.mutate({ id: editingUser.id, name: editName }); }}
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setEditingUser(null)} disabled={editNameMutation.isPending}>
+              取消
+            </Button>
+            <Button
+              className="flex-1 bg-blue-500 hover:bg-blue-600"
+              onClick={() => editNameMutation.mutate({ id: editingUser.id, name: editName })}
+              disabled={!editName.trim() || editNameMutation.isPending}
+            >
+              {editNameMutation.isPending ? "儲存中..." : "確認儲存"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
