@@ -295,7 +295,7 @@ export default function VenueSchedule() {
                                     </div>
                                     {schedule.coachName && (
                                       <div className="text-blue-600">
-                                        {schedule.coachName}
+                                        {schedule.coachName}{schedule.coachName2 && ` / ${schedule.coachName2}`}
                                       </div>
                                     )}
                                     {schedule.notes && (
