@@ -153,4 +153,89 @@ export function setupWeeklyNotificationCron(): void {
   console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 20:00 Asia/Taipei)');
 }
 
-export { sendWeeklyScheduleNotifications };
+async function sendDailyTomorrowNotifications(): Promise<void> {
+  console.log('[LINE Notify] Starting daily tomorrow notifications...');
+
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) {
+    console.log('[LINE Notify] LINE_CHANNEL_ACCESS_TOKEN not configured, skipping');
+    return;
+  }
+
+  try {
+    const now = new Date();
+    const tomorrowDate = addDays(now, 1);
+    const tomorrowStr = format(tomorrowDate, 'yyyy-MM-dd');
+    const tomorrowDisplay = format(tomorrowDate, 'M/d', { locale: zhTW });
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    const tomorrowDayName = dayNames[tomorrowDate.getDay()];
+
+    const tomorrowSchedules = await storage.getSchedulesByDateRange(tomorrowStr, tomorrowStr);
+
+    if (tomorrowSchedules.length === 0) {
+      console.log(`[LINE Notify] No schedules for tomorrow (${tomorrowStr}), skipping`);
+      return;
+    }
+
+    const approvedCoaches = await storage.getApprovedCoachUsers();
+    const coachMap = new Map(
+      approvedCoaches
+        .filter(c => c.lineId && c.linkedCoachName)
+        .map(c => [c.linkedCoachName!, c])
+    );
+
+    let sentCount = 0;
+    let failCount = 0;
+
+    for (const [coachName, coach] of coachMap) {
+      const mySchedules = tomorrowSchedules.filter(
+        s => s.coachName === coachName || s.coachName2 === coachName
+      );
+
+      if (mySchedules.length === 0) continue;
+
+      const sorted = [...mySchedules].sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
+
+      let message = `📋 明日課程提醒\n`;
+      message += `${tomorrowDisplay}(${tomorrowDayName})\n\n`;
+      message += `${coachName} 教練，您好！\n`;
+      message += `明天共有 ${sorted.length} 堂課：\n`;
+
+      for (const s of sorted) {
+        message += `\n🏊 ${s.venue.name}\n`;
+        message += `⏰ ${s.timeSlot.startTime}-${s.timeSlot.endTime}`;
+        if (s.className) {
+          message += ` - ${s.className}`;
+        }
+        message += `\n`;
+      }
+
+      message += `\n請教練務必準時抵達場館！`;
+
+      const success = await sendLinePushMessage(coach.lineId!, message);
+      if (success) {
+        sentCount++;
+        console.log(`[LINE Notify] Daily: sent to ${coachName}`);
+      } else {
+        failCount++;
+      }
+    }
+
+    console.log(`[LINE Notify] Daily done. Sent: ${sentCount}, Failed: ${failCount}, Date: ${tomorrowStr}`);
+  } catch (error) {
+    console.error('[LINE Notify] Error sending daily notifications:', error);
+  }
+}
+
+export function setupDailyNotificationCron(): void {
+  cron.schedule('0 19 * * *', () => {
+    console.log('[LINE Notify] Cron triggered: daily 19:00');
+    sendDailyTomorrowNotifications();
+  }, {
+    timezone: 'Asia/Taipei',
+  });
+
+  console.log('[LINE Notify] Daily notify cron scheduled (19:00 Asia/Taipei)');
+}
+
+export { sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications };

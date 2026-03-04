@@ -7,7 +7,7 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
-import { setupWeeklyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
+import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1461,6 +1461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   setupWeeklyNotificationCron();
+  setupDailyNotificationCron();
 
   app.get('/api/admin/ragic-status', async (req, res) => {
     const password = req.headers['x-admin-password'] || req.query?.password;
