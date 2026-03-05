@@ -1,0 +1,256 @@
+你想要的是把這個系統後台中「重新綁定 LINE 帳號」功能的完整代碼和說明整理出來，方便你在另一個 Replit 專案複製使用，對嗎？
+
+這不需要修改任何程式碼，我直接幫你整理出來。
+
+後台 LINE 帳號重新綁定功能 — 完整代碼與說明
+功能說明
+管理員在後台編輯訂單時，可以：
+
+查看目前訂單綁定的 LINE 帳號（顯示頭像、名稱）
+搜尋系統中所有曾登入過的 LINE 使用者
+重新綁定到另一個 LINE 帳號
+解除綁定移除 LINE 綁定
+需要的環境建置
+① 資料庫：line_users 資料表 + orders 表的 lineUserId 欄位
+// shared/schema.ts
+// LINE 使用者表（記錄所有曾登入過的 LINE 帳號）
+export const lineUsers = pgTable("line_users", {
+  id: serial("id").primaryKey(),
+  lineUserId: text("line_user_id").notNull().unique(),  // LINE 的唯一 ID
+  displayName: text("display_name").default(""),         // LINE 顯示名稱
+  pictureUrl: text("picture_url").default(""),           // LINE 頭像網址
+  venueKey: text("venue_key").default(""),               // 從哪個場館登入的
+  linkedAt: text("linked_at").notNull(),                 // 登入時間
+});
+export const insertLineUserSchema = createInsertSchema(lineUsers).omit({ id: true });
+export type InsertLineUser = z.infer<typeof insertLineUserSchema>;
+export type LineUser = typeof lineUsers.$inferSelect;
+// 訂單表需要有這個欄位：
+// orders 表中加入：
+lineUserId: text("line_user_id").default(""),  // 綁定的 LINE 帳號 ID
+② 後端 Storage 方法
+// server/storage.ts
+// --- 介面定義 ---
+interface IStorage {
+  getLineUser(lineUserId: string): Promise<LineUser | undefined>;
+  getAllLineUsers(): Promise<LineUser[]>;
+  upsertLineUser(data: InsertLineUser): Promise<LineUser>;
+  updateOrder(id: number, data: Partial<Order>): Promise<Order>;
+}
+// --- 實作 ---
+// 查詢單一 LINE 使用者
+async getLineUser(lineUserId: string) {
+  const [user] = await db
+    .select()
+    .from(lineUsers)
+    .where(eq(lineUsers.lineUserId, lineUserId));
+  return user;
+}
+// 取得所有 LINE 使用者列表（給後台搜尋用）
+async getAllLineUsers() {
+  return db.select().from(lineUsers);
+}
+// 新增或更新 LINE 使用者（使用者每次 LINE 登入時呼叫）
+async upsertLineUser(data: InsertLineUser) {
+  const existing = await this.getLineUser(data.lineUserId);
+  if (existing) {
+    // 已存在 → 更新資料
+    const [updated] = await db
+      .update(lineUsers)
+      .set({
+        displayName: data.displayName,
+        pictureUrl: data.pictureUrl,
+        venueKey: data.venueKey
+      })
+      .where(eq(lineUsers.lineUserId, data.lineUserId))
+      .returning();
+    return updated;
+  }
+  // 不存在 → 新增
+  const [created] = await db
+    .insert(lineUsers)
+    .values(data)
+    .returning();
+  return created;
+}
+③ 後端 API 路由
+// server/routes.ts
+// 取得所有 LINE 使用者列表（需管理員權限）
+app.get("/api/line-users", requireAdmin, async (_req, res) => {
+  try {
+    const users = await storage.getAllLineUsers();
+    res.json(users);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+// 更新訂單（包含 lineUserId 重新綁定，需管理員權限）
+app.patch("/api/orders/:id", requireAdmin, async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const updateData = z.object({
+      // ...你的其他訂單欄位...
+      lineUserId: z.string().optional(),  // ← 重新綁定的關鍵欄位
+    }).parse(req.body);
+    const updated = await storage.updateOrder(orderId, updateData);
+    res.json(updated);
+  } catch (e: any) {
+    res.status(400).json({ message: e.message });
+  }
+});
+④ 前端：後台訂單編輯中的 LINE 綁定 UI（完整代碼）
+// 在你的後台管理頁面（例如 admin.tsx）中
+// === 1. Import 需要的元件 ===
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Link2, Unlink, UserCircle } from "lucide-react";
+import type { LineUser } from "@shared/schema";
+// === 2. 在訂單管理元件中，加入以下 state 和查詢 ===
+// 查詢所有 LINE 使用者
+const { data: lineUsers = [] } = useQuery<LineUser[]>({
+  queryKey: ["/api/line-users"]
+});
+// 狀態管理
+const [editLineUserId, setEditLineUserId] = useState("");    // 目前選中的 LINE 帳號
+const [lineUserSearch, setLineUserSearch] = useState("");     // 搜尋關鍵字
+// === 3. 開啟編輯訂單時，載入目前的 LINE 綁定 ===
+const openEditOrder = (order: OrderWithItems) => {
+  setEditLineUserId(order.lineUserId || "");
+  setLineUserSearch("");
+  // ... 其他欄位的 setState ...
+};
+// === 4. 儲存訂單時，帶入 lineUserId ===
+const handleSaveEdit = async () => {
+  const data: Record<string, any> = {
+    // ... 其他欄位 ...
+    lineUserId: editLineUserId,  // ← 把新的綁定存進去
+  };
+  await apiRequest("PATCH", `/api/orders/${editOrder.id}`, data);
+  // 記得 invalidate 快取
+  queryClient.invalidateQueries({ queryKey: ["/api/inquiry/orders"] });
+};
+// === 5. UI 區塊（放在訂單編輯 Dialog 中） ===
+{/* ====== LINE 帳號綁定區塊 ====== */}
+<div className="space-y-2">
+  {/* 標題 */}
+  <Label className="font-medium text-sm flex items-center gap-1">
+    <Link2 className="w-4 h-4" />LINE 帳號綁定
+  </Label>
+  {/* 目前綁定狀態 */}
+  {editLineUserId ? (
+    <div className="flex items-center gap-3 p-3 rounded-lg border bg-green-50">
+      {(() => {
+        const lu = lineUsers.find(u => u.lineUserId === editLineUserId);
+        return lu ? (
+          <>
+            {/* 頭像 */}
+            {lu.pictureUrl ? (
+              <img src={lu.pictureUrl} className="w-8 h-8 rounded-full" />
+            ) : (
+              <UserCircle className="w-8 h-8 text-muted-foreground" />
+            )}
+            {/* 名稱和 ID */}
+            <div className="flex-1">
+              <p className="text-sm font-medium">{lu.displayName}</p>
+              <p className="text-[10px] text-muted-foreground">{lu.lineUserId}</p>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm flex-1">
+            已綁定（ID: {editLineUserId.slice(0, 12)}...）
+          </p>
+        );
+      })()}
+      {/* 解除綁定按鈕 */}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive"
+        onClick={() => setEditLineUserId("")}
+      >
+        <Unlink className="w-3 h-3 mr-1" />解除
+      </Button>
+    </div>
+  ) : (
+    <div className="p-3 rounded-lg border bg-muted/30 text-center">
+      <p className="text-xs text-muted-foreground">尚未綁定 LINE 帳號</p>
+    </div>
+  )}
+  {/* 搜尋框 */}
+  <Input
+    placeholder="搜尋 LINE 使用者名稱或場館..."
+    value={lineUserSearch}
+    onChange={(e) => setLineUserSearch(e.target.value)}
+    className="h-8 text-xs"
+  />
+  {/* 搜尋結果列表 */}
+  <ScrollArea className="max-h-36 rounded-md border">
+    {/* 「不綁定」選項 */}
+    <div
+      className="px-3 py-1.5 text-xs cursor-pointer hover:bg-muted/50"
+      onClick={() => { setEditLineUserId(""); setLineUserSearch(""); }}
+    >
+      不綁定
+    </div>
+    {/* 篩選後的使用者列表 */}
+    {lineUsers
+      .filter(lu =>
+        !lineUserSearch ||
+        lu.displayName?.toLowerCase().includes(lineUserSearch.toLowerCase()) ||
+        lu.venueKey?.toLowerCase().includes(lineUserSearch.toLowerCase())
+      )
+      .map(lu => (
+        <div
+          key={lu.lineUserId}
+          className={`flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-muted/50 
+            ${editLineUserId === lu.lineUserId
+              ? "bg-primary/10 font-medium"  // 目前選中的高亮
+              : ""
+            }`}
+          onClick={() => {
+            setEditLineUserId(lu.lineUserId);
+            setLineUserSearch("");
+          }}
+        >
+          {/* 小頭像 */}
+          {lu.pictureUrl ? (
+            <img src={lu.pictureUrl} className="w-5 h-5 rounded-full" />
+          ) : (
+            <UserCircle className="w-5 h-5 text-muted-foreground" />
+          )}
+          {/* 名稱 */}
+          <span>{lu.displayName}</span>
+          {/* 場館標籤 */}
+          <Badge variant="outline" className="text-[9px]">
+            {lu.venueKey}
+          </Badge>
+        </div>
+      ))
+    }
+  </ScrollArea>
+</div>
+完整運作流程
+前提：客人用新 LINE 帳號在系統上登入過一次
+       → 系統自動存入 line_users 表
+管理員操作：
+  1. 進入後台 → 訂單查詢
+  2. 找到需要重新綁定的訂單 → 點編輯
+  3. 在「LINE 帳號綁定」區塊：
+     - 看到目前綁定的 LINE 帳號（頭像+名稱）
+     - 在搜尋框輸入客人的新 LINE 名稱
+     - 從列表中點選正確的帳號
+  4. 點「儲存變更」
+結果：
+  - 訂單的 lineUserId 更新為新帳號
+  - 之後的 LINE 推播通知會發到新帳號
+  - 客人用新帳號登入「我的訂單」可以看到這筆訂單
+涉及的檔案清單
+檔案	修改內容
+shared/schema.ts	新增 lineUsers 資料表定義
+server/storage.ts	新增 getLineUser、getAllLineUsers、upsertLineUser 方法
+server/routes.ts	新增 GET /api/line-users，PATCH /api/orders/:id 加入 lineUserId
+client/src/pages/admin.tsx	新增 LINE 綁定 UI 區塊（搜尋框 + 列表 + 綁定/解除）
+你可以把以上內容直接貼給另一個 Replit 專案的 Agent，讓它照著建制就好了。記得要先確保 LINE OAuth 登入功能已經完成，這樣 line_users 表裡才會有使用者資料可以搜尋。
