@@ -176,10 +176,11 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
     }
 
     const approvedCoaches = await storage.getApprovedCoachUsers();
+    const withLine = approvedCoaches.filter(c => c.lineId && c.linkedCoachName);
+    console.log(`[LINE Notify] Approved coaches total: ${approvedCoaches.length}, with LINE ID: ${withLine.length}`);
+    console.log(`[LINE Notify] Tomorrow schedules: ${tomorrowSchedules.length} classes, coaches: ${[...new Set(tomorrowSchedules.flatMap(s => [s.coachName, s.coachName2]).filter(Boolean))].join(', ')}`);
     const coachMap = new Map(
-      approvedCoaches
-        .filter(c => c.lineId && c.linkedCoachName)
-        .map(c => [c.linkedCoachName!, c])
+      withLine.map(c => [c.linkedCoachName!, c])
     );
 
     let sentCount = 0;
