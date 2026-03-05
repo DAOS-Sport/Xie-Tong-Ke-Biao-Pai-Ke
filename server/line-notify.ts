@@ -178,10 +178,13 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
     const approvedCoaches = await storage.getApprovedCoachUsers();
     const withLine = approvedCoaches.filter(c => c.lineId && c.linkedCoachName);
     console.log(`[LINE Notify] Approved coaches total: ${approvedCoaches.length}, with LINE ID: ${withLine.length}`);
-    console.log(`[LINE Notify] Tomorrow schedules: ${tomorrowSchedules.length} classes, coaches: ${[...new Set(tomorrowSchedules.flatMap(s => [s.coachName, s.coachName2]).filter(Boolean))].join(', ')}`);
-    const coachMap = new Map(
-      withLine.map(c => [c.linkedCoachName!, c])
-    );
+    const tomorrowCoaches = [...new Set(tomorrowSchedules.flatMap(s => [s.coachName, s.coachName2]).filter(Boolean))];
+    console.log(`[LINE Notify] Tomorrow schedules: ${tomorrowSchedules.length} classes, coaches: ${tomorrowCoaches.join(', ')}`);
+    const coachMap = new Map(withLine.map(c => [c.linkedCoachName!, c]));
+    console.log(`[LINE Notify] LINE-bound coach names: ${[...coachMap.keys()].join(', ')}`);
+    const matched = tomorrowCoaches.filter(n => coachMap.has(n!));
+    const unmatched = tomorrowCoaches.filter(n => !coachMap.has(n!));
+    console.log(`[LINE Notify] Matched: ${matched.join(', ') || '(無)'}, Unmatched: ${unmatched.join(', ') || '(無)'}`);
 
     let sentCount = 0;
     let failCount = 0;
