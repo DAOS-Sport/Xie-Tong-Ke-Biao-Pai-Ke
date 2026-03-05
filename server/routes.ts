@@ -7,7 +7,7 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
-import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications } from "./line-notify";
+import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1482,6 +1482,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Manual Ragic sync error:", error);
       res.status(500).json({ message: "同步失敗", error: String(error) });
+    }
+  });
+
+  app.post('/api/admin/notify-daily', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.body?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      await sendDailyTomorrowNotifications();
+      res.json({ success: true, message: "每日推播已觸發" });
+    } catch (error) {
+      console.error("Manual daily notify error:", error);
+      res.status(500).json({ message: "推播失敗", error: String(error) });
     }
   });
 
