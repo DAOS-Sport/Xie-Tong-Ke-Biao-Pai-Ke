@@ -99,6 +99,8 @@ function CoachUsersSection() {
   const [search, setSearch] = useState("");
   const [editingUser, setEditingUser] = useState<{ id: string; name: string } | null>(null);
   const [editName, setEditName] = useState("");
+  const [editingLineCoachId, setEditingLineCoachId] = useState<string | null>(null);
+  const [lineIdInput, setLineIdInput] = useState("");
 
   const { data: coachUsers = [], isLoading } = useQuery<CoachUser[]>({
     queryKey: ["/api/admin/coach-users", filter],
@@ -149,6 +151,41 @@ function CoachUsersSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
       setEditingUser(null);
+    },
+  });
+
+  const setLineIdMutation = useMutation({
+    mutationFn: async ({ coachUserId, lineId }: { coachUserId: string; lineId: string }) => {
+      const res = await fetch(`/api/admin/set-coach-line-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ coachUserId, lineId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "綁定失敗");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
+      setEditingLineCoachId(null);
+      setLineIdInput("");
+    },
+    onError: (err: Error) => {
+      alert(err.message);
+    },
+  });
+
+  const clearLineIdMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/clear-coach-line-id/${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) throw new Error("清除失敗");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
     },
   });
 
@@ -236,14 +273,73 @@ function CoachUsersSection() {
                     <TableCell>{user.phone || "-"}</TableCell>
                     <TableCell>{user.email || "-"}</TableCell>
                     <TableCell>
-                      {user.lineId ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
-                          ✅ 已綁定
-                        </span>
+                      {editingLineCoachId === user.id ? (
+                        <div className="flex flex-col gap-1 min-w-[180px]">
+                          <Input
+                            value={lineIdInput}
+                            onChange={e => setLineIdInput(e.target.value)}
+                            placeholder="貼上 LINE ID（U...）"
+                            className="h-7 text-xs font-mono"
+                            autoFocus
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              className="h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
+                              disabled={!lineIdInput.trim() || setLineIdMutation.isPending}
+                              onClick={() => setLineIdMutation.mutate({ coachUserId: user.id, lineId: lineIdInput.trim() })}
+                            >
+                              確認
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs px-2"
+                              onClick={() => { setEditingLineCoachId(null); setLineIdInput(""); }}
+                            >
+                              取消
+                            </Button>
+                          </div>
+                        </div>
+                      ) : user.lineId ? (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
+                            ✅ 已綁定
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 w-5 p-0 text-gray-400 hover:text-blue-600"
+                            title="修改 LINE ID"
+                            onClick={() => { setEditingLineCoachId(user.id); setLineIdInput(user.lineId || ""); }}
+                          >
+                            ✏️
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 w-5 p-0 text-gray-400 hover:text-red-600"
+                            title="清除綁定"
+                            disabled={clearLineIdMutation.isPending}
+                            onClick={() => { if (confirm(`確定清除「${user.name}」的 LINE 綁定？`)) clearLineIdMutation.mutate(user.id); }}
+                          >
+                            🗑️
+                          </Button>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-2 py-0.5">
-                          未綁定
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-2 py-0.5">
+                            未綁定
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 text-xs px-1 text-blue-600 hover:text-blue-800"
+                            onClick={() => { setEditingLineCoachId(user.id); setLineIdInput(""); }}
+                          >
+                            + 綁定
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>

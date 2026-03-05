@@ -1485,6 +1485,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/set-coach-line-id', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.body?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const { coachUserId, lineId } = req.body;
+    if (!coachUserId || !lineId) {
+      return res.status(400).json({ message: "缺少 coachUserId 或 lineId" });
+    }
+    const existing = await storage.getCoachUserByLineId(lineId);
+    if (existing && existing.id !== coachUserId) {
+      return res.status(409).json({ message: `此 LINE ID 已綁定給「${existing.name}」，請先清除再綁定` });
+    }
+    const updated = await storage.updateCoachUserLineId(coachUserId, lineId);
+    res.json(updated);
+  });
+
+  app.delete('/api/admin/clear-coach-line-id/:id', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.query?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const updated = await storage.clearCoachUserLineId(req.params.id);
+    res.json(updated);
+  });
+
   app.post('/api/admin/notify-daily', async (req, res) => {
     const password = req.headers['x-admin-password'] || req.body?.password;
     if (password !== 'dream0935314711') {
