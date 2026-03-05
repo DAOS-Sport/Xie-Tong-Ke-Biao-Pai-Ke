@@ -143,14 +143,12 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
 }
 
 export function setupWeeklyNotificationCron(): void {
-  cron.schedule('0 20 * * 0', () => {
-    console.log('[LINE Notify] Cron triggered: Sunday 20:00');
+  cron.schedule('0 12 * * 0', () => {
+    console.log('[LINE Notify] Cron triggered: Sunday 20:00 TST (12:00 UTC)');
     sendWeeklyScheduleNotifications();
-  }, {
-    timezone: 'Asia/Taipei',
   });
 
-  console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 20:00 Asia/Taipei)');
+  console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 20:00 TST = 12:00 UTC)');
 }
 
 async function sendDailyTomorrowNotifications(): Promise<void> {
@@ -228,14 +226,12 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
 }
 
 export function setupDailyNotificationCron(): void {
-  cron.schedule('0 19 * * *', () => {
-    console.log('[LINE Notify] Cron triggered: daily 19:00');
+  cron.schedule('0 11 * * *', () => {
+    console.log('[LINE Notify] Cron triggered: daily 19:00 TST (11:00 UTC)');
     sendDailyTomorrowNotifications();
-  }, {
-    timezone: 'Asia/Taipei',
   });
 
-  console.log('[LINE Notify] Daily notify cron scheduled (19:00 Asia/Taipei)');
+  console.log('[LINE Notify] Daily notify cron scheduled (19:00 TST = 11:00 UTC)');
 }
 
 export { sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications };

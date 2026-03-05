@@ -238,12 +238,12 @@ export function setupRagicSyncCron() {
     console.error("Initial Ragic sync failed:", err);
   });
 
-  cron.schedule('0 3 * * *', () => {
-    console.log('[Ragic] Daily sync triggered at 3:00 AM (Asia/Taipei)');
+  cron.schedule('0 19 * * *', () => {
+    console.log('[Ragic] Daily sync triggered at 03:00 TST (19:00 UTC)');
     syncRagicAll().catch(err => {
       console.error("Scheduled Ragic sync failed:", err);
     });
-  }, { timezone: 'Asia/Taipei' });
+  });
 
   console.log('[Ragic] Daily sync scheduled: 03:00 Asia/Taipei');
 }
