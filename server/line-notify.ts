@@ -58,15 +58,17 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
 
   try {
     const approvedCoaches = await storage.getApprovedCoachUsers();
-    const coachesWithLine = approvedCoaches.filter(c => c.lineId && c.linkedCoachName);
+    // 優先用 linkedCoachName，沒有則用 name 作為比對鍵
+    const coachesWithLine = approvedCoaches.filter(c => c.lineId && (c.linkedCoachName || c.name));
 
     if (coachesWithLine.length === 0) {
-      console.log('[LINE Notify] No approved coaches with LINE accounts and linked names found');
+      console.log('[LINE Notify] No approved coaches with LINE accounts found');
       return;
     }
 
     const today = new Date();
-    const nextMonday = startOfWeek(addDays(today, 7), { weekStartsOn: 1 });
+    // addDays(today, 1) 確保：週日 cron 看下週，週一~週六手動觸發看本週
+    const nextMonday = startOfWeek(addDays(today, 1), { weekStartsOn: 1 });
     const nextSunday = addDays(nextMonday, 6);
     const startDate = format(nextMonday, 'yyyy-MM-dd');
     const endDate = format(nextSunday, 'yyyy-MM-dd');
@@ -77,7 +79,7 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
     let failCount = 0;
 
     for (const coach of coachesWithLine) {
-      const coachName = coach.linkedCoachName!;
+      const coachName = (coach.linkedCoachName || coach.name)!;
       const lineId = coach.lineId!;
 
       const mySchedules = weekSchedules.filter(
