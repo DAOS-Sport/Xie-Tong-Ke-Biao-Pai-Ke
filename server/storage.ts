@@ -204,6 +204,7 @@ export class DatabaseStorage implements IStorage {
         className: schedules.className,
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         coachCount: schedules.coachCount,
         isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
@@ -228,6 +229,7 @@ export class DatabaseStorage implements IStorage {
         className: schedules.className,
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         coachCount: schedules.coachCount,
         isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
@@ -253,12 +255,13 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateSchedule(id: string, updateData: Partial<{ className: string; coachName: string; coachName2: string | null; coachCount: number }>): Promise<Schedule> {
+  async updateSchedule(id: string, updateData: Partial<{ className: string; coachName: string; coachName2: string | null; coachCount: number; coach2IsTeaching: boolean }>): Promise<Schedule> {
     const setData: any = { updatedAt: new Date() };
     if (updateData.className !== undefined) setData.className = updateData.className;
     if (updateData.coachName !== undefined) setData.coachName = updateData.coachName;
     if (updateData.coachName2 !== undefined) setData.coachName2 = updateData.coachName2;
     if (updateData.coachCount !== undefined) setData.coachCount = updateData.coachCount;
+    if (updateData.coach2IsTeaching !== undefined) setData.coach2IsTeaching = updateData.coach2IsTeaching;
     const [result] = await db
       .update(schedules)
       .set(setData)
@@ -284,6 +287,7 @@ export class DatabaseStorage implements IStorage {
         className: schedules.className,
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         coachCount: schedules.coachCount,
         isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
@@ -485,6 +489,7 @@ export class DatabaseStorage implements IStorage {
         className: schedules.className,
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         coachCount: schedules.coachCount,
         isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
@@ -568,6 +573,7 @@ export class DatabaseStorage implements IStorage {
         className: schedules.className,
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         coachCount: schedules.coachCount,
         isClassLocked: schedules.isClassLocked,
         notes: schedules.notes,
