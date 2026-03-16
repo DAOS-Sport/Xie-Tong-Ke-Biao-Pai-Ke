@@ -283,15 +283,18 @@ function CoachAssignmentContent() {
       scheduleId,
       coachName,
       coachName2,
+      coach2IsTeaching,
     }: {
       scheduleId: string;
       coachName?: string;
       coachName2?: string;
+      coach2IsTeaching?: boolean;
     }) => {
       const adminPassword = sessionStorage.getItem("admin-password") || "";
       const body: any = {};
       if (coachName !== undefined) body.coachName = coachName;
       if (coachName2 !== undefined) body.coachName2 = coachName2;
+      if (coach2IsTeaching !== undefined) body.coach2IsTeaching = coach2IsTeaching;
       const res = await fetch(`/api/schedules/${scheduleId}/assign-coach`, {
         method: "PUT",
         headers: {
@@ -734,21 +737,41 @@ function CoachAssignmentContent() {
                                             triggerClassName={hasCoach ? "border-green-400 bg-green-50" : "border-red-400 bg-red-50"}
                                           />
                                           {needsTwo && (
-                                            <CoachSearchSelect
-                                              value={schedule.coachName2 || ""}
-                                              onValueChange={(value) => {
-                                                assignCoachMutation.mutate({
-                                                  scheduleId: schedule.id,
-                                                  coachName2: value === "__clear__" ? "" : value,
-                                                });
-                                              }}
-                                              coaches={coaches}
-                                              available={available}
-                                              conflicts={coach2Conflicts}
-                                              placeholder="教練2"
-                                              hasValue={hasCoach2}
-                                              triggerClassName={hasCoach2 ? "border-blue-400 bg-blue-50" : "border-amber-400 bg-amber-50"}
-                                            />
+                                            <>
+                                              <CoachSearchSelect
+                                                value={schedule.coachName2 || ""}
+                                                onValueChange={(value) => {
+                                                  assignCoachMutation.mutate({
+                                                    scheduleId: schedule.id,
+                                                    coachName2: value === "__clear__" ? "" : value,
+                                                  });
+                                                }}
+                                                coaches={coaches}
+                                                available={available}
+                                                conflicts={coach2Conflicts}
+                                                placeholder="教練2"
+                                                hasValue={hasCoach2}
+                                                triggerClassName={hasCoach2 ? "border-blue-400 bg-blue-50" : "border-amber-400 bg-amber-50"}
+                                              />
+                                              {hasCoach2 && (
+                                                <label className="flex items-center gap-1 cursor-pointer select-none">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={!!schedule.coach2IsTeaching}
+                                                    onChange={(e) => {
+                                                      assignCoachMutation.mutate({
+                                                        scheduleId: schedule.id,
+                                                        coach2IsTeaching: e.target.checked,
+                                                      });
+                                                    }}
+                                                    className="h-3 w-3 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                                                  />
+                                                  <span className={`text-[10px] ${schedule.coach2IsTeaching ? 'text-orange-600 font-semibold' : 'text-gray-400'}`}>
+                                                    當班教學
+                                                  </span>
+                                                </label>
+                                              )}
+                                            </>
                                           )}
                                         </div>
                                       );

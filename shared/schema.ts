@@ -64,6 +64,7 @@ export const schedules = pgTable("schedules", {
   className: varchar("class_name"),
   coachName: varchar("coach_name"),
   coachName2: varchar("coach_name_2"),
+  coach2IsTeaching: boolean("coach2_is_teaching").notNull().default(false),
   coachCount: integer("coach_count").notNull().default(1),
   isClassLocked: boolean("is_class_locked").notNull().default(false),
   notes: text("notes"),

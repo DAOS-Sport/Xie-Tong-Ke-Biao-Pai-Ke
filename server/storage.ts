@@ -58,6 +58,8 @@ export interface IStorage {
   getCoachStatistics(startDate: string, endDate: string, coachName?: string): Promise<{
     coachName: string;
     totalClasses: number;
+    teachingClasses: number;
+    assistClasses: number;
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]>;
   getUniqueCoaches(): Promise<string[]>;
@@ -363,12 +365,15 @@ export class DatabaseStorage implements IStorage {
   async getCoachStatistics(startDate: string, endDate: string, coachName?: string): Promise<{
     coachName: string;
     totalClasses: number;
+    teachingClasses: number;
+    assistClasses: number;
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]> {
     const allSchedules = await db
       .select({
         coachName: schedules.coachName,
         coachName2: schedules.coachName2,
+        coach2IsTeaching: schedules.coach2IsTeaching,
         venueName: venues.name,
         venueColor: venues.color,
       })
@@ -383,17 +388,24 @@ export class DatabaseStorage implements IStorage {
 
     const coachStats = new Map<string, {
       totalClasses: number;
+      teachingClasses: number;
+      assistClasses: number;
       venueMap: Map<string, { count: number; color: string }>;
     }>();
 
-    const addCoachCount = (name: string, venueName: string, venueColor: string) => {
+    const addCoachCount = (name: string, venueName: string, venueColor: string, isTeaching: boolean) => {
       if (!name || name.trim() === '') return;
       const trimmed = name.trim();
       if (!coachStats.has(trimmed)) {
-        coachStats.set(trimmed, { totalClasses: 0, venueMap: new Map() });
+        coachStats.set(trimmed, { totalClasses: 0, teachingClasses: 0, assistClasses: 0, venueMap: new Map() });
       }
       const stats = coachStats.get(trimmed)!;
       stats.totalClasses += 1;
+      if (isTeaching) {
+        stats.teachingClasses += 1;
+      } else {
+        stats.assistClasses += 1;
+      }
       const existing = stats.venueMap.get(venueName);
       if (existing) {
         existing.count += 1;
@@ -403,13 +415,15 @@ export class DatabaseStorage implements IStorage {
     };
 
     for (const row of allSchedules) {
-      if (row.coachName) addCoachCount(row.coachName, row.venueName, row.venueColor);
-      if (row.coachName2) addCoachCount(row.coachName2, row.venueName, row.venueColor);
+      if (row.coachName) addCoachCount(row.coachName, row.venueName, row.venueColor, true);
+      if (row.coachName2) addCoachCount(row.coachName2, row.venueName, row.venueColor, !!row.coach2IsTeaching);
     }
 
     let result = Array.from(coachStats.entries()).map(([name, stats]) => ({
       coachName: name,
       totalClasses: stats.totalClasses,
+      teachingClasses: stats.teachingClasses,
+      assistClasses: stats.assistClasses,
       venueBreakdown: Array.from(stats.venueMap.entries()).map(([venueName, v]) => ({
         venueName,
         count: v.count,

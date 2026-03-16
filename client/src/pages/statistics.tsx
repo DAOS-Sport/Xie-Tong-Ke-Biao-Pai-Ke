@@ -46,6 +46,8 @@ export default function Statistics() {
   const { data: statistics, isLoading: statsLoading } = useQuery<{
     coachName: string;
     totalClasses: number;
+    teachingClasses: number;
+    assistClasses: number;
     venueBreakdown: { venueName: string; count: number; color: string }[];
   }[]>({
     queryKey: [`/api/statistics?startDate=${currentPeriod.startDate}&endDate=${currentPeriod.endDate}`],
@@ -83,12 +85,14 @@ export default function Statistics() {
     }
 
     const venueNames = allVenues.map(v => v.name);
-    const headers = ["教練姓名", "總堂數", ...venueNames];
+    const headers = ["教練姓名", "總堂數", "當班", "偕同", ...venueNames];
     const rows = filteredStatistics.map(stat => {
       const venueCountMap = new Map(stat.venueBreakdown.map(v => [v.venueName, v.count]));
       return [
         stat.coachName,
         stat.totalClasses.toString(),
+        (stat.teachingClasses || 0).toString(),
+        (stat.assistClasses || 0).toString(),
         ...venueNames.map(vn => (venueCountMap.get(vn) || 0).toString())
       ];
     });
@@ -96,6 +100,8 @@ export default function Statistics() {
     const totalRow = [
       "合計",
       totalClasses.toString(),
+      filteredStatistics.reduce((sum, s) => sum + (s.teachingClasses || 0), 0).toString(),
+      filteredStatistics.reduce((sum, s) => sum + (s.assistClasses || 0), 0).toString(),
       ...venueNames.map(vn => {
         const sum = filteredStatistics.reduce((acc, stat) => {
           const venue = stat.venueBreakdown.find(v => v.venueName === vn);
@@ -282,6 +288,8 @@ export default function Statistics() {
                     <th className="text-center p-3 text-sm font-medium text-muted-foreground w-12">#</th>
                     <th className="text-left p-3 text-sm font-medium text-muted-foreground">教練姓名</th>
                     <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">總堂數</th>
+                    <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">當班</th>
+                    <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">偕同</th>
                     <th className="text-left p-3 text-sm font-medium text-muted-foreground">各場館分布</th>
                   </tr>
                 </thead>
@@ -293,6 +301,8 @@ export default function Statistics() {
                           <td className="p-3 text-sm text-center text-muted-foreground">{index + 1}</td>
                           <td className="p-3 text-sm font-medium">{stat.coachName}</td>
                           <td className="p-3 text-sm text-center font-bold text-primary">{stat.totalClasses}</td>
+                          <td className="p-3 text-sm text-center font-medium text-orange-600">{stat.teachingClasses || 0}</td>
+                          <td className="p-3 text-sm text-center font-medium text-blue-500">{stat.assistClasses || 0}</td>
                           <td className="p-3 text-sm">
                             <div className="flex flex-wrap gap-1.5">
                               {stat.venueBreakdown.map((venue, vIndex) => (
@@ -312,6 +322,8 @@ export default function Statistics() {
                         <td className="p-3 text-sm text-center"></td>
                         <td className="p-3 text-sm">合計 ({filteredStatistics.length} 位教練)</td>
                         <td className="p-3 text-sm text-center font-bold text-primary">{totalClasses}</td>
+                        <td className="p-3 text-sm text-center font-medium text-orange-600">{filteredStatistics.reduce((sum, s) => sum + (s.teachingClasses || 0), 0)}</td>
+                        <td className="p-3 text-sm text-center font-medium text-blue-500">{filteredStatistics.reduce((sum, s) => sum + (s.assistClasses || 0), 0)}</td>
                         <td className="p-3 text-sm">
                           <div className="flex flex-wrap gap-1.5">
                             {allVenues.map((venue, vIndex) => {
@@ -336,7 +348,7 @@ export default function Statistics() {
                     </>
                   ) : (
                     <tr>
-                      <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                      <td colSpan={6} className="p-6 text-center text-muted-foreground">
                         {searchCoach ? '未找到符合條件的教練' : '本期間無課程記錄'}
                       </td>
                     </tr>
