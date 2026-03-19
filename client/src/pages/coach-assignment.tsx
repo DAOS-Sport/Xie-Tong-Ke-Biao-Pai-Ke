@@ -231,6 +231,16 @@ function CoachAssignmentContent() {
     },
   });
 
+  const { data: venuePrefsMap = {} } = useQuery<Record<string, string[]>>({
+    queryKey: ["/api/admin/coach-venue-preferences"],
+    queryFn: async () => {
+      const password = sessionStorage.getItem("admin-password") || "";
+      const res = await fetch(`/api/admin/coach-venue-preferences?password=${password}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+  });
+
   const availabilityMap = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const a of availability) {
@@ -241,8 +251,19 @@ function CoachAssignmentContent() {
     return map;
   }, [availability]);
 
-  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number): Set<string> => {
-    return availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set();
+  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number, venueName?: string): Set<string> => {
+    const timeAvailable = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
+    if (!venueName) return timeAvailable;
+    const result = new Set<string>();
+    for (const coach of timeAvailable) {
+      const prefs = venuePrefsMap[coach];
+      if (!prefs || prefs.length === 0) {
+        result.add(coach);
+      } else if (prefs.includes(venueName)) {
+        result.add(coach);
+      }
+    }
+    return result;
   };
 
   const getConflictingCoaches = (date: string, timeSlotId: string, currentScheduleId: string): Set<string> => {
@@ -388,7 +409,7 @@ function CoachAssignmentContent() {
       const date = new Date(schedule.date);
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
       const timeSlotOrder = schedule.timeSlot?.order || 0;
-      const available = getAvailableCoaches(dayOfWeek, timeSlotOrder);
+      const available = getAvailableCoaches(dayOfWeek, timeSlotOrder, schedule.venue?.name);
       const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
       const candidates = Array.from(available).filter(c => !conflicting.has(c));
 
@@ -435,7 +456,8 @@ function CoachAssignmentContent() {
             const d = new Date(selectedCell.date);
             return d.getDay() === 0 ? 7 : d.getDay();
           })(),
-          selectedCell.timeSlotOrder
+          selectedCell.timeSlotOrder,
+          selectedVenueData?.name
         );
         const assigned = getAssignedCoachesForSlot(selectedCell.date, selectedCell.timeSlotId);
         const conflicting = new Set<string>();
@@ -705,7 +727,7 @@ function CoachAssignmentContent() {
                                       const needsTwo = (schedule.coachCount || 1) >= 2;
                                       const coach1Conflicts = getCoach1Conflicts(schedule);
                                       const coach2Conflicts = getCoach2Conflicts(schedule);
-                                      const available = getAvailableCoaches(dayOfWeek, timeSlot.order);
+                                      const available = getAvailableCoaches(dayOfWeek, timeSlot.order, selectedVenueData?.name);
 
                                       const isMissing = !hasCoach || (needsTwo && !hasCoach2);
                                       const missingBg = isMissing
