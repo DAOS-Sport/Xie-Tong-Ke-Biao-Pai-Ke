@@ -91,7 +91,7 @@ Preferred communication style: Simple, everyday language.
   - Syncs: 部門名稱 → venue name, google map → venueInfos.mapUrl
   - **LINE ID sync**: 從員工表單(ragicforms4/20004)的「個人LINE ID」欄位(field 1003633)同步教練 LINE ID，用於推播通知
   - **Employee ID sync**: 從員工表單(ragicforms4/20004)的「員工編號」欄位同步員工編號到 coachUsers.employeeId（僅在欄位為空時補填）
-  - Syncs: 教練姓名/手機/Email/員工編號 → coachUsers (only 在職 + 應徵職務含「教練」, auto-approved)
+  - Syncs: 教練姓名/手機/Email/員工編號 → coachUsers (only 應徵職務含「教練」, auto-approved; 在職狀態不篩選)
   - Excluded names: "(測試帳號)教練"
   - Only additive: adds new venues, fills empty mapUrl; never deletes or overwrites
   - Coach list sorted: 陳柏榮 always first, then alphabetical

@@ -148,7 +148,7 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
   ]);
 
   const EXCLUDED_NAMES = ["(測試帳號)教練"];
-  const activeCoaches = allRecords.filter(r => r["姓名"] && r["在職狀態"] === "在職" && isCoachRole(r) && !EXCLUDED_NAMES.includes(r["姓名"] as string));
+  const activeCoaches = allRecords.filter(r => r["姓名"] && isCoachRole(r) && !EXCLUDED_NAMES.includes(r["姓名"] as string));
 
   const existingCoaches = await storage.getAllCoachUsers();
   const existingByName = new Map(existingCoaches.map(c => [c.name, c]));
