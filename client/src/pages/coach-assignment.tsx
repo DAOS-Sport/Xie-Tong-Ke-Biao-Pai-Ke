@@ -776,11 +776,15 @@ function CoachAssignmentContent() {
                                                 triggerClassName={hasCoach2 ? "border-blue-400 bg-blue-50" : "border-amber-400 bg-amber-50"}
                                               />
                                               {hasCoach2 && (
-                                                <label className="flex items-center gap-1 cursor-pointer select-none">
+                                                <label
+                                                  className="flex items-center gap-1 cursor-pointer select-none"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
                                                   <input
                                                     type="checkbox"
                                                     checked={!!schedule.coach2IsTeaching}
                                                     onChange={(e) => {
+                                                      e.stopPropagation();
                                                       assignCoachMutation.mutate({
                                                         scheduleId: schedule.id,
                                                         coach2IsTeaching: e.target.checked,
