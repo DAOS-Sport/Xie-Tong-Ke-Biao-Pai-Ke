@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
   - `users` - User accounts with role-based permissions (admin/coach/student)
   - `venues` - Swimming pool locations with color coding (8 venues including 清江國小, 松山國小)
   - `timeSlots` - Available time periods for scheduling
-  - `schedules` - Class bookings linking coaches to venues and time slots (coachCount: 1-2, coachName2 for second coach, coach2IsTeaching: boolean flag for teaching duty)
+  - `schedules` - Class bookings linking coaches to venues and time slots (coachCount: 1-2, coachName2 for second coach, coach1IsTeaching: boolean flag for coach1 on-duty teaching, coach2IsTeaching: boolean flag for coach2 on-duty teaching)
   - `coachUsers` - LINE-based coach registration (lineId, name, phone, email, employeeId, status, linkedCoachName)
   - `coach_availability` - Coach weekly availability slots (coachName, weekStart, dayOfWeek 1-7, timeSlotOrder 1-7)
   - `coach_venue_preferences` - Coach venue preferences (coachName, venueName, unique constraint)

@@ -276,11 +276,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const { coachName, coachName2, coach2IsTeaching } = req.body;
+      const { coachName, coachName2, coach1IsTeaching, coach2IsTeaching } = req.body;
       if (coachName2 !== undefined) {
         const updateData: any = { coachName2: coachName2 || null };
         if (!coachName2) updateData.coach2IsTeaching = false;
         const schedule = await storage.updateSchedule(req.params.id, updateData);
+        return res.json(schedule);
+      }
+      if (coach1IsTeaching !== undefined) {
+        const schedule = await storage.updateSchedule(req.params.id, { coach1IsTeaching: !!coach1IsTeaching });
         return res.json(schedule);
       }
       if (coach2IsTeaching !== undefined) {
@@ -300,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (password !== 'dream0935314711') {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const { coachCount, coachName, coachName2, coach2IsTeaching } = req.body;
+      const { coachCount, coachName, coachName2, coach1IsTeaching, coach2IsTeaching } = req.body;
       const updateData: any = {};
       if (coachCount !== undefined) {
         const count = parseInt(coachCount);
@@ -309,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (coachName !== undefined) updateData.coachName = coachName;
       if (coachName2 !== undefined) updateData.coachName2 = coachName2;
+      if (coach1IsTeaching !== undefined) updateData.coach1IsTeaching = !!coach1IsTeaching;
       if (coach2IsTeaching !== undefined) updateData.coach2IsTeaching = !!coach2IsTeaching;
       const schedule = await storage.updateSchedule(req.params.id, updateData);
       res.json(schedule);

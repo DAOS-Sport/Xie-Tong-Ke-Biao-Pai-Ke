@@ -141,6 +141,7 @@ export async function initializeSchoolSchema(schoolCode: string) {
         class_name VARCHAR,
         coach_name VARCHAR,
         coach_name_2 VARCHAR,
+        coach1_is_teaching BOOLEAN NOT NULL DEFAULT false,
         coach2_is_teaching BOOLEAN NOT NULL DEFAULT false,
         is_class_locked BOOLEAN NOT NULL DEFAULT false,
         notes TEXT,
@@ -152,6 +153,7 @@ export async function initializeSchoolSchema(schoolCode: string) {
     // 補上既有表格可能缺少的欄位（向下相容）
     await mainDb.execute(sql.raw(`
       ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach_name_2 VARCHAR;
+      ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach1_is_teaching BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach2_is_teaching BOOLEAN NOT NULL DEFAULT false;
     `));
     
