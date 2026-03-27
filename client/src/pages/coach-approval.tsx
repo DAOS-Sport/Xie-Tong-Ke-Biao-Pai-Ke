@@ -14,14 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
@@ -225,13 +217,13 @@ function CoachUsersSection() {
       LINE綁定狀態: u.lineId ? "已綁定" : "未綁定",
       LINE_ID: u.lineId || "",
       可排課地點: (venuePrefsMap[u.name] || []).join("、"),
-      狀態: statusLabel(u.status),
       註冊時間: u.createdAt ? format(new Date(u.createdAt), "yyyy/MM/dd HH:mm") : "",
+      狀態: statusLabel(u.status),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const colWidths = [
       { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 28 },
-      { wch: 12 }, { wch: 36 }, { wch: 30 }, { wch: 8 }, { wch: 16 },
+      { wch: 12 }, { wch: 36 }, { wch: 30 }, { wch: 16 }, { wch: 8 },
     ];
     ws["!cols"] = colWidths;
     const wb = XLSX.utils.book_new();
