@@ -1,18 +1,37 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertScheduleSchema, insertCoachRegistrationSchema, insertTeacherFeedbackSchema } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { schedules, teachers, teacherFeedbacks } from "@shared/schema";
+import { schedules, teachers, teacherFeedbacks, coachUsers } from "@shared/schema";
 import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
+
+async function runStartupFixes(): Promise<void> {
+  try {
+    const result = await db
+      .update(coachUsers)
+      .set({ name: "林聖潤", linkedCoachName: "林聖潤" })
+      .where(eq(coachUsers.name, "聖潤"))
+      .returning({ id: coachUsers.id, name: coachUsers.name });
+    if (result.length > 0) {
+      console.log(`[Migration] Renamed coach "聖潤" → "林聖潤" (id: ${result[0].id})`);
+    }
+  } catch (err) {
+    console.error("[Migration] runStartupFixes failed:", err);
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // One-time data fixes (idempotent)
+  await runStartupFixes();
 
   // Initialize default data
   await storage.initializeVenues();
