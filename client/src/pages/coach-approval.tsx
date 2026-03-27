@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud } from "lucide-react";
+import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -35,7 +36,7 @@ function CoachApprovalContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-5xl mx-auto p-4 space-y-4">
+      <main className="max-w-7xl mx-auto p-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => navigate("/mgt-x9k7p2/class-edit")}>
@@ -189,14 +190,17 @@ function CoachUsersSection() {
     },
   });
 
+  const statusLabel = (s: string) =>
+    s === "approved" ? "已通過" : s === "pending" ? "待審核" : "已拒絕";
+
   const statusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-400">待審核</Badge>;
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-400 whitespace-nowrap">待審核</Badge>;
       case "approved":
-        return <Badge className="bg-green-500">已通過</Badge>;
+        return <Badge className="bg-green-500 whitespace-nowrap">已通過</Badge>;
       case "rejected":
-        return <Badge variant="destructive">已拒絕</Badge>;
+        return <Badge variant="destructive" className="whitespace-nowrap">已拒絕</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -212,80 +216,119 @@ function CoachUsersSection() {
 
   const pendingCount = coachUsers.filter((u) => u.status === "pending").length;
 
+  const exportToExcel = () => {
+    const rows = filteredUsers.map((u) => ({
+      姓名: u.name,
+      員編: u.employeeId || "",
+      電話: u.phone || "",
+      信箱: u.email || "",
+      LINE綁定狀態: u.lineId ? "已綁定" : "未綁定",
+      LINE_ID: u.lineId || "",
+      可排課地點: (venuePrefsMap[u.name] || []).join("、"),
+      狀態: statusLabel(u.status),
+      註冊時間: u.createdAt ? format(new Date(u.createdAt), "yyyy/MM/dd HH:mm") : "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = [
+      { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 28 },
+      { wch: 12 }, { wch: 36 }, { wch: 30 }, { wch: 8 }, { wch: 16 },
+    ];
+    ws["!cols"] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "教練列表");
+    XLSX.writeFile(wb, `教練列表_${format(new Date(), "yyyyMMdd_HHmm")}.xlsx`);
+  };
+
   return (
     <>
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
             教練列表
             {pendingCount > 0 && (
               <Badge className="bg-red-500 text-xs">{pendingCount} 待審</Badge>
             )}
           </CardTitle>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部</SelectItem>
-              <SelectItem value="pending">待審核</SelectItem>
-              <SelectItem value="approved">已通過</SelectItem>
-              <SelectItem value="rejected">已拒絕</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-sm text-green-700 border-green-300 hover:bg-green-50"
+              onClick={exportToExcel}
+              disabled={filteredUsers.length === 0}
+            >
+              <FileDown className="h-4 w-4 mr-1" />
+              匯出 Excel
+            </Button>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="pending">待審核</SelectItem>
+                <SelectItem value="approved">已通過</SelectItem>
+                <SelectItem value="rejected">已拒絕</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="mt-2">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜尋姓名、電話、信箱..."
-            className="h-8 text-sm"
+            className="h-9 text-sm"
           />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0 pb-0">
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">載入中...</div>
         ) : filteredUsers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">目前無教練資料</div>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>姓名</TableHead>
-                  <TableHead>員編</TableHead>
-                  <TableHead>電話</TableHead>
-                  <TableHead>信箱</TableHead>
-                  <TableHead>LINE 綁定</TableHead>
-                  <TableHead>可排課地點</TableHead>
-                  <TableHead>狀態</TableHead>
-                  <TableHead>註冊時間</TableHead>
-                  <TableHead>操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-mono">{user.employeeId || "-"}</TableCell>
-                    <TableCell>{user.phone || "-"}</TableCell>
-                    <TableCell>{user.email || "-"}</TableCell>
-                    <TableCell>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[80px]">姓名</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[80px]">員編</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[110px]">電話</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-[200px]">信箱</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-[220px]">LINE 綁定</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-[160px]">可排課地點</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[80px]">狀態</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[110px]">註冊時間</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-gray-600 whitespace-nowrap w-[130px]">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user, idx) => (
+                  <tr key={user.id} className={`border-b transition-colors hover:bg-gray-50 ${idx % 2 === 0 ? "" : "bg-gray-50/40"}`}>
+                    <td className="px-4 py-3 font-semibold whitespace-nowrap">{user.name}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground font-mono whitespace-nowrap">{user.employeeId || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{user.phone || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <span className="block truncate text-xs text-gray-600" title={user.email || ""}>
+                        {user.email || <span className="text-gray-300">—</span>}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       {editingLineCoachId === user.id ? (
-                        <div className="flex flex-col gap-1 min-w-[180px]">
+                        <div className="flex flex-col gap-1.5">
                           <Input
                             value={lineIdInput}
                             onChange={e => setLineIdInput(e.target.value)}
                             placeholder="貼上 LINE ID（U...）"
-                            className="h-7 text-xs font-mono"
+                            className="h-7 text-xs font-mono w-[190px]"
                             autoFocus
                           />
                           <div className="flex gap-1">
                             <Button
                               size="sm"
-                              className="h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
+                              className="h-6 text-xs px-2.5 bg-green-600 hover:bg-green-700"
                               disabled={!lineIdInput.trim() || setLineIdMutation.isPending}
                               onClick={() => setLineIdMutation.mutate({ coachUserId: user.id, lineId: lineIdInput.trim() })}
                             >
@@ -294,7 +337,7 @@ function CoachUsersSection() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-6 text-xs px-2"
+                              className="h-6 text-xs px-2.5"
                               onClick={() => { setEditingLineCoachId(null); setLineIdInput(""); }}
                             >
                               取消
@@ -302,51 +345,50 @@ function CoachUsersSection() {
                           </div>
                         </div>
                       ) : user.lineId ? (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
-                            ✅ 已綁定
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-blue-600"
-                            title="修改 LINE ID"
-                            onClick={() => { setEditingLineCoachId(user.id); setLineIdInput(user.lineId || ""); }}
-                          >
-                            ✏️
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-red-600"
-                            title="清除綁定"
-                            disabled={clearLineIdMutation.isPending}
-                            onClick={() => { if (confirm(`確定清除「${user.name}」的 LINE 綁定？`)) clearLineIdMutation.mutate(user.id); }}
-                          >
-                            🗑️
-                          </Button>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5 whitespace-nowrap">
+                              ✅ 已綁定
+                            </span>
+                            <button
+                              className="text-gray-400 hover:text-blue-600 transition-colors"
+                              title="修改 LINE ID"
+                              onClick={() => { setEditingLineCoachId(user.id); setLineIdInput(user.lineId || ""); }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                              title="清除綁定"
+                              disabled={clearLineIdMutation.isPending}
+                              onClick={() => { if (confirm(`確定清除「${user.name}」的 LINE 綁定？`)) clearLineIdMutation.mutate(user.id); }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-mono truncate max-w-[190px]" title={user.lineId}>
+                            {user.lineId}
+                          </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-2 py-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 whitespace-nowrap">
                             未綁定
                           </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 text-xs px-1 text-blue-600 hover:text-blue-800"
+                          <button
+                            className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors whitespace-nowrap"
                             onClick={() => { setEditingLineCoachId(user.id); setLineIdInput(""); }}
                           >
                             + 綁定
-                          </Button>
+                          </button>
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-4 py-3">
                       {venuePrefsMap[user.name]?.length ? (
                         <div className="flex flex-wrap gap-1">
                           {venuePrefsMap[user.name].map(v => (
-                            <Badge key={v} variant="outline" className="text-xs px-1.5 py-0">
+                            <Badge key={v} variant="outline" className="text-xs px-1.5 py-0 whitespace-nowrap">
                               {v}
                             </Badge>
                           ))}
@@ -354,57 +396,46 @@ function CoachUsersSection() {
                       ) : (
                         <span className="text-xs text-muted-foreground">未設定</span>
                       )}
-                    </TableCell>
-                    <TableCell>{statusBadge(user.status)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {user.createdAt
-                        ? format(new Date(user.createdAt), "yyyy/MM/dd HH:mm")
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+                    </td>
+                    <td className="px-4 py-3">{statusBadge(user.status)}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {user.createdAt ? format(new Date(user.createdAt), "yyyy/MM/dd HH:mm") : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <button
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors whitespace-nowrap"
                           onClick={() => { setEditingUser({ id: user.id, name: user.name }); setEditName(user.name); }}
                         >
-                          ✏️ 改名
-                        </Button>
+                          <Pencil className="h-3 w-3" />
+                          改名
+                        </button>
                         {user.status !== "approved" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
-                            onClick={() =>
-                              approveMutation.mutate({ id: user.id, status: "approved" })
-                            }
+                          <button
+                            className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 hover:underline transition-colors whitespace-nowrap disabled:opacity-50"
+                            onClick={() => approveMutation.mutate({ id: user.id, status: "approved" })}
                             disabled={approveMutation.isPending}
                           >
-                            <CheckCircle className="h-3 w-3 mr-1" />
+                            <CheckCircle className="h-3 w-3" />
                             通過
-                          </Button>
+                          </button>
                         )}
                         {user.status !== "rejected" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
-                            onClick={() =>
-                              approveMutation.mutate({ id: user.id, status: "rejected" })
-                            }
+                          <button
+                            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 hover:underline transition-colors whitespace-nowrap disabled:opacity-50"
+                            onClick={() => approveMutation.mutate({ id: user.id, status: "rejected" })}
                             disabled={approveMutation.isPending}
                           >
-                            <XCircle className="h-3 w-3 mr-1" />
+                            <XCircle className="h-3 w-3" />
                             拒絕
-                          </Button>
+                          </button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
       </CardContent>
