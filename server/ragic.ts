@@ -168,26 +168,42 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
     const existing = existingByName.get(name);
 
     if (!existing) {
-      await storage.createCoachUser({
-        name,
-        phone,
-        email,
-        status: "approved",
-        role: "coach",
-        lineId: personalLineId,
-        linkedCoachName: name,
-        employeeId,
-      });
-      existingByName.set(name, { name, lineId: personalLineId, employeeId } as any);
-      added++;
-      if (personalLineId) lineIdsSynced++;
-      if (employeeId) employeeIdsSynced++;
-      console.log(`[Ragic] Added coach "${name}"${personalLineId ? " with LINE ID" : ""}${employeeId ? ` (${employeeId})` : ""}`);
+      try {
+        await storage.createCoachUser({
+          name,
+          phone,
+          email,
+          status: "approved",
+          role: "coach",
+          lineId: personalLineId,
+          linkedCoachName: name,
+          employeeId,
+        });
+        existingByName.set(name, { name, lineId: personalLineId, employeeId } as any);
+        added++;
+        if (personalLineId) lineIdsSynced++;
+        if (employeeId) employeeIdsSynced++;
+        console.log(`[Ragic] Added coach "${name}"${personalLineId ? " with LINE ID" : ""}${employeeId ? ` (${employeeId})` : ""}`);
+      } catch (err: any) {
+        if (err?.message?.includes("unique") || err?.code === "23505") {
+          console.warn(`[Ragic] Skipped creating coach "${name}": duplicate value (LINE ID or name conflict)`);
+        } else {
+          console.error(`[Ragic] Failed to create coach "${name}":`, err?.message);
+        }
+      }
     } else {
       if (personalLineId && existing.lineId !== personalLineId) {
-        await storage.updateCoachUserLineId(existing.id, personalLineId);
-        lineIdsSynced++;
-        console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
+        try {
+          await storage.updateCoachUserLineId(existing.id, personalLineId);
+          lineIdsSynced++;
+          console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
+        } catch (err: any) {
+          if (err?.message?.includes("unique") || err?.code === "23505") {
+            console.warn(`[Ragic] Skipped LINE ID update for coach "${name}": LINE ID already used by another coach`);
+          } else {
+            console.error(`[Ragic] Failed to update LINE ID for coach "${name}":`, err?.message);
+          }
+        }
       }
       if (employeeId && !existing.employeeId) {
         await storage.updateCoachEmployeeId(existing.id, employeeId);
