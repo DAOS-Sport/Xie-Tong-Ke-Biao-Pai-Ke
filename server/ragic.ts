@@ -189,6 +189,7 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
           console.warn(`[Ragic] Skipped creating coach "${name}": duplicate value (LINE ID or name conflict)`);
         } else {
           console.error(`[Ragic] Failed to create coach "${name}":`, err?.message);
+          throw err;
         }
       }
     } else {
@@ -202,6 +203,7 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
             console.warn(`[Ragic] Skipped LINE ID update for coach "${name}": LINE ID already used by another coach`);
           } else {
             console.error(`[Ragic] Failed to update LINE ID for coach "${name}":`, err?.message);
+            throw err;
           }
         }
       }

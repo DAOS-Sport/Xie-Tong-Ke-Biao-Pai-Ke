@@ -16,7 +16,7 @@ async function runStartupFixes(): Promise<void> {
     const result = await db
       .update(coachUsers)
       .set({ name: "林聖潤", linkedCoachName: "林聖潤" })
-      .where(eq(coachUsers.name, "聖潤"))
+      .where(and(eq(coachUsers.name, "聖潤"), eq(coachUsers.id, "6b069216-12c8-4022-aa67-40de8a8c19f8")))
       .returning({ id: coachUsers.id, name: coachUsers.name });
     if (result.length > 0) {
       console.log(`[Migration] Renamed coach "聖潤" → "林聖潤" (id: ${result[0].id})`);
