@@ -188,8 +188,9 @@ function CoachUsersSection() {
         method: "POST",
         headers: { "x-admin-password": adminPassword },
       });
-      if (!res.ok) throw new Error("同步失敗");
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "同步失敗");
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
