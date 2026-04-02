@@ -182,6 +182,23 @@ function CoachUsersSection() {
     },
   });
 
+  const ragicSyncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/ragic-sync", {
+        method: "POST",
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) throw new Error("同步失敗");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coach-users"] });
+    },
+    onError: (err: Error) => {
+      alert(err.message);
+    },
+  });
+
   const statusLabel = (s: string) =>
     s === "approved" ? "已通過" : s === "pending" ? "待審核" : "已拒絕";
 
@@ -243,6 +260,16 @@ function CoachUsersSection() {
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-sm"
+              onClick={() => ragicSyncMutation.mutate()}
+              disabled={ragicSyncMutation.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${ragicSyncMutation.isPending ? "animate-spin" : ""}`} />
+              {ragicSyncMutation.isPending ? "同步中..." : "同步 Ragic"}
+            </Button>
             <Button
               size="sm"
               variant="outline"
