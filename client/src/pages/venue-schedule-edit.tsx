@@ -129,10 +129,14 @@ function VenueScheduleEditContent() {
         },
         body: JSON.stringify({ coachCount }),
       });
+      if (!response.ok) throw new Error(await response.text());
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+    },
+    onError: (error) => {
+      toast({ title: "更新失敗", description: error.message, variant: "destructive" });
     },
   });
 

@@ -672,7 +672,7 @@ function CoachAssignmentContent() {
                                   />
                                   {hasCoach && (
                                     <label
-                                      className="flex items-center gap-1 cursor-pointer select-none"
+                                      className="flex items-center gap-1 cursor-pointer select-none whitespace-nowrap"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <input
@@ -721,7 +721,7 @@ function CoachAssignmentContent() {
                                       />
                                       {hasCoach2 && (
                                         <label
-                                          className="flex items-center gap-1 cursor-pointer select-none"
+                                          className="flex items-center gap-1 cursor-pointer select-none whitespace-nowrap"
                                           onClick={(e) => e.stopPropagation()}
                                         >
                                           <input
