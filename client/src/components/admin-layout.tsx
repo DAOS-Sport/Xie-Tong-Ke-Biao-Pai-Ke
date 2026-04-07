@@ -65,17 +65,17 @@ export default function AdminLayout({
         />
       )}
 
-      {/* Left Sidebar — absolute overlay */}
+      {/* Left Sidebar — absolute overlay
+          No overflow-hidden so tooltips can visually escape the sidebar boundary */}
       <div
-        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col bg-card border-r border-border shadow-lg transition-all duration-200 overflow-hidden"
+        className="absolute left-0 top-0 bottom-0 z-20 flex flex-col bg-card border-r border-border shadow-lg transition-all duration-200"
         style={{ width: expanded ? `${SIDEBAR_EXPANDED_W}px` : `${SIDEBAR_COLLAPSED_W}px` }}
       >
         {/* Toggle button */}
         <button
           className="h-14 flex items-center justify-center hover:bg-accent transition-colors flex-shrink-0 border-b border-border"
-          style={{ minWidth: `${SIDEBAR_COLLAPSED_W}px` }}
+          style={{ width: `${SIDEBAR_COLLAPSED_W}px` }}
           onClick={() => setExpanded(!expanded)}
-          title={expanded ? "收合選單" : "展開選單"}
         >
           <i
             className={`fas ${expanded ? "fa-chevron-left" : "fa-bars"} text-muted-foreground text-sm`}
@@ -83,14 +83,19 @@ export default function AdminLayout({
         </button>
 
         {/* Nav items */}
-        <nav className="flex-1 py-1 overflow-hidden">
+        <nav className="flex-1 py-1">
           {navItems.map((item) => {
             const isActive = item.key === activeTab;
             const isGreen = !!item.isGreen;
+            const tooltipLabel = item.subLabel
+              ? `${item.label} (${item.subLabel})`
+              : item.label;
+
             return (
               <button
                 key={item.key}
-                className={`w-full flex items-center gap-3 py-3 text-sm font-medium transition-colors whitespace-nowrap
+                /* relative so the absolute tooltip is positioned against this button */
+                className={`relative w-full flex items-center gap-3 py-3 text-sm font-medium transition-colors whitespace-nowrap group
                   ${isActive
                     ? isGreen
                       ? "bg-green-50 text-green-700 border-l-2 border-green-500"
@@ -106,12 +111,34 @@ export default function AdminLayout({
                   className={`fas ${item.icon} text-sm flex-shrink-0 text-center`}
                   style={{ width: "20px" }}
                 ></i>
+
+                {/* Label — only visible when expanded */}
                 {expanded && (
                   <span className="truncate text-left">
                     {item.label}
                     {item.subLabel && (
                       <span className="text-xs ml-1 opacity-60">({item.subLabel})</span>
                     )}
+                  </span>
+                )}
+
+                {/* Hover tooltip — only shown when sidebar is collapsed
+                    Uses absolute positioning so it escapes the sidebar overflow boundary.
+                    Because the sidebar parent has no overflow-hidden, this renders correctly. */}
+                {!expanded && (
+                  <span
+                    className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3
+                               px-2.5 py-1.5 rounded-md text-xs font-normal
+                               bg-gray-800 text-white shadow-lg
+                               opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    style={{ zIndex: 9999 }}
+                  >
+                    {tooltipLabel}
+                    {/* Arrow pointing left */}
+                    <span
+                      className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent"
+                      style={{ borderRightColor: "#1f2937" }}
+                    />
                   </span>
                 )}
               </button>
@@ -156,7 +183,7 @@ export default function AdminLayout({
             {children}
           </main>
           {rightPanel && (
-            <aside className="w-72 flex-shrink-0 overflow-y-auto border-l border-border bg-background">
+            <aside className="w-64 flex-shrink-0 overflow-y-auto border-l border-border bg-background">
               {rightPanel}
             </aside>
           )}

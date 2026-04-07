@@ -14,36 +14,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle, XCircle, Users, ArrowLeft, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil } from "lucide-react";
+import { CheckCircle, XCircle, Users, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
-import { useLocation } from "wouter";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
+import AdminLayout from "@/components/admin-layout";
 
 const adminPassword = "dream0935314711";
 
 function CoachApprovalContent() {
-  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"users" | "rules" | "venues" | "notify">("users");
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto p-4 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => navigate("/mgt-x9k7p2/class-edit")}>
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              學校課表編輯
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate("/mgt-x9k7p2/assign")}>
-              <Users className="h-4 w-4 mr-1" />
-              教練指派
-            </Button>
-            <h1 className="text-lg font-bold">教練管理後台</h1>
-          </div>
-        </div>
+  const headerRight = (
+    <span className="text-sm bg-purple-500 text-white px-3 py-1 rounded-full">教練審核</span>
+  );
 
-        <div className="flex gap-2 border-b pb-2">
+  return (
+    <AdminLayout activeTab="approval" headerRight={headerRight}>
+      <div className="max-w-7xl mx-auto p-4 space-y-4">
+        <div className="flex gap-2 border-b pb-2 flex-wrap">
           <Button
             variant={activeTab === "users" ? "default" : "outline"}
             size="sm"
@@ -82,8 +71,8 @@ function CoachApprovalContent() {
         {activeTab === "rules" && <CoachRulesSection />}
         {activeTab === "venues" && <VenueInfoSection />}
         {activeTab === "notify" && <NotificationSection />}
-      </main>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }
 
