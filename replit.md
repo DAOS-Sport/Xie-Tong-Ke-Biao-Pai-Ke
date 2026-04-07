@@ -89,6 +89,7 @@ Preferred communication style: Simple, everyday language.
   - API: `https://ap7.ragic.com/xinsheng/ragicforms4/20004` (員工表，含個人LINE ID)
   - Auto-sync daily at 03:00 Asia/Taipei + on app startup
   - Syncs: 部門名稱 → venue name, google map → venueInfos.mapUrl
+  - **Venue exclusion**: 同步時跳過「營運性質」欄位（Ragic field 1002826）值為「內勤單位」的部門；另有 EXCLUDED_VENUES 靜態名稱黑名單作為額外防護（只阻止新增，不刪除已有場館）
   - **LINE ID sync**: 從員工表單(ragicforms4/20004)的「個人LINE ID」欄位(field 1003633)同步教練 LINE ID，用於推播通知
   - **Employee ID sync**: 從員工表單(ragicforms4/20004)的「員工編號」欄位同步員工編號到 coachUsers.employeeId（僅在欄位為空時補填）
   - Syncs: 教練姓名/手機/Email/員工編號 → coachUsers (only 應徵職務含「教練」, auto-approved; 在職狀態不篩選)

@@ -46,23 +46,12 @@ async function fetchRagicRecords(apiUrl: string, limit = 500): Promise<RagicReco
 
 const EXCLUDED_VENUES = new Set([
   "勞務-民生國中", "勞務-西湖國中", "勞務-明倫高中", "勞務-永吉國中", "勞務-陽明高中",
-  "勞務-台灣科技大學", "國防醫學大學", "溪口國小", "百齡高中", "建成國中", "士林國中",
+  "勞務-台灣科技大學", "國防醫學大學", "溪口國小", "百齡高中", "建成國中",
   "駿斯運動事業股份有限公司", "士東國小", "新竹科學園區", "新屋高中",
   "行銷事業處", "數位轉型發展處", "人力資源處", "營運管理處",
 ]);
 
-async function cleanupExcludedVenues(): Promise<void> {
-  const existingVenues = await storage.getVenues();
-  for (const venue of existingVenues) {
-    if (EXCLUDED_VENUES.has(venue.name)) {
-      await storage.deleteVenue(venue.id);
-      console.log(`[Ragic] Cleaned up excluded venue: "${venue.name}"`);
-    }
-  }
-}
-
 async function syncVenues(): Promise<{ added: string[]; updated: string[]; total: number }> {
-  await cleanupExcludedVenues();
   const departments = (await fetchRagicRecords(RAGIC_DEPT_API_URL)).filter(r => r["部門名稱"]);
   const existingVenues = await storage.getVenues();
   const existingVenueNames = new Set(existingVenues.map(v => v.name));
@@ -77,8 +66,10 @@ async function syncVenues(): Promise<{ added: string[]; updated: string[]; total
   for (const dept of departments) {
     const name = dept["部門名稱"] as string;
     const googleMap = (dept["google map"] as string) || "";
+    const operationType = (dept["營運性質"] as string) || "";
 
     if (EXCLUDED_VENUES.has(name)) continue;
+    if (operationType === "內勤單位") continue;
 
     if (!existingVenueNames.has(name)) {
       const color = VENUE_COLORS[colorIndex % VENUE_COLORS.length];
