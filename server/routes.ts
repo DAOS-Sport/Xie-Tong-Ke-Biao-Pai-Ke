@@ -7,7 +7,7 @@ import { insertScheduleSchema, insertCoachRegistrationSchema, insertTeacherFeedb
 import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { schedules, teachers, teacherFeedbacks, coachUsers } from "@shared/schema";
+import { schedules, teachers, teacherFeedbacks, coachUsers, venues } from "@shared/schema";
 import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
@@ -23,6 +23,19 @@ async function runStartupFixes(): Promise<void> {
     }
   } catch (err) {
     console.error("[Migration] runStartupFixes failed:", err);
+  }
+
+  try {
+    const fixed = await db
+      .update(venues)
+      .set({ color: "blue" })
+      .where(and(eq(venues.name, "士林國中"), eq(venues.color, "cyan")))
+      .returning({ id: venues.id, name: venues.name });
+    if (fixed.length > 0) {
+      console.log(`[Migration] Fixed 士林國中 color: cyan → blue`);
+    }
+  } catch (err) {
+    console.error("[Migration] Fix 士林國中 color failed:", err);
   }
 }
 
