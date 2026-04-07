@@ -95,7 +95,7 @@ function CoachSearchSelect({
       >
         <div className="flex items-center gap-1 min-w-0">
           {hasValue && <Check className="h-3 w-3 flex-shrink-0 text-green-600" />}
-          <span className={`truncate ${value ? "" : "text-gray-400"}`}>
+          <span className={`flex-1 min-w-0 truncate ${value ? "" : "text-gray-400"}`}>
             {value || placeholder}
           </span>
         </div>

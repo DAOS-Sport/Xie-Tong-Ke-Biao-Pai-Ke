@@ -65,8 +65,7 @@ export default function AdminLayout({
         />
       )}
 
-      {/* Left Sidebar — absolute overlay
-          No overflow-hidden so tooltips can visually escape the sidebar boundary */}
+      {/* Left Sidebar — absolute overlay */}
       <div
         className="absolute left-0 top-0 bottom-0 z-20 flex flex-col bg-card border-r border-border shadow-lg transition-all duration-200"
         style={{ width: expanded ? `${SIDEBAR_EXPANDED_W}px` : `${SIDEBAR_COLLAPSED_W}px` }}
@@ -122,9 +121,7 @@ export default function AdminLayout({
                   </span>
                 )}
 
-                {/* Hover tooltip — only shown when sidebar is collapsed
-                    Uses absolute positioning so it escapes the sidebar overflow boundary.
-                    Because the sidebar parent has no overflow-hidden, this renders correctly. */}
+                {/* Hover tooltip when collapsed */}
                 {!expanded && (
                   <span
                     className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3
