@@ -118,7 +118,7 @@ export default function VenueSchedule() {
                   {getExtendedWeekDays(currentWeek).map((date, index) => {
                     const weekDayNames = getExtendedWeekdayNames(currentWeek);
                     return (
-                      <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                      <th key={index} className="border border-gray-300 p-2 bg-gray-50 min-w-48">
                         <div className="text-center">
                           <div className="font-semibold">{weekDayNames[index]}</div>
                           <div className="text-sm text-gray-600">{format(date, "MM/dd")}</div>
@@ -140,23 +140,23 @@ export default function VenueSchedule() {
                       const daySchedules = schedulesByDateAndTime[dateStr]?.[timeSlot.id] || [];
                       return (
                         <td key={`${timeSlot.id}-${index}`} className="border border-gray-300 p-1 align-top">
-                          <div className="flex flex-col gap-1 min-h-[60px]">
+                          <div className="grid grid-cols-2 gap-1 min-h-[48px]">
                             {daySchedules.map((schedule, idx) => (
                               <div
                                 key={`${schedule.id}-${idx}`}
-                                className="p-1.5 rounded bg-blue-100 border border-blue-200"
+                                className="p-1 rounded bg-blue-100 border border-blue-200"
                               >
-                                <div className="text-base font-bold text-blue-800 leading-tight">
+                                <div className="text-sm font-bold text-blue-800 leading-tight">
                                   {schedule.className || "游泳課"}
                                 </div>
                                 {schedule.coachName && (
-                                  <div className="text-sm text-blue-600 whitespace-normal leading-snug mt-0.5">
+                                  <div className="text-xs text-blue-600 leading-snug mt-0.5">
                                     {schedule.coachName}
-                                    {schedule.coachName2 && ` / ${schedule.coachName2}`}
+                                    {schedule.coachName2 && `-${schedule.coachName2}`}
                                   </div>
                                 )}
                                 {schedule.notes && (
-                                  <div className="text-xs text-gray-600 mt-1">{schedule.notes}</div>
+                                  <div className="text-xs text-gray-600 mt-0.5">{schedule.notes}</div>
                                 )}
                               </div>
                             ))}
