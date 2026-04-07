@@ -4,6 +4,7 @@ import { format, addMonths, subMonths } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 
@@ -23,6 +24,7 @@ const VENUE_COLORS: Record<string, string> = {
 function StatisticsContent() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [searchCoach, setSearchCoach] = useState("");
+  const { toast } = useToast();
 
   const getStatisticsPeriod = (baseDate: Date) => {
     const year = baseDate.getFullYear();
@@ -70,7 +72,10 @@ function StatisticsContent() {
   const getVenueBg = (color: string) => VENUE_COLORS[color] || "#6b7280";
 
   const exportToExcel = () => {
-    if (!filteredStatistics.length) return;
+    if (!filteredStatistics.length) {
+      toast({ title: "無資料", description: "目前沒有可匯出的統計資料", variant: "destructive" });
+      return;
+    }
     const venueNames = allVenues.map(v => v.name);
     const headers = ["教練姓名", "總堂數", "當班", "偕同", ...venueNames];
     const rows = filteredStatistics.map(stat => {
@@ -87,6 +92,7 @@ function StatisticsContent() {
     a.download = `堂數統計_${currentPeriod.startDate}_${currentPeriod.endDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast({ title: "匯出成功", description: `已下載堂數統計 (${filteredStatistics.length} 位教練)` });
   };
 
   return (
