@@ -187,6 +187,7 @@ function CoachAssignmentContent() {
     timeSlotId: string;
     timeSlotOrder: number;
   } | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
 
   const { data: venues } = useQuery<Venue[]>({ queryKey: ["/api/venues"] });
   const { data: timeSlots } = useQuery<TimeSlot[]>({ queryKey: ["/api/time-slots"] });
@@ -614,8 +615,8 @@ function CoachAssignmentContent() {
                             })
                           }
                         >
-                          {/* 2-column grid for schedule cards */}
-                          <div className="grid grid-cols-2 gap-1 min-h-[80px]">
+                          {/* Vertically stacked schedule cards */}
+                          <div className="flex flex-col gap-1 min-h-[80px]">
                             {daySchedules.map((schedule) => {
                               if (!schedule.className) return null;
                               const hasCoach = !!schedule.coachName;
@@ -629,16 +630,24 @@ function CoachAssignmentContent() {
                                 selectedVenueData?.name
                               );
                               const isMissing = !hasCoach || (needsTwo && !hasCoach2);
+                              const isCardSelected = selectedScheduleId === schedule.id;
                               const missingBg = isMissing
                                 ? !hasCoach
                                   ? "bg-red-50 border border-red-200"
                                   : "bg-amber-50 border border-amber-200"
-                                : "";
+                                : "bg-white border border-gray-200";
 
                               return (
                                 <div
                                   key={schedule.id}
-                                  className={`rounded p-1.5 space-y-1 ${missingBg}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCell({ date: dateStr, timeSlotId: timeSlot.id, timeSlotOrder: timeSlot.order });
+                                    setSelectedScheduleId(isCardSelected ? null : schedule.id);
+                                  }}
+                                  className={`rounded p-1.5 space-y-1 cursor-pointer transition-all ${missingBg} ${
+                                    isCardSelected ? "ring-2 ring-blue-500 shadow-md" : "hover:shadow-sm"
+                                  }`}
                                 >
                                   <div className="bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded text-center truncate flex items-center justify-center gap-1">
                                     {schedule.className}
