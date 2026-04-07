@@ -124,9 +124,9 @@ export default function AdminLayout({
                 {/* Hover tooltip when collapsed */}
                 {!expanded && (
                   <span
-                    className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3
-                               px-2.5 py-1.5 rounded-md text-xs font-normal
-                               bg-gray-800 text-white shadow-lg
+                    className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2
+                               px-2.5 py-1.5 rounded-md text-xs font-normal whitespace-nowrap
+                               bg-white text-gray-900 shadow-md border border-gray-200
                                opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                     style={{ zIndex: 9999 }}
                   >
@@ -134,7 +134,7 @@ export default function AdminLayout({
                     {/* Arrow pointing left */}
                     <span
                       className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent"
-                      style={{ borderRightColor: "#1f2937" }}
+                      style={{ borderRightColor: "#ffffff" }}
                     />
                   </span>
                 )}

@@ -615,8 +615,8 @@ function CoachAssignmentContent() {
                             })
                           }
                         >
-                          {/* Vertically stacked schedule cards */}
-                          <div className="flex flex-col gap-1 min-h-[80px]">
+                          {/* Schedule cards: 2-col grid when 2+ classes, else single col */}
+                          <div className={`min-h-[80px] gap-1 ${daySchedules.length >= 2 ? "grid grid-cols-2" : "flex flex-col"}`}>
                             {daySchedules.map((schedule) => {
                               if (!schedule.className) return null;
                               const hasCoach = !!schedule.coachName;
