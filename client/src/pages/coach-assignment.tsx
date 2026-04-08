@@ -630,8 +630,8 @@ function CoachAssignmentContent() {
                             })
                           }
                         >
-                          {/* Schedule cards: 2-col grid when 2+ classes, else single col */}
-                          <div className={`min-h-[80px] gap-1 ${daySchedules.length >= 2 ? "grid grid-cols-2" : "flex flex-col"}`}>
+                          {/* Schedule cards: single col on mobile, 2-col grid on md+ when 2+ classes */}
+                          <div className={`min-h-[80px] gap-1 ${daySchedules.length >= 2 ? "flex flex-col md:grid md:grid-cols-2" : "flex flex-col"}`}>
                             {daySchedules.map((schedule) => {
                               if (!schedule.className) return null;
                               const hasCoach = !!schedule.coachName;
