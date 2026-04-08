@@ -57,7 +57,7 @@ export default function VenueSchedule() {
   const weekDateLabel = `${format(currentWeek, "yyyy/MM/dd")} - ${format(addDays(currentWeek, 4), "MM/dd")}`;
 
   const headerCenter = (
-    <div className="flex items-center gap-2 flex-wrap justify-center">
+    <div className="flex items-center gap-2 flex-nowrap">
       <span className="text-sm font-medium whitespace-nowrap">選擇場館：</span>
       <Select value={selectedVenue} onValueChange={setSelectedVenue}>
         <SelectTrigger className="w-36 h-8 text-sm">

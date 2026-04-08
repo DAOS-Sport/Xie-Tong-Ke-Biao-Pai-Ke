@@ -77,7 +77,7 @@ export default function CoachView() {
   };
 
   const headerCenter = (
-    <div className="flex items-center gap-2 flex-wrap justify-center">
+    <div className="flex items-center gap-2 flex-nowrap">
       <span className="text-sm font-medium whitespace-nowrap">選擇教練：</span>
       <Select value={selectedCoach} onValueChange={setSelectedCoach}>
         <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-coach">
