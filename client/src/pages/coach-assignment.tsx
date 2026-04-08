@@ -168,6 +168,16 @@ function CoachSearchSelect({
             {availableList.length === 0 && otherList.length === 0 && (
               <div className="px-2 py-3 text-xs text-gray-400 text-center">無符合結果</div>
             )}
+            {search.trim() && !coaches.includes(search.trim()) && (
+              <button
+                type="button"
+                onClick={() => handleSelect(search.trim())}
+                className="w-full text-left px-2 py-1.5 text-xs text-orange-600 hover:bg-orange-50 border-t border-orange-100 flex items-center gap-1 font-medium"
+              >
+                <span className="flex-shrink-0">＋</span>
+                <span>直接使用「{search.trim()}」（代班）</span>
+              </button>
+            )}
           </div>
         </div>
       )}
