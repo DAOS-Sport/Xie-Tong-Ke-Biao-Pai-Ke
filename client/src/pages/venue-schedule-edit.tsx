@@ -89,7 +89,12 @@ function VenueScheduleEditContent() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
+      toast({ title: "新增成功" });
     },
     onError: (error) => {
       toast({
@@ -109,7 +114,11 @@ function VenueScheduleEditContent() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
     },
   });
 
@@ -133,7 +142,11 @@ function VenueScheduleEditContent() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
     },
     onError: (error) => {
       toast({ title: "更新失敗", description: error.message, variant: "destructive" });
@@ -166,7 +179,11 @@ function VenueScheduleEditContent() {
         title: "複製成功",
         description: `已複製 ${data.copied} 個班級`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].includes("/api/schedules"),
+      });
       setShowCopyWeek(false);
     },
     onError: () => {
