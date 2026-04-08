@@ -188,6 +188,7 @@ function CoachAssignmentContent() {
     timeSlotOrder: number;
   } | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
+  const [showRightPanel, setShowRightPanel] = useState(false);
 
   const { data: venues } = useQuery<Venue[]>({ queryKey: ["/api/venues"] });
   const { data: timeSlots } = useQuery<TimeSlot[]>({ queryKey: ["/api/time-slots"] });
@@ -444,11 +445,25 @@ function CoachAssignmentContent() {
   );
 
   const headerRight = (
-    <span className="text-sm bg-blue-500 text-white px-3 py-1 rounded-full">教練指派</span>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => setShowRightPanel(v => !v)}
+        title={showRightPanel ? "隱藏本週統計" : "顯示本週統計"}
+        className={`flex items-center gap-1 h-8 px-2 rounded-md border text-xs transition-colors ${
+          showRightPanel
+            ? "bg-blue-100 border-blue-300 text-blue-700"
+            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+        }`}
+      >
+        <BarChart3 className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">本週統計</span>
+      </button>
+      <span className="text-sm bg-blue-500 text-white px-3 py-1 rounded-full">教練指派</span>
+    </div>
   );
 
   /* Right panel: available coaches + weekly stats */
-  const rightPanel = (
+  const rightPanelContent = (
     <div className="p-3 space-y-4">
       {selectedCell && sidebarAvailableCoaches && (
         <Card>
@@ -537,7 +552,7 @@ function CoachAssignmentContent() {
       activeTab="assign"
       headerCenter={headerCenter}
       headerRight={headerRight}
-      rightPanel={rightPanel}
+      rightPanel={showRightPanel ? rightPanelContent : undefined}
     >
       <div className="p-4">
         {/* Missing coach alert */}
