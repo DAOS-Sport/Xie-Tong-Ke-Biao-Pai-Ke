@@ -1033,10 +1033,15 @@ function NotificationSection() {
   const [logPreview, setLogPreview] = useState<LogPreview | null>(null);
   const [weeklyResult, setWeeklyResult] = useState<string | null>(null);
   const [isSendingWeekly, setIsSendingWeekly] = useState(false);
+  const [venueFilter, setVenueFilter] = useState("__all__");
+  const [coachFilter, setCoachFilter] = useState("__all__");
+  const [scheduleModifiedAt, setScheduleModifiedAt] = useState<number>(
+    () => parseInt(localStorage.getItem("scheduleLastModified") || "0")
+  );
 
   const notifyLogsKey = `/api/admin/notify-logs?date=${selectedDate}`;
 
-  const { data: rows = [], isFetching, refetch } = useQuery<NotifyLogRow[]>({
+  const { data: rows = [], isFetching, dataUpdatedAt } = useQuery<NotifyLogRow[]>({
     queryKey: [notifyLogsKey],
     queryFn: async () => {
       const res = await fetch(`/api/admin/notify-logs?date=${selectedDate}`, {
@@ -1048,14 +1053,50 @@ function NotificationSection() {
     refetchInterval: 30000,
   });
 
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "scheduleLastModified" && e.newValue) {
+        setScheduleModifiedAt(parseInt(e.newValue));
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const showModifiedBanner = scheduleModifiedAt > 0 && dataUpdatedAt > 0 && scheduleModifiedAt > dataUpdatedAt;
+
   const handleRefresh = () => {
     setSelectedKeys(new Set());
     queryClient.invalidateQueries({
       predicate: q => typeof q.queryKey[0] === "string" && q.queryKey[0].includes("/api/admin/notify-logs"),
     });
+    const latest = parseInt(localStorage.getItem("scheduleLastModified") || "0");
+    setScheduleModifiedAt(latest);
   };
 
-  const allKeys = rows.flatMap(r => {
+  const extractPeriodNum = (period: string) => {
+    const m = period.match(/\d+/);
+    return m ? parseInt(m[0]) : 0;
+  };
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const venueCmp = a.venue.localeCompare(b.venue, "zh-TW");
+    if (venueCmp !== 0) return venueCmp;
+    return extractPeriodNum(a.period) - extractPeriodNum(b.period);
+  });
+
+  const venueOptions = Array.from(new Set(rows.map(r => r.venue))).sort((a, b) => a.localeCompare(b, "zh-TW"));
+  const coachOptions = Array.from(new Set(rows.flatMap(r => [r.coachName, r.coachName2].filter(Boolean) as string[]))).sort((a, b) => a.localeCompare(b, "zh-TW"));
+
+  const filteredRows = sortedRows.filter(r => {
+    if (venueFilter !== "__all__" && r.venue !== venueFilter) return false;
+    if (coachFilter !== "__all__") {
+      if (r.coachName !== coachFilter && r.coachName2 !== coachFilter) return false;
+    }
+    return true;
+  });
+
+  const allKeys = filteredRows.flatMap(r => {
     const keys: string[] = [];
     if (r.coachName) keys.push(`${r.scheduleId}-1`);
     if (r.coachName2) keys.push(`${r.scheduleId}-2`);
@@ -1079,7 +1120,7 @@ function NotificationSection() {
 
   const getSelectedCoaches = () => {
     const coaches = new Set<string>();
-    rows.forEach(r => {
+    filteredRows.forEach(r => {
       if (r.coachName && selectedKeys.has(`${r.scheduleId}-1`)) coaches.add(r.coachName);
       if (r.coachName2 && selectedKeys.has(`${r.scheduleId}-2`)) coaches.add(r.coachName2);
     });
@@ -1188,7 +1229,23 @@ function NotificationSection() {
           {/* Header row */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="font-semibold text-sm">📋 個別通知教練</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={venueFilter}
+                onChange={e => { setVenueFilter(e.target.value); setSelectedKeys(new Set()); }}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="__all__">全部場館</option>
+                {venueOptions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <select
+                value={coachFilter}
+                onChange={e => { setCoachFilter(e.target.value); setSelectedKeys(new Set()); }}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="__all__">全部教練</option>
+                {coachOptions.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
               <input
                 type="date"
                 value={selectedDate}
@@ -1207,6 +1264,14 @@ function NotificationSection() {
             </div>
           </div>
 
+          {/* Modified banner */}
+          {showModifiedBanner && (
+            <div className="flex items-center gap-2 bg-orange-50 border border-orange-300 rounded px-3 py-2 text-sm text-orange-700">
+              <span className="text-base">⚠️</span>
+              <span>教練名單有異動調整，請手動點選右側「重新整理」。</span>
+            </div>
+          )}
+
           {/* Table */}
           <div className="overflow-x-auto rounded border">
             <Table>
@@ -1218,24 +1283,24 @@ function NotificationSection() {
                       onCheckedChange={toggleAll}
                     />
                   </TableHead>
-                  <TableHead className="text-xs">場館</TableHead>
-                  <TableHead className="text-xs">節次</TableHead>
-                  <TableHead className="text-xs">時間</TableHead>
-                  <TableHead className="text-xs">班級</TableHead>
-                  <TableHead className="text-xs">教練</TableHead>
-                  <TableHead className="text-xs">推播時間</TableHead>
-                  <TableHead className="text-xs">推播內容</TableHead>
+                  <TableHead className="text-sm">場館</TableHead>
+                  <TableHead className="text-sm">節次</TableHead>
+                  <TableHead className="text-sm">時間</TableHead>
+                  <TableHead className="text-sm">班級</TableHead>
+                  <TableHead className="text-sm">教練</TableHead>
+                  <TableHead className="text-sm">推播時間</TableHead>
+                  <TableHead className="text-sm">推播內容</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ? (
+                {filteredRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">
-                      {isFetching ? "載入中..." : "該日期無排課資料"}
+                      {isFetching ? "載入中..." : rows.length === 0 ? "該日期無排課資料" : "無符合篩選條件的資料"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.flatMap(r => {
+                  filteredRows.flatMap(r => {
                     const rowItems: { key: string; coach: string; log: NotifyLogRow["coach1Log"] }[] = [];
                     if (r.coachName) rowItems.push({ key: `${r.scheduleId}-1`, coach: r.coachName, log: r.coach1Log });
                     if (r.coachName2) rowItems.push({ key: `${r.scheduleId}-2`, coach: r.coachName2, log: r.coach2Log });
@@ -1249,19 +1314,19 @@ function NotificationSection() {
                             onCheckedChange={() => toggleKey(item.key)}
                           />
                         </TableCell>
-                        <TableCell className="text-xs">{idx === 0 ? r.venue : ""}</TableCell>
-                        <TableCell className="text-xs">{idx === 0 ? r.period : ""}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">{idx === 0 ? `${r.startTime}-${r.endTime}` : ""}</TableCell>
-                        <TableCell className="text-xs">{idx === 0 ? r.className : ""}</TableCell>
-                        <TableCell className="text-xs font-medium">{item.coach}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">
+                        <TableCell className="text-sm">{idx === 0 ? r.venue : ""}</TableCell>
+                        <TableCell className="text-sm">{idx === 0 ? r.period : ""}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{idx === 0 ? `${r.startTime}-${r.endTime}` : ""}</TableCell>
+                        <TableCell className="text-sm">{idx === 0 ? r.className : ""}</TableCell>
+                        <TableCell className="text-sm font-medium">{item.coach}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
                           {item.log ? (
                             <span className="text-green-700">{formatSentAt(item.log.sentAt)}</span>
                           ) : (
                             <span className="text-gray-400">─（尚未推播）</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-xs">
+                        <TableCell className="text-sm">
                           {item.log ? (
                             <button
                               onClick={() => setLogPreview({ coachName: item.coach, sentAt: item.log!.sentAt, content: item.log!.content, notifyType: item.log!.notifyType })}

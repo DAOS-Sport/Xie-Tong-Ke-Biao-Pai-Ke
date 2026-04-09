@@ -320,6 +320,7 @@ function CoachAssignmentContent() {
           typeof query.queryKey[0] === "string" &&
           (query.queryKey[0].includes("/api/schedules") || query.queryKey[0].includes("/api/conflicts")),
       });
+      localStorage.setItem("scheduleLastModified", Date.now().toString());
       toast({ title: "指派成功", description: "教練已更新" });
     },
     onError: (error) => {
