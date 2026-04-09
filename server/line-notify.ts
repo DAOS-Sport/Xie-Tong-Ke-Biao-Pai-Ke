@@ -135,13 +135,16 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
       if (success) {
         sentCount++;
         console.log(`[LINE Notify] Sent to ${coachName}`);
-        await db.insert(lineNotifyLogs).values({
-          coachName,
-          lineId,
-          content: message,
-          notifyType: 'weekly',
-          scheduleDate: startDate,
-        }).catch(e => console.error('[LINE Notify] Failed to log weekly push:', e));
+        // Log one record per scheduled date so date-based queries find the push
+        for (const dateKey of sortedDates) {
+          await db.insert(lineNotifyLogs).values({
+            coachName,
+            lineId,
+            content: message,
+            notifyType: 'weekly',
+            scheduleDate: dateKey,
+          }).catch(e => console.error('[LINE Notify] Failed to log weekly push:', e));
+        }
       } else {
         failCount++;
       }

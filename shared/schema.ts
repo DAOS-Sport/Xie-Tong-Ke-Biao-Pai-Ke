@@ -164,7 +164,7 @@ export const lineNotifyLogs = pgTable("line_notify_logs", {
   sentAt: timestamp("sent_at").notNull().defaultNow(),
   content: text("content").notNull(),
   notifyType: varchar("notify_type").notNull(), // 'weekly' | 'daily' | 'manual'
-  scheduleDate: varchar("schedule_date"), // yyyy-MM-dd — the date the notified classes are on
+  scheduleDate: date("schedule_date").notNull(), // the date the notified classes are on
 });
 
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
