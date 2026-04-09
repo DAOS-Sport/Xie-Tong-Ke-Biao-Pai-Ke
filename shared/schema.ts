@@ -157,6 +157,16 @@ export const coachAvailability = pgTable("coach_availability", {
   unique().on(table.coachName, table.weekStart, table.dayOfWeek, table.timeSlotOrder),
 ]);
 
+export const lineNotifyLogs = pgTable("line_notify_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachName: varchar("coach_name").notNull(),
+  lineId: varchar("line_id"),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  content: text("content").notNull(),
+  notifyType: varchar("notify_type").notNull(), // 'weekly' | 'daily' | 'manual'
+  scheduleDate: varchar("schedule_date"), // yyyy-MM-dd — the date the notified classes are on
+});
+
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],
@@ -256,3 +266,5 @@ export type InsertCoachUserType = z.infer<typeof insertCoachUserSchema>;
 export type CoachAvailability = typeof coachAvailability.$inferSelect;
 export type InsertCoachAvailability = typeof coachAvailability.$inferInsert;
 export type CoachVenuePreference = typeof coachVenuePreferences.$inferSelect;
+export type LineNotifyLog = typeof lineNotifyLogs.$inferSelect;
+export type InsertLineNotifyLog = typeof lineNotifyLogs.$inferInsert;

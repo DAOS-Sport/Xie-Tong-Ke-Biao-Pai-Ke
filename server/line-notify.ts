@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { storage } from './storage';
 import { format, addDays, startOfWeek } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { db } from './db';
+import { lineNotifyLogs } from '@shared/schema';
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
@@ -133,6 +135,13 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
       if (success) {
         sentCount++;
         console.log(`[LINE Notify] Sent to ${coachName}`);
+        await db.insert(lineNotifyLogs).values({
+          coachName,
+          lineId,
+          content: message,
+          notifyType: 'weekly',
+          scheduleDate: startDate,
+        }).catch(e => console.error('[LINE Notify] Failed to log weekly push:', e));
       } else {
         failCount++;
       }
@@ -225,6 +234,13 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
       if (success) {
         sentCount++;
         console.log(`[LINE Notify] Daily: sent to ${coachName}`);
+        await db.insert(lineNotifyLogs).values({
+          coachName,
+          lineId: coach.lineId!,
+          content: message,
+          notifyType: 'daily',
+          scheduleDate: tomorrowStr,
+        }).catch(e => console.error('[LINE Notify] Failed to log daily push:', e));
       } else {
         failCount++;
       }
