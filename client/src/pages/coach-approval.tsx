@@ -1230,22 +1230,24 @@ function NotificationSection() {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="font-semibold text-sm">📋 個別通知教練</p>
             <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={venueFilter}
-                onChange={e => { setVenueFilter(e.target.value); setSelectedKeys(new Set()); }}
-                className="border rounded px-2 py-1 text-sm"
-              >
-                <option value="__all__">全部場館</option>
-                {venueOptions.map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-              <select
-                value={coachFilter}
-                onChange={e => { setCoachFilter(e.target.value); setSelectedKeys(new Set()); }}
-                className="border rounded px-2 py-1 text-sm"
-              >
-                <option value="__all__">全部教練</option>
-                {coachOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <Select value={venueFilter} onValueChange={v => { setVenueFilter(v); setSelectedKeys(new Set()); }}>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue placeholder="全部場館" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部場館</SelectItem>
+                  {venueOptions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={coachFilter} onValueChange={v => { setCoachFilter(v); setSelectedKeys(new Set()); }}>
+                <SelectTrigger className="h-8 text-sm w-28">
+                  <SelectValue placeholder="全部教練" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">全部教練</SelectItem>
+                  {coachOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <input
                 type="date"
                 value={selectedDate}
