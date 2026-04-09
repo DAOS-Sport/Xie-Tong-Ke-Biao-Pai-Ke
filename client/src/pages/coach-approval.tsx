@@ -1050,7 +1050,9 @@ function NotificationSection() {
 
   const handleRefresh = () => {
     setSelectedKeys(new Set());
-    refetch();
+    queryClient.invalidateQueries({
+      predicate: q => typeof q.queryKey[0] === "string" && q.queryKey[0].includes("/api/admin/notify-logs"),
+    });
   };
 
   const allKeys = rows.flatMap(r => {
@@ -1256,7 +1258,7 @@ function NotificationSection() {
                           {item.log ? (
                             <span className="text-green-700">{formatSentAt(item.log.sentAt)}</span>
                           ) : (
-                            <span className="text-gray-400">─ 尚未推播</span>
+                            <span className="text-gray-400">─（尚未推播）</span>
                           )}
                         </TableCell>
                         <TableCell className="text-xs">
@@ -1266,7 +1268,7 @@ function NotificationSection() {
                               className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               <MessageSquare className="h-3 w-3" />
-                              {notifyTypeLabel(item.log.notifyType)}
+                              {notifyTypeLabel(item.log.notifyType)} →
                             </button>
                           ) : (
                             <span className="text-gray-300">─</span>
