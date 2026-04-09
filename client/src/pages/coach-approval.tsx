@@ -14,7 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle, XCircle, Users, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil } from "lucide-react";
+import { CheckCircle, XCircle, Users, BookOpen, MapPin, Save, Bell, Send, Copy, ExternalLink, Link, Plus, Trash2, RefreshCw, Cloud, FileDown, Pencil, RotateCcw, MessageSquare } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
@@ -1000,32 +1004,137 @@ function VenueInfoEditor({
   );
 }
 
-function NotificationSection() {
-  const [sendResult, setSendResult] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
+interface NotifyLogRow {
+  scheduleId: string;
+  date: string;
+  venue: string;
+  period: string;
+  startTime: string;
+  endTime: string;
+  className: string | null;
+  coachName: string | null;
+  coachName2: string | null;
+  coach1Log: { sentAt: string; content: string; notifyType: string } | null;
+  coach2Log: { sentAt: string; content: string; notifyType: string } | null;
+}
 
-  const sendNotification = async () => {
-    setIsSending(true);
-    setSendResult(null);
+interface LogPreview {
+  coachName: string;
+  sentAt: string;
+  content: string;
+  notifyType: string;
+}
+
+function NotificationSection() {
+  const { toast } = useToast();
+  const today = format(new Date(), "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [logPreview, setLogPreview] = useState<LogPreview | null>(null);
+  const [weeklyResult, setWeeklyResult] = useState<string | null>(null);
+  const [isSendingWeekly, setIsSendingWeekly] = useState(false);
+
+  const notifyLogsKey = `/api/admin/notify-logs?date=${selectedDate}`;
+
+  const { data: rows = [], isFetching, refetch } = useQuery<NotifyLogRow[]>({
+    queryKey: [notifyLogsKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/notify-logs?date=${selectedDate}`, {
+        headers: { "x-admin-password": adminPassword },
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const handleRefresh = () => {
+    setSelectedKeys(new Set());
+    refetch();
+  };
+
+  const allKeys = rows.flatMap(r => {
+    const keys: string[] = [];
+    if (r.coachName) keys.push(`${r.scheduleId}-1`);
+    if (r.coachName2) keys.push(`${r.scheduleId}-2`);
+    return keys;
+  });
+  const allSelected = allKeys.length > 0 && allKeys.every(k => selectedKeys.has(k));
+
+  const toggleAll = () => {
+    if (allSelected) setSelectedKeys(new Set());
+    else setSelectedKeys(new Set(allKeys));
+  };
+
+  const toggleKey = (key: string) => {
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const getSelectedCoaches = () => {
+    const coaches = new Set<string>();
+    rows.forEach(r => {
+      if (r.coachName && selectedKeys.has(`${r.scheduleId}-1`)) coaches.add(r.coachName);
+      if (r.coachName2 && selectedKeys.has(`${r.scheduleId}-2`)) coaches.add(r.coachName2);
+    });
+    return Array.from(coaches);
+  };
+
+  const sendIndividualMutation = useMutation({
+    mutationFn: async (coachNames: string[]) => {
+      const res = await fetch("/api/admin/send-notify-individual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({ coachNames, date: selectedDate }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "發送失敗");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "推播完成", description: `成功 ${data.sentCount} 筆，失敗 ${data.failCount} 筆` });
+      setSelectedKeys(new Set());
+      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && q.queryKey[0].includes("/api/admin/notify-logs") });
+    },
+    onError: (e: Error) => {
+      toast({ title: "推播失敗", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const sendWeeklyNotification = async () => {
+    setIsSendingWeekly(true);
+    setWeeklyResult(null);
     try {
       const res = await fetch("/api/admin/send-weekly-notifications", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
       });
       const data = await res.json();
-      if (res.ok) {
-        setSendResult("推播已成功發送！");
-      } else {
-        setSendResult(`發送失敗：${data.message || "未知錯誤"}`);
-      }
+      setWeeklyResult(res.ok ? "推播已成功發送！" : `失敗：${data.message || "未知錯誤"}`);
     } catch {
-      setSendResult("發送失敗：網路錯誤");
+      setWeeklyResult("發送失敗：網路錯誤");
     } finally {
-      setIsSending(false);
+      setIsSendingWeekly(false);
     }
+  };
+
+  const formatSentAt = (sentAt: string) => {
+    try {
+      const d = new Date(sentAt);
+      return format(d, "MM/dd HH:mm");
+    } catch {
+      return sentAt;
+    }
+  };
+
+  const notifyTypeLabel = (t: string) => {
+    if (t === "daily") return "明日課表";
+    if (t === "weekly") return "下週課表";
+    if (t === "manual") return "手動補發";
+    return t;
   };
 
   return (
@@ -1036,37 +1145,182 @@ function NotificationSection() {
           LINE 推播通知
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm space-y-2">
-          <p className="font-medium text-blue-800">自動推播排程</p>
-          <p className="text-blue-700">
-            系統會在每週日晚上 20:00（台灣時間）自動發送 LINE 推播，通知每位教練下週排定的課程。
-          </p>
-          <p className="text-blue-600 text-xs">
-            條件：教練需已核准、已綁定 LINE 帳號、且帳號已連結排課系統中的教練名稱。
-          </p>
+      <CardContent className="space-y-5">
+
+        {/* Top row: 自動排程 (4/5) + 手動群體發送 (1/5) */}
+        <div className="flex gap-3 items-stretch">
+          {/* 自動推播排程 — 4 parts */}
+          <div className="flex-[4] bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm space-y-2">
+            <p className="font-semibold text-blue-800">📅 自動推播排程</p>
+            <div className="space-y-1 text-blue-700">
+              <p>● <span className="font-medium">每週日 20:00</span>（台灣時間）→ 發送下週完整課表給所有教練</p>
+              <p>● <span className="font-medium">每日 19:00</span>（台灣時間）→ 發送明日課表給隔日有排課的教練</p>
+            </div>
+            <p className="text-blue-500 text-xs pt-1">
+              推播條件：教練需已核准 ＋ 已綁定 LINE ＋ 已連結排課系統中的教練名稱
+            </p>
+          </div>
+
+          {/* 手動群體發送 — 1 part */}
+          <div className="flex-[1] border rounded-lg p-4 flex flex-col gap-2 min-w-[140px]">
+            <p className="font-semibold text-sm">✉️ 手動群體發送</p>
+            <Button
+              size="sm"
+              onClick={sendWeeklyNotification}
+              disabled={isSendingWeekly}
+              className="bg-green-500 hover:bg-green-600 text-xs"
+            >
+              <Send className="h-3 w-3 mr-1" />
+              {isSendingWeekly ? "發送中..." : "立即發送下週課程通知"}
+            </Button>
+            {weeklyResult && (
+              <p className={`text-xs ${weeklyResult.includes("成功") ? "text-green-600" : "text-red-600"}`}>
+                {weeklyResult}
+              </p>
+            )}
+          </div>
         </div>
 
+        {/* Individual notify section */}
         <div className="border rounded-lg p-4 space-y-3">
-          <p className="font-medium">手動發送推播</p>
-          <p className="text-sm text-muted-foreground">
-            點擊下方按鈕立即發送下週課程通知給所有符合條件的教練。
-          </p>
-          <Button
-            onClick={sendNotification}
-            disabled={isSending}
-            className="bg-green-500 hover:bg-green-600"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            {isSending ? "發送中..." : "立即發送下週課程通知"}
-          </Button>
-          {sendResult && (
-            <p className={`text-sm mt-2 ${sendResult.includes("成功") ? "text-green-600" : "text-red-600"}`}>
-              {sendResult}
-            </p>
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="font-semibold text-sm">📋 個別通知教練</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => { setSelectedDate(e.target.value); setSelectedKeys(new Set()); }}
+                className="border rounded px-2 py-1 text-sm"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={isFetching}
+              >
+                <RotateCcw className={`h-3.5 w-3.5 mr-1 ${isFetching ? "animate-spin" : ""}`} />
+                重新整理
+              </Button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto rounded border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-8 px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs">場館</TableHead>
+                  <TableHead className="text-xs">節次</TableHead>
+                  <TableHead className="text-xs">時間</TableHead>
+                  <TableHead className="text-xs">班級</TableHead>
+                  <TableHead className="text-xs">教練</TableHead>
+                  <TableHead className="text-xs">推播時間</TableHead>
+                  <TableHead className="text-xs">推播內容</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">
+                      {isFetching ? "載入中..." : "該日期無排課資料"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.flatMap(r => {
+                    const rowItems: { key: string; coach: string; log: NotifyLogRow["coach1Log"] }[] = [];
+                    if (r.coachName) rowItems.push({ key: `${r.scheduleId}-1`, coach: r.coachName, log: r.coach1Log });
+                    if (r.coachName2) rowItems.push({ key: `${r.scheduleId}-2`, coach: r.coachName2, log: r.coach2Log });
+                    if (rowItems.length === 0) return [];
+
+                    return rowItems.map((item, idx) => (
+                      <TableRow key={item.key} className={selectedKeys.has(item.key) ? "bg-blue-50" : ""}>
+                        <TableCell className="px-2">
+                          <Checkbox
+                            checked={selectedKeys.has(item.key)}
+                            onCheckedChange={() => toggleKey(item.key)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-xs">{idx === 0 ? r.venue : ""}</TableCell>
+                        <TableCell className="text-xs">{idx === 0 ? r.period : ""}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{idx === 0 ? `${r.startTime}-${r.endTime}` : ""}</TableCell>
+                        <TableCell className="text-xs">{idx === 0 ? r.className : ""}</TableCell>
+                        <TableCell className="text-xs font-medium">{item.coach}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {item.log ? (
+                            <span className="text-green-700">{formatSentAt(item.log.sentAt)}</span>
+                          ) : (
+                            <span className="text-gray-400">─ 尚未推播</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {item.log ? (
+                            <button
+                              onClick={() => setLogPreview({ coachName: item.coach, sentAt: item.log!.sentAt, content: item.log!.content, notifyType: item.log!.notifyType })}
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                              {notifyTypeLabel(item.log.notifyType)}
+                            </button>
+                          ) : (
+                            <span className="text-gray-300">─</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Footer actions */}
+          {selectedKeys.size > 0 && (
+            <div className="flex items-center gap-3 pt-1">
+              <span className="text-sm text-muted-foreground">已選 {selectedKeys.size} 筆</span>
+              <Button
+                size="sm"
+                onClick={() => sendIndividualMutation.mutate(getSelectedCoaches())}
+                disabled={sendIndividualMutation.isPending}
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                <Send className="h-3.5 w-3.5 mr-1" />
+                {sendIndividualMutation.isPending ? "發送中..." : "個別通知教練"}
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>
+
+      {/* Push content preview dialog */}
+      <Dialog open={!!logPreview} onOpenChange={open => !open && setLogPreview(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              推播內容預覽
+            </DialogTitle>
+          </DialogHeader>
+          {logPreview && (
+            <div className="space-y-3">
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p><span className="font-medium text-foreground">收件人：</span>{logPreview.coachName}</p>
+                <p><span className="font-medium text-foreground">發送時間：</span>{formatSentAt(logPreview.sentAt)}</p>
+                <p><span className="font-medium text-foreground">類型：</span>{notifyTypeLabel(logPreview.notifyType)}</p>
+              </div>
+              <div className="bg-gray-50 border rounded p-3 whitespace-pre-wrap text-sm font-mono leading-relaxed max-h-72 overflow-y-auto">
+                {logPreview.content}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
