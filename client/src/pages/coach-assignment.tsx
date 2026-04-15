@@ -169,18 +169,21 @@ function CoachSearchSelect({
                 })}
               </>
             )}
-            {availableList.length === 0 && otherList.length === 0 && (
-              <div className="px-2 py-3 text-xs text-gray-400 text-center">無符合結果</div>
+            {availableList.length === 0 && otherList.length === 0 && search.trim() === "" && (
+              <div className="px-2 py-3 text-xs text-gray-400 text-center">請輸入姓名搜尋</div>
             )}
-            {search.trim() && !coaches.includes(search.trim()) && (
-              <button
-                type="button"
-                onClick={() => handleSelect(search.trim())}
-                className="w-full text-left px-2 py-1.5 text-xs text-orange-600 hover:bg-orange-50 border-t border-orange-100 flex items-center gap-1 font-medium"
-              >
-                <span className="flex-shrink-0">＋</span>
-                <span>直接使用「{search.trim()}」（代班）</span>
-              </button>
+            {availableList.length === 0 && otherList.length === 0 && search.trim() !== "" && (
+              <>
+                <div className="px-2 py-3 text-xs text-gray-400 text-center">無符合結果</div>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(search.trim())}
+                  className="w-full text-left px-2 py-1.5 text-xs text-orange-600 hover:bg-orange-50 border-t border-orange-100 flex items-center gap-1 font-medium"
+                >
+                  <span className="flex-shrink-0">＋</span>
+                  <span>直接使用「{search.trim()}」（代班）</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -373,15 +376,8 @@ function CoachAssignmentContent() {
 
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
-  // 依教練場館偏好篩選：只保留「未填偏好」或「有勾選此場館」的教練
-  const venueEligibleCoaches = useMemo(() => {
-    const venueName = selectedVenueData?.name;
-    if (!venueName) return coaches;
-    return coaches.filter((coach) => {
-      const prefs = venuePrefsMap[coach];
-      return !prefs || prefs.length === 0 || prefs.includes(venueName);
-    });
-  }, [coaches, selectedVenueData, venuePrefsMap]);
+  // 場館偏好功能暫時隱藏，不做場館篩選，所有已核准教練都可選
+  const venueEligibleCoaches = useMemo(() => coaches, [coaches]);
 
   // SWIM-05: 依 (isAvailable, prefersVenue) 評分，優先指派最合適教練
   const scoredCandidates = (dayOfWeek: number, timeSlotOrder: number, venueName: string, excludeSet: Set<string>): string[] => {
