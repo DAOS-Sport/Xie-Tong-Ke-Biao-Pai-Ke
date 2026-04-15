@@ -475,6 +475,7 @@ function ApprovedDashboard({
     return set;
   }, [assignedSlots]);
 
+  // 載入場館偏好暫時停用（功能出問題，後續修復後再開啟）
   const { data: venuePreferences = [] } = useQuery<string[]>({
     queryKey: ["/api/coach-portal/venue-preferences", coachName],
     queryFn: async () => {
@@ -482,6 +483,7 @@ function ApprovedDashboard({
       if (!res.ok) return [];
       return res.json();
     },
+    enabled: false,
   });
 
   const { toast } = useToast();

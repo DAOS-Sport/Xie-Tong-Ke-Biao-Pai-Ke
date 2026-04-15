@@ -150,3 +150,17 @@ Preferred communication style: Simple, everyday language.
 ## Default Access
 - **Default Landing Page**: Coach portal (public access, LINE login)
 - **Navigation**: Password-protected functions use complex URLs, separated from public coach view
+
+## Pending / Known Issues
+
+### 場館偏好載入暫停
+- **問題**：教練端「可排課地點」的場館偏好載入功能出問題，已在 `coach-portal.tsx` 用 `enabled: false` 暫時停用
+- **影響**：每次進入教練端，所有場館都顯示為未勾選（不會從資料庫載入舊的偏好）
+- **後續**：找到問題根因後重新開啟（把 `enabled: false` 移除即可）
+
+### 待辦：推播通知教練填寫時間與場館
+- **需求**：目前有填寫可用時段與場館偏好的教練很少，需要透過 LINE 推播通知**所有教練**，
+  請他們進入教練端填寫「可用時段」（7x7 時間矩陣）與「可排課地點」（場館勾選）
+- **實作方向**：在管理員後台（推播通知頁）新增一個「發送填寫提醒」按鈕，
+  對所有已核准且已綁定 LINE 的教練推送固定格式訊息，附上教練端網址
+- **狀態**：僅記錄需求，尚未實作
