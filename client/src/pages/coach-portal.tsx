@@ -475,7 +475,6 @@ function ApprovedDashboard({
     return set;
   }, [assignedSlots]);
 
-  // 載入場館偏好暫時停用（功能出問題，後續修復後再開啟）
   const { data: venuePreferences = [] } = useQuery<string[]>({
     queryKey: ["/api/coach-portal/venue-preferences", coachName],
     queryFn: async () => {
@@ -483,7 +482,7 @@ function ApprovedDashboard({
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: false,
+    enabled: !!coachName,
   });
 
   const { toast } = useToast();
@@ -555,7 +554,7 @@ function ApprovedDashboard({
           }),
         });
         if (!res.ok) throw new Error("Failed");
-        queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/coach-portal/availability", coachName] });
         toast({ title: "可用時段已更新" });
       } catch {
         toast({ title: "儲存失敗，請重試", variant: "destructive" });

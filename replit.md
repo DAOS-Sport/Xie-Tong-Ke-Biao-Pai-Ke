@@ -153,10 +153,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Pending / Known Issues
 
-### 場館偏好載入暫停
-- **問題**：教練端「可排課地點」的場館偏好載入功能出問題，已在 `coach-portal.tsx` 用 `enabled: false` 暫時停用
-- **影響**：每次進入教練端，所有場館都顯示為未勾選（不會從資料庫載入舊的偏好）
-- **後續**：找到問題根因後重新開啟（把 `enabled: false` 移除即可）
+### ~~場館偏好載入暫停~~ ✅ 已修復
+- 根因：`enabled: false` 被手動停用 + coachName 為空時會發出無效請求
+- 修復：改為 `enabled: !!coachName`，確保 coachName 有值才載入
 
 ### 待辦：推播通知教練填寫時間與場館
 - **需求**：目前有填寫可用時段與場館偏好的教練很少，需要透過 LINE 推播通知**所有教練**，
