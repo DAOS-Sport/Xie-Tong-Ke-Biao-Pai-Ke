@@ -27,7 +27,8 @@ import {
 interface CoachSearchSelectProps {
   value: string;
   onValueChange: (value: string) => void;
-  coaches: string[];
+  coaches: string[];       // 場館教練（已篩選）
+  allCoaches: string[];    // 全部教練（代班模式用）
   available: Set<string>;
   conflicts: Set<string>;
   placeholder: string;
@@ -39,6 +40,7 @@ function CoachSearchSelect({
   value,
   onValueChange,
   coaches,
+  allCoaches,
   available,
   conflicts,
   placeholder,
@@ -47,12 +49,14 @@ function CoachSearchSelect({
 }: CoachSearchSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [substituteMode, setSubstituteMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setSearch("");
+      setSubstituteMode(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -68,6 +72,7 @@ function CoachSearchSelect({
   }, [open]);
 
   const normalize = (s: string) => s.toLowerCase().replace(/[\s\(\)\（\）\-_]/g, "");
+  const activeList = substituteMode ? allCoaches : coaches;
   const filtered = (list: string[]) =>
     search.trim() === ""
       ? list
@@ -76,8 +81,9 @@ function CoachSearchSelect({
           return c.toLowerCase().includes(q) || normalize(c).includes(normalize(q));
         });
 
-  const availableList = filtered(coaches.filter((c) => available.has(c)));
-  const otherList = filtered(coaches.filter((c) => !available.has(c)));
+  const availableList = filtered(activeList.filter((c) => available.has(c)));
+  const otherList = filtered(activeList.filter((c) => !available.has(c)));
+  const noResults = availableList.length === 0 && otherList.length === 0;
 
   const handleSelect = (coach: string) => {
     onValueChange(coach);
@@ -115,13 +121,23 @@ function CoachSearchSelect({
 
       {open && (
         <div className="absolute z-50 top-full left-0 mt-0.5 min-w-[220px] w-max max-w-[320px] bg-white border border-gray-200 rounded shadow-lg">
+          {substituteMode && (
+            <div className="px-2 py-1 text-[10px] text-orange-600 font-medium bg-orange-50 border-b border-orange-100 flex items-center justify-between">
+              <span>代班模式：顯示全部教練</span>
+              <button
+                type="button"
+                onClick={() => { setSubstituteMode(false); setSearch(""); }}
+                className="text-orange-400 hover:text-orange-600 ml-1"
+              >✕</button>
+            </div>
+          )}
           <div className="p-1.5 border-b flex items-center gap-1">
             <Search className="h-3 w-3 text-gray-400 flex-shrink-0" />
             <input
               ref={inputRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜尋教練..."
+              placeholder={substituteMode ? "搜尋全部教練..." : "搜尋場館教練..."}
               className="flex-1 text-xs outline-none bg-transparent"
               onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
             />
@@ -150,7 +166,9 @@ function CoachSearchSelect({
             )}
             {otherList.length > 0 && (
               <>
-                <div className="px-2 py-0.5 text-[10px] text-gray-400 font-medium bg-gray-50 border-t">其他教練</div>
+                <div className="px-2 py-0.5 text-[10px] text-gray-400 font-medium bg-gray-50 border-t">
+                  {substituteMode ? "全部教練" : "場館教練"}
+                </div>
                 {otherList.map((coach) => {
                   const isConflict = conflicts.has(coach);
                   return (
@@ -169,23 +187,35 @@ function CoachSearchSelect({
                 })}
               </>
             )}
-            {availableList.length === 0 && otherList.length === 0 && search.trim() === "" && (
-              <div className="px-2 py-3 text-xs text-gray-400 text-center">請輸入姓名搜尋</div>
+            {noResults && search.trim() === "" && (
+              <div className="px-2 py-2 text-xs text-gray-400 text-center">請輸入姓名搜尋</div>
             )}
-            {availableList.length === 0 && otherList.length === 0 && search.trim() !== "" && (
+            {noResults && search.trim() !== "" && (
               <>
-                <div className="px-2 py-3 text-xs text-gray-400 text-center">無符合結果</div>
+                <div className="px-2 py-2 text-xs text-gray-400 text-center">無符合結果</div>
                 <button
                   type="button"
                   onClick={() => handleSelect(search.trim())}
                   className="w-full text-left px-2 py-1.5 text-xs text-orange-600 hover:bg-orange-50 border-t border-orange-100 flex items-center gap-1 font-medium"
                 >
                   <span className="flex-shrink-0">＋</span>
-                  <span>直接使用「{search.trim()}」（代班）</span>
+                  <span>直接使用「{search.trim()}」</span>
                 </button>
               </>
             )}
           </div>
+          {!substituteMode && (
+            <div className="border-t border-orange-100">
+              <button
+                type="button"
+                onClick={() => { setSubstituteMode(true); setSearch(""); setTimeout(() => inputRef.current?.focus(), 50); }}
+                className="w-full text-left px-2 py-1.5 text-xs text-orange-600 hover:bg-orange-50 flex items-center gap-1 font-medium"
+              >
+                <span className="flex-shrink-0">＋</span>
+                <span>指派代班教練（顯示全部）</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -376,8 +406,15 @@ function CoachAssignmentContent() {
 
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
-  // 場館偏好功能暫時隱藏，不做場館篩選，所有已核准教練都可選
-  const venueEligibleCoaches = useMemo(() => coaches, [coaches]);
+  // 場館教練：有填偏好且包含此場館，或尚未填任何偏好者
+  const venueEligibleCoaches = useMemo(() => {
+    const venueName = selectedVenueData?.name;
+    if (!venueName) return coaches;
+    return coaches.filter((coach) => {
+      const prefs = venuePrefsMap[coach];
+      return !prefs || prefs.length === 0 || prefs.includes(venueName);
+    });
+  }, [coaches, selectedVenueData, venuePrefsMap]);
 
   // SWIM-05: 依 (isAvailable, prefersVenue) 評分，優先指派最合適教練
   const scoredCandidates = (dayOfWeek: number, timeSlotOrder: number, venueName: string, excludeSet: Set<string>): string[] => {
@@ -741,6 +778,7 @@ function CoachAssignmentContent() {
                                       });
                                     }}
                                     coaches={venueEligibleCoaches}
+                                    allCoaches={coaches}
                                     available={available}
                                     conflicts={coach1Conflicts}
                                     placeholder="教練1"
@@ -788,6 +826,7 @@ function CoachAssignmentContent() {
                                           });
                                         }}
                                         coaches={venueEligibleCoaches}
+                                        allCoaches={coaches}
                                         available={available}
                                         conflicts={coach2Conflicts}
                                         placeholder="教練2"
