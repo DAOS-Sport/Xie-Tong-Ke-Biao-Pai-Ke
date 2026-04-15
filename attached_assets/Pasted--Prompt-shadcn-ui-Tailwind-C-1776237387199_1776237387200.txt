@@ -1,0 +1,618 @@
+# 五泳池課表整合系統｜前後台雙向連通 + 邏輯修補 Prompt
+# 原則：不重構、不大幅改動畫面、不新增頁面（只新增區塊/對話框）
+# 沿用現有 shadcn/ui 元件、Tailwind CSS、Drizzle ORM 架構
+
+---
+
+## 核心方針
+
+本次修改聚焦三件事：
+1. **補指派通知**：教練被排課後一定要知道
+2. **補填寫可見性**：管理員要看到哪些教練還沒填時段/偏好
+3. **補邏輯連貫**：Ragic 同步、鎖定流程、自動填入的邏輯斷點
+
+---
+
+## SWIM-01：教練指派後 LINE 推播通知
+
+**斷點：** 管理員在 Phase 2（教練指派）指派或更換教練後，教練完全不知道。
+
+**後端：**
+在以下三個操作觸發後，自動發送 LINE push：
+1. `PATCH /api/schedules/:id`（更新 coachName 或 coachName2）
+2. `POST /api/admin/auto-fill`（自動填入後）
+3. 解鎖後重新指派（isClassLocked 從 true → false 再變更 coach）
+
+```ts
+// 在 schedule 更新時，找出受影響的教練並推播
+async function notifyCoachAssigned(
+  schedule: Schedule,
+  previousCoach1: string | null,
+  previousCoach2: string | null
+) {
+  const affectedCoaches = []
+
+  // 新指派的教練
+  if (schedule.coachName && schedule.coachName !== previousCoach1) {
+    affectedCoaches.push({
+      name: schedule.coachName,
+      role: schedule.coach1IsTeaching ? '當班教學' : '教練'
+    })
+  }
+  if (schedule.coachName2 && schedule.coachName2 !== previousCoach2) {
+    affectedCoaches.push({
+      name: schedule.coachName2,
+      role: schedule.coach2IsTeaching ? '當班教學' : '協助'
+    })
+  }
+
+  for (const { name, role } of affectedCoaches) {
+    const coachUser = await db.query.coachUsers.findFirst({
+      where: and(
+        eq(coachUsers.linkedCoachName, name),
+        isNotNull(coachUsers.lineId)
+      )
+    })
+    if (!coachUser?.lineId) continue
+
+    const dateStr = format(parseISO(schedule.date), 'M/d (EEE)', { locale: zhTW })
+    const timeSlotLabel = await getTimeSlotLabel(schedule.timeSlotId)
+
+    await sendLinePush(coachUser.lineId,
+      `📋 課程指派通知\n` +
+      `您已被排入以下課程：\n` +
+      `日期：${dateStr}\n` +
+      `時段：${timeSlotLabel}\n` +
+      `場館：${schedule.venueName}\n` +
+      `班級：${schedule.className}\n` +
+      `角色：${role}\n\n` +
+      `請前往教練端確認：${process.env.COACH_PORTAL_URL}`
+    )
+  }
+}
+```
+
+**自動填入（auto-fill）的批次通知：**
+```ts
+// auto-fill 完成後，彙整所有新指派並統一發送
+// 避免同一教練收到多則獨立通知，改為一則彙整訊息
+const coachSummary = new Map<string, string[]>() // lineId → 課程描述[]
+
+for (const assignment of newAssignments) {
+  // 彙整同一教練的所有新課
+  if (!coachSummary.has(assignment.lineId)) {
+    coachSummary.set(assignment.lineId, [])
+  }
+  coachSummary.get(assignment.lineId)!.push(
+    `${assignment.dateStr} ${assignment.timeSlot} @${assignment.venue}`
+  )
+}
+
+// 每位教練只發一則彙整訊息
+for (const [lineId, courses] of coachSummary) {
+  await sendLinePush(lineId,
+    `📋 課程指派通知（本週新增 ${courses.length} 堂）\n` +
+    courses.map((c, i) => `${i+1}. ${c}`).join('\n') +
+    `\n\n請前往教練端確認課表。`
+  )
+}
+```
+
+**驗收：**
+1. 手動指派教練後，該教練收到 LINE 通知
+2. 自動填入後每位受影響教練收到彙整通知
+3. 被移除的教練（從某堂課中移除）也收到通知
+
+---
+
+## SWIM-02：課表異動通知（鎖定/修改後）
+
+**斷點：** Phase 1 鎖定或解鎖後，已指派的教練不會收到任何通知。
+班名或時段異動後教練繼續以舊資料為準。
+
+**後端：**
+在以下操作後觸發通知：
+1. `POST /api/schedules/lock`（鎖定 venue+week）
+2. `POST /api/schedules/unlock`（解鎖）
+3. Phase 1 修改 className 後（若已有教練指派）
+
+```ts
+// 解鎖時，通知該 venue+week 所有已指派的教練
+async function notifyScheduleUnlocked(venueName: string, weekStart: string) {
+  const affectedSchedules = await db.query.schedules.findMany({
+    where: and(
+      eq(schedules.venueName, venueName),
+      between(schedules.date, weekStart, addDays(weekStart, 6))
+    )
+  })
+
+  const coachLineIds = new Set<string>()
+  for (const s of affectedSchedules) {
+    // 收集所有有 lineId 的教練
+    for (const name of [s.coachName, s.coachName2].filter(Boolean)) {
+      const c = await findCoachLineId(name!)
+      if (c) coachLineIds.add(c)
+    }
+  }
+
+  for (const lineId of coachLineIds) {
+    await sendLinePush(lineId,
+      `⚠️ 課表異動通知\n` +
+      `${venueName} ${format(parseISO(weekStart),'M/d')} 週的課表已更新，` +
+      `請重新確認您的排課內容。\n\n` +
+      `建議重新匯出 Google Calendar。`
+    )
+  }
+}
+```
+
+**前端（Admin）：**
+解鎖 dialog 中新增提示文字：
+```tsx
+<AlertDialog>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>確認解鎖課表？</AlertDialogTitle>
+      <AlertDialogDescription>
+        解鎖後可重新編輯班名。
+        <span className="block mt-1 text-amber-600 text-xs">
+          ⚠️ 此操作將自動通知已指派的教練課表有異動。
+        </span>
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>取消</AlertDialogCancel>
+      <AlertDialogAction onClick={handleUnlock}>確認解鎖</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+**驗收：**
+1. 解鎖後該週已指派教練收到異動通知
+2. 班名修改後若已有指派，儲存時提示是否通知教練（可選）
+
+---
+
+## SWIM-03：教練填寫率儀表板
+
+**斷點：** 管理員不知道哪些教練還沒填可用時段或場館偏好，
+LINE 推播提醒也尚未實作（known issue）。
+
+**後端 API：**
+```
+GET /api/admin/coach-fillrate
+Response: {
+  coaches: Array<{
+    name: string,
+    lineId: string | null,
+    hasAvailability: boolean,    // 是否有填任何時段
+    availabilitySlots: number,   // 填了幾格（滿分49）
+    hasVenuePrefs: boolean,      // 是否有填場館偏好
+    venuePrefsCount: number,
+    lastUpdated: string | null,
+  }>,
+  summary: {
+    total: number,
+    filledAvailability: number,
+    filledVenuePrefs: number,
+    linkedLine: number,           // 有綁定 LINE 的教練數
+  }
+}
+```
+
+查詢邏輯：
+```ts
+const coaches = await db.query.coachUsers.findMany({
+  where: eq(coachUsers.status, 'approved')
+})
+
+return Promise.all(coaches.map(async (coach) => {
+  const avail = await db.query.coachAvailability.findMany({
+    where: eq(coachAvailability.coachName, coach.linkedCoachName ?? coach.name)
+  })
+  const prefs = await db.query.coachVenuePreferences.findMany({
+    where: eq(coachVenuePreferences.coachName, coach.linkedCoachName ?? coach.name)
+  })
+  return {
+    name: coach.linkedCoachName ?? coach.name,
+    lineId: coach.lineId,
+    hasAvailability: avail.length > 0,
+    availabilitySlots: avail.length,
+    hasVenuePrefs: prefs.length > 0,
+    venuePrefsCount: prefs.length,
+  }
+}))
+```
+
+**前端（Admin）：**
+在管理後台「教練審核」頁面的現有列表下方，新增「填寫狀態」摺疊區塊：
+```tsx
+<Collapsible>
+  <CollapsibleTrigger className="w-full flex items-center justify-between py-2 border-t mt-4">
+    <span className="text-sm font-medium">教練填寫狀態</span>
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-gray-400">
+        時段：{summary.filledAvailability}/{summary.total} ·
+        場館：{summary.filledVenuePrefs}/{summary.total}
+      </span>
+      <ChevronDown className="h-4 w-4" />
+    </div>
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    {/* LINE推播提醒按鈕 */}
+    <div className="flex items-center justify-between mb-3 mt-2">
+      <span className="text-xs text-gray-500">
+        {unfilledCount} 位教練尚未填寫
+      </span>
+      <Button
+        size="sm" variant="outline"
+        className="gap-1.5 text-xs border-green-200 text-green-700 hover:bg-green-50"
+        onClick={sendFillReminder}
+        disabled={!hasLinkedCoaches}
+      >
+        發送填寫提醒
+      </Button>
+    </div>
+    {/* 教練列表 */}
+    <div className="space-y-1">
+      {coaches.map(coach => (
+        <div key={coach.name}
+          className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+          <span className="text-sm">{coach.name}</span>
+          <div className="flex items-center gap-2">
+            {/* 時段填寫進度 */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400">時段</span>
+              {coach.hasAvailability
+                ? <span className="text-xs text-green-600">
+                    ✓ {coach.availabilitySlots}/49
+                  </span>
+                : <span className="text-xs text-red-500">未填</span>
+              }
+            </div>
+            {/* 場館偏好 */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400">場館</span>
+              {coach.hasVenuePrefs
+                ? <span className="text-xs text-green-600">
+                    ✓ {coach.venuePrefsCount}個
+                  </span>
+                : <span className="text-xs text-red-500">未填</span>
+              }
+            </div>
+            {/* LINE 綁定狀態 */}
+            <span className={`text-xs px-1.5 py-0.5 rounded ${
+              coach.lineId
+                ? 'bg-green-50 text-green-700'
+                : 'bg-gray-100 text-gray-400'
+            }`}>
+              {coach.lineId ? 'LINE ✓' : 'LINE 未綁'}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </CollapsibleContent>
+</Collapsible>
+```
+
+**實作已知 pending issue：LINE 填寫提醒推播**
+```ts
+// POST /api/admin/send-fill-reminder
+// 對所有「已核准 + 已綁定 LINE + 尚未填時段或場館」的教練發送提醒
+
+const targets = coaches.filter(c =>
+  c.lineId && (!c.hasAvailability || !c.hasVenuePrefs)
+)
+
+for (const coach of targets) {
+  const missing = []
+  if (!coach.hasAvailability) missing.push('可用時段（7×7 矩陣）')
+  if (!coach.hasVenuePrefs) missing.push('可排課場館')
+
+  await sendLinePush(coach.lineId!,
+    `📝 填寫提醒\n` +
+    `您尚未填寫以下資訊，請盡快完成：\n` +
+    missing.map((m, i) => `${i+1}. ${m}`).join('\n') +
+    `\n\n前往教練端填寫：${process.env.COACH_PORTAL_URL}`
+  )
+}
+
+return { sent: targets.length }
+```
+
+**驗收：**
+1. 管理後台顯示每位教練的時段/場館填寫進度
+2. 「發送填寫提醒」按鈕對未填寫的教練批次推播
+3. 已全部填寫的教練不在提醒名單中
+
+---
+
+## SWIM-04：教練端填寫進度自我檢視
+
+**斷點：** 教練端沒有提示「你還有什麼沒填」，填完覺得完成了但其實漏了場館偏好。
+
+**前端（Coach Portal）：**
+在教練端選擇教練後，顯示一個輕量的「待完成」提示條：
+```tsx
+// 在現有教練端頁面頂部，教練選擇器下方新增
+{selectedCoach && (
+  <div className="flex gap-2 mb-3 flex-wrap">
+    {!hasAvailability && (
+      <button
+        className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200
+                   text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+        onClick={() => scrollToAvailability()}
+      >
+        ⚠ 尚未填寫可用時段
+      </button>
+    )}
+    {!hasVenuePrefs && (
+      <button
+        className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200
+                   text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+        onClick={() => scrollToVenuePrefs()}
+      >
+        ⚠ 尚未選擇場館偏好
+      </button>
+    )}
+    {hasAvailability && hasVenuePrefs && (
+      <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200
+                       text-green-700 px-3 py-1.5 rounded-full">
+        ✓ 時段與場館資料已填寫完整
+      </span>
+    )}
+  </div>
+)}
+```
+
+點擊按鈕後，頁面平滑捲動到對應區塊（smooth scroll to ID）。
+
+**驗收：**
+1. 未填時段時顯示 amber 提示按鈕
+2. 未填場館偏好時顯示另一個 amber 提示
+3. 全部填完後顯示綠色完成標記
+4. 點擊按鈕自動捲動到對應區塊
+
+---
+
+## SWIM-05：自動填入邏輯強化（場館偏好優先）
+
+**斷點：** 目前自動填入優先考量「排課數最少」（負載均衡），
+但場館偏好的權重未明確設定，可能派教練去他不能去的場館。
+
+**後端（`/api/admin/auto-fill` 或 auto-fill 邏輯）：**
+```ts
+// 修改候選教練的篩選順序
+async function getCandidateCoaches(
+  venueName: string,
+  date: string,
+  timeSlotId: number
+): Promise<RankedCoach[]> {
+
+  const dayOfWeek = getDay(parseISO(date)) || 7  // 1=Mon, 7=Sun
+  const timeSlotOrder = await getTimeSlotOrder(timeSlotId)
+
+  // Step 1: 找有填「該時段可用」的教練
+  const available = await db.query.coachAvailability.findMany({
+    where: and(
+      eq(coachAvailability.dayOfWeek, dayOfWeek),
+      eq(coachAvailability.timeSlotOrder, timeSlotOrder)
+    )
+  })
+  const availableNames = new Set(available.map(a => a.coachName))
+
+  // Step 2: 找有「該場館偏好」的教練
+  const prefersVenue = await db.query.coachVenuePreferences.findMany({
+    where: eq(coachVenuePreferences.venueName, venueName)
+  })
+  const prefersNames = new Set(prefersVenue.map(p => p.coachName))
+
+  // Step 3: 確認無衝突（同時段未排其他課）
+  const allApproved = await db.query.coachUsers.findMany({
+    where: eq(coachUsers.status, 'approved')
+  })
+
+  const ranked = allApproved.map(coach => {
+    const name = coach.linkedCoachName ?? coach.name
+    const isAvailable = availableNames.has(name)
+    const prefersThisVenue = prefersNames.has(name)
+
+    // 優先級分數
+    let score = 0
+    if (isAvailable && prefersThisVenue) score = 3   // 最優先
+    else if (isAvailable) score = 2                   // 有時段但無場館偏好
+    else if (prefersThisVenue) score = 1              // 有場館偏好但時段未填
+    else score = 0                                     // 都沒填
+
+    return { name, score, isAvailable, prefersThisVenue }
+  })
+
+  // score=0 的教練不自動填入（兩樣都沒填的不強派）
+  return ranked
+    .filter(c => c.score > 0)
+    .sort((a, b) => b.score - a.score || getAssignedCount(a.name) - getAssignedCount(b.name))
+}
+```
+
+在管理員的指派 UI 中，候選教練顯示標記更新：
+- `✅🏊` = 有時段 + 有場館偏好（最優）
+- `✅` = 只有時段
+- `🏊` = 只有場館偏好
+- 無標記 = 兩樣都沒填（仍可手動指派，但自動填入不考慮）
+
+**驗收：**
+1. 自動填入優先選「有時段 + 有場館偏好」的教練
+2. 兩樣都沒填的教練不會被自動指派
+3. 手動指派界面的標記更新為三種類型
+
+---
+
+## SWIM-06：Ragic 同步保護機制
+
+**斷點：** Ragic 每日 03:00 自動同步，可能覆蓋管理員手動修改的教練資料
+（目前設計為「不刪除不覆寫」，但需確認 lineId 等欄位有保護）。
+
+**後端（`server/ragic.ts`）：**
+確認同步邏輯對以下欄位有保護：
+```ts
+// 同步教練資料時，lineId 欄位只在「目前為空」時才更新
+// （已在架構中提及 isValidLineUserId 保護，確認實際執行）
+if (existingCoach) {
+  await db.update(coachUsers)
+    .set({
+      name: ragicData.name,
+      phone: ragicData.phone,
+      email: ragicData.email,
+      // lineId：只在目前為空或無效時才更新
+      ...(isValidLineId(existingCoach.lineId)
+        ? {}  // 已有有效 lineId，不覆蓋
+        : { lineId: ragicData.lineId ?? null }
+      ),
+      // employeeId：只在目前為空時填入（架構中已提及）
+      ...(existingCoach.employeeId
+        ? {}
+        : { employeeId: ragicData.employeeId ?? null }
+      ),
+    })
+    .where(eq(coachUsers.id, existingCoach.id))
+}
+```
+
+新增同步日誌欄位（可選，建議）：
+```sql
+ALTER TABLE coachUsers ADD COLUMN last_ragic_sync timestamptz;
+ALTER TABLE coachUsers ADD COLUMN ragic_sync_note text;
+```
+
+管理後台的「Ragic 同步狀態」顯示中，列出最後一次同步有哪些教練資料被更新。
+
+**驗收：**
+1. 已有有效 lineId 的教練，Ragic 同步後 lineId 不被覆蓋
+2. 管理後台可查看最後一次 Ragic 同步的更新摘要
+
+---
+
+## SWIM-07：Google Calendar 版本提示
+
+**斷點：** 教練匯出 ICS 後，課表若有異動，舊的 ICS 不會失效，
+教練可能持續以過期資料為準。
+
+**後端：**
+新增欄位記錄課表最後異動時間（若尚無）：
+```sql
+ALTER TABLE schedules ADD COLUMN last_modified_at timestamptz DEFAULT now();
+```
+
+`PATCH /api/schedules/:id` 時更新 `last_modified_at = now()`。
+
+新增 API：
+```
+GET /api/coach/schedule-version?coachName=&weekStart=
+Response: { lastModified: string, hasChangedSince: string | null }
+```
+
+**前端（Coach Portal）：**
+在 Google Calendar 匯出按鈕旁，顯示課表版本時間：
+```tsx
+<div className="flex items-center gap-2 flex-wrap">
+  <Button size="sm" variant="outline" onClick={exportICS}>
+    匯出 Google Calendar (.ics)
+  </Button>
+  {lastModified && (
+    <span className="text-xs text-gray-400">
+      課表最後更新：{format(parseISO(lastModified), 'M/d HH:mm')}
+    </span>
+  )}
+</div>
+
+{/* 若課表在上次匯出後有變動，顯示提醒 */}
+{hasChangedSinceLastExport && (
+  <p className="text-xs text-amber-600 mt-1">
+    ⚠ 課表自上次匯出後已更新，建議重新匯出。
+  </p>
+)}
+```
+
+（`hasChangedSinceLastExport` 存在 localStorage，記錄上次匯出時間後比對）
+
+**驗收：**
+1. 課表頁面顯示最後更新時間
+2. 若課表有新異動，匯出按鈕旁提示建議重新匯出
+
+---
+
+## SWIM-08：邏輯連貫補齊
+
+### 8-A：衝突教練的視覺優化
+**現況：** 衝突檢測邏輯存在，但發生衝突時的 UI 訊息不夠明確。
+
+```tsx
+// 衝突提示改為更明確的說明
+{conflict && (
+  <div className="text-xs text-red-600 mt-1 bg-red-50 px-2 py-1 rounded">
+    ⚠ {conflict.coachName} 在 {conflict.conflictVenue} 
+    的 {conflict.conflictTime} 已有排課，無法重複指派。
+  </div>
+)}
+```
+
+### 8-B：Phase 1 單格解鎖（不需整批解鎖）
+**現況：** 解鎖操作是 venue+week 整批解鎖，若只想改一格班名很麻煩。
+
+新增單格 className 修改的 API：
+```
+PATCH /api/schedules/:id/class-name
+Body: { className: string }
+// 不需要解鎖整批，直接修改單格班名
+// 但若 isClassLocked=true，需要密碼確認
+```
+
+前端在已鎖定的格子上，右鍵選單或長按出現「修改班名」選項，
+彈出簡單 Input dialog，不需要解鎖整批。
+
+### 8-C：統計頁面月份彙整
+**現況：** 統計以週為單位，需要手動加總月份數據。
+
+在統計頁面頂部新增「月份彙整」快速模式（toggle）：
+```tsx
+<div className="flex items-center gap-3 mb-4">
+  <span className="text-sm text-gray-500">檢視模式</span>
+  <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+    <button
+      className={cn("px-3 py-1 text-sm", viewMode==='week' && "bg-gray-100 font-medium")}
+      onClick={() => setViewMode('week')}
+    >按週</button>
+    <button
+      className={cn("px-3 py-1 text-sm", viewMode==='month' && "bg-gray-100 font-medium")}
+      onClick={() => setViewMode('month')}
+    >按月</button>
+  </div>
+</div>
+```
+
+月份模式下，後端 `GET /api/stats?month=yyyy-MM` 自動彙整四週數據，
+Excel 匯出也支援月份模式。
+
+---
+
+## ✅ 全部驗收清單
+
+**通知連通（Admin → Coach）**
+- [ ] 指派教練後當事教練收到 LINE 通知（SWIM-01）
+- [ ] 自動填入後受影響教練收到彙整通知（SWIM-01）
+- [ ] 課表解鎖/異動後已指派教練收到提醒（SWIM-02）
+
+**填寫可見性**
+- [ ] 管理後台顯示每位教練時段/場館填寫進度（SWIM-03）
+- [ ] 「發送填寫提醒」按鈕正常推播（SWIM-03，解決 known issue）
+- [ ] 教練端顯示自己還沒填什麼（SWIM-04）
+
+**邏輯優化**
+- [ ] 自動填入優先選「時段+場館」都有填的教練（SWIM-05）
+- [ ] Ragic 同步不覆蓋已有效的 lineId（SWIM-06）
+- [ ] 課表版本提示，異動後建議重新匯出（SWIM-07）
+- [ ] 衝突提示顯示具體衝突位置（SWIM-08A）
+- [ ] 已鎖定班表可單格修改班名（SWIM-08B）
+- [ ] 統計頁面支援月份彙整模式（SWIM-08C）

@@ -184,16 +184,16 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
         }
       }
     } else {
-      if (personalLineId && existing.lineId !== personalLineId) {
+      if (personalLineId && !existing.lineId) {
         try {
           await storage.updateCoachUserLineId(existing.id, personalLineId);
           lineIdsSynced++;
-          console.log(`[Ragic] Updated LINE ID for coach "${name}"`);
+          console.log(`[Ragic] Synced LINE ID for coach "${name}" (was empty)`);
         } catch (err: any) {
           if (err?.message?.includes("unique") || err?.code === "23505") {
-            console.warn(`[Ragic] Skipped LINE ID update for coach "${name}": LINE ID already used by another coach`);
+            console.warn(`[Ragic] Skipped LINE ID sync for coach "${name}": LINE ID already used by another coach`);
           } else {
-            console.error(`[Ragic] Failed to update LINE ID for coach "${name}":`, err?.message);
+            console.error(`[Ragic] Failed to sync LINE ID for coach "${name}":`, err?.message);
             throw err;
           }
         }

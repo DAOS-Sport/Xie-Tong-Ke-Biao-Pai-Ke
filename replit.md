@@ -68,15 +68,20 @@ Preferred communication style: Simple, everyday language.
   - Weekly availability matrix (7x7 checkbox grid: Mon-Sun, periods 1-7) with week navigation
   - Assigned slots locked (blue 🔒): cannot uncheck if coach is scheduled for that slot
   - Venue preferences: coaches select which venues they can work at (checkbox grid)
+  - Fill progress chips: shows amber warnings if availability or venue prefs not filled; tapping scrolls to the relevant section
+  - Schedule last-modified hint: shows timestamp of most recently updated schedule record in the week view
 - **Coach Availability Matching**: Availability-aware coach assignment system
   - Coaches fill weekly availability via 7x7 matrix in coach portal
   - Admin coach assignment UI shows available coaches with ✅ markers, grouped separately
   - Missing coach highlighting (red for no coach1, amber for missing coach2)
-  - Auto-fill button: assigns coaches based on availability + load balancing (least-assigned-first)
+  - Auto-fill button: assigns coaches based on scored ranking (isAvailable+prefersVenue=3, isAvailable=2, prefersVenue=1, neither excluded) then load balancing (least-assigned-first)
   - Sidebar panel: shows available/assigned coaches for selected time slot with weekly stats
   - Weekly stats: assigned count vs available count per coach
+  - Venue preference filtering: dropdown only shows coaches who prefer (or haven't set prefs for) the selected venue
 - **Admin Coach Approval (2.0)**: Dashboard for managing coach registrations
   - Approve/reject coach accounts
+  - Manual LINE ID bind/clear per coach: admin can set or remove lineId directly in the approval UI
+  - Fill-rate card: shows which coaches have filled availability/venue prefs, with LINE push reminder button
   - Coach rules editor
   - **Venue management**: Admin can add/delete venues dynamically through UI (no hardcoding)
   - New venues automatically get public URLs (/school/:venueName) and editable info sections

@@ -1,9 +1,10 @@
 import cron from 'node-cron';
 import { storage } from './storage';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { format, addDays, startOfWeek, parseISO } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { db } from './db';
-import { lineNotifyLogs } from '@shared/schema';
+import { lineNotifyLogs, coachUsers, coachAvailability, coachVenuePreferences, schedules, venues, timeSlots } from '@shared/schema';
+import { eq, and, between } from 'drizzle-orm';
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
@@ -253,6 +254,111 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
   } catch (error) {
     console.error('[LINE Notify] Error sending daily notifications:', error);
   }
+}
+
+// SWIM-01: 教練指派通知
+export async function notifyCoachAssigned(
+  schedule: { id: string; date: string; coachName: string | null; coachName2: string | null; coach1IsTeaching: boolean; coach2IsTeaching: boolean; className: string | null },
+  prevCoach1: string | null,
+  prevCoach2: string | null,
+  venueName: string,
+  timeSlotLabel: string
+): Promise<void> {
+  const affectedCoaches: { name: string; role: string }[] = [];
+  if (schedule.coachName && schedule.coachName !== prevCoach1) {
+    affectedCoaches.push({ name: schedule.coachName, role: schedule.coach1IsTeaching ? '當班教學' : '教練' });
+  }
+  if (schedule.coachName2 && schedule.coachName2 !== prevCoach2) {
+    affectedCoaches.push({ name: schedule.coachName2, role: schedule.coach2IsTeaching ? '當班教學' : '協助' });
+  }
+  if (prevCoach1 && !schedule.coachName) {
+    const c = await db.select().from(coachUsers).where(eq(coachUsers.lineId, prevCoach1 as any)).limit(1);
+    const byName = await db.select().from(coachUsers).where(eq(coachUsers.name, prevCoach1)).limit(1);
+    const byLinked = await db.select().from(coachUsers).where(eq(coachUsers.linkedCoachName, prevCoach1)).limit(1);
+    const coach = c[0] || byLinked[0] || byName[0];
+    if (coach?.lineId) {
+      const dateStr = format(parseISO(schedule.date), 'M/d (EEEE)', { locale: zhTW });
+      const msg = `📋 課程異動通知\n${dateStr} ${timeSlotLabel}\n場館：${venueName}\n班級：${schedule.className || ''}\n\n您已被從上述課程中移除。`;
+      await sendLinePushMessage(coach.lineId, msg).catch(() => {});
+    }
+  }
+
+  for (const { name, role } of affectedCoaches) {
+    const byLinked = await db.select().from(coachUsers).where(eq(coachUsers.linkedCoachName, name)).limit(1);
+    const byName = await db.select().from(coachUsers).where(eq(coachUsers.name, name)).limit(1);
+    const coach = byLinked[0] || byName[0];
+    if (!coach?.lineId) continue;
+    const dateStr = format(parseISO(schedule.date), 'M/d (EEEE)', { locale: zhTW });
+    const msg =
+      `📋 課程指派通知\n` +
+      `您已被排入以下課程：\n` +
+      `日期：${dateStr}\n` +
+      `時段：${timeSlotLabel}\n` +
+      `場館：${venueName}\n` +
+      `班級：${schedule.className || '（待定）'}\n` +
+      `角色：${role}\n\n` +
+      `請前往教練端確認您的課表。`;
+    await sendLinePushMessage(coach.lineId, msg).catch(() => {});
+  }
+}
+
+// SWIM-02: 課表解鎖通知
+export async function notifyScheduleUnlocked(venueId: string, startDate: string, endDate: string): Promise<void> {
+  try {
+    const rows = await db
+      .select({ coachName: schedules.coachName, coachName2: schedules.coachName2, venueName: venues.name })
+      .from(schedules)
+      .innerJoin(venues, eq(schedules.venueId, venues.id))
+      .where(and(eq(schedules.venueId, venueId), between(schedules.date, startDate, endDate)));
+
+    const venueName = rows[0]?.venueName || '';
+    const weekStr = format(parseISO(startDate), 'M/d', { locale: zhTW });
+    const notified = new Set<string>();
+
+    for (const row of rows) {
+      for (const name of [row.coachName, row.coachName2].filter(Boolean) as string[]) {
+        if (notified.has(name)) continue;
+        notified.add(name);
+        const byLinked = await db.select().from(coachUsers).where(eq(coachUsers.linkedCoachName, name)).limit(1);
+        const byName = await db.select().from(coachUsers).where(eq(coachUsers.name, name)).limit(1);
+        const coach = byLinked[0] || byName[0];
+        if (!coach?.lineId) continue;
+        const msg =
+          `⚠️ 課表異動通知\n` +
+          `${venueName} ${weekStr} 週的課表已更新，請重新確認您的排課內容。\n\n` +
+          `建議重新查看教練端課表，並視需要重新匯出 Google Calendar。`;
+        await sendLinePushMessage(coach.lineId, msg).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.error('[LINE Notify] notifyScheduleUnlocked error:', e);
+  }
+}
+
+// SWIM-03: 發送填寫提醒給尚未填寫的教練
+export async function sendFillReminderToCoaches(): Promise<{ sent: number }> {
+  const approved = await storage.getApprovedCoachUsers();
+  const withLine = approved.filter(c => c.lineId);
+  let sent = 0;
+  for (const coach of withLine) {
+    const coachName = coach.linkedCoachName || coach.name;
+    const avail = await db.select().from(coachAvailability).where(eq(coachAvailability.coachName, coachName)).limit(1);
+    const prefs = await db.select().from(coachVenuePreferences).where(eq(coachVenuePreferences.coachName, coachName)).limit(1);
+    const hasAvail = avail.length > 0;
+    const hasPrefs = prefs.length > 0;
+    if (hasAvail && hasPrefs) continue;
+    const missing: string[] = [];
+    if (!hasAvail) missing.push('可用時段（7×7 矩陣）');
+    if (!hasPrefs) missing.push('可排課場館');
+    const msg =
+      `📝 填寫提醒\n` +
+      `您尚未填寫以下資訊，請盡快完成：\n` +
+      missing.map((m, i) => `${i + 1}. ${m}`).join('\n') +
+      `\n\n請前往教練端填寫，謝謝！`;
+    const ok = await sendLinePushMessage(coach.lineId!, msg).catch(() => false);
+    if (ok) sent++;
+  }
+  return { sent };
 }
 
 export function setupDailyNotificationCron(): void {

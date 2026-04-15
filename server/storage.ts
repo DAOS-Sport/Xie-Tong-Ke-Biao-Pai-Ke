@@ -48,6 +48,7 @@ export interface IStorage {
   upsertSchedule(schedule: InsertScheduleType): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
   getCoachSchedules(coachName: string, startDate: string, endDate: string): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>;
+  getScheduleById(id: string): Promise<Schedule | undefined>;
   getConflicts(date: string): Promise<{ coachName: string; timeSlotId: string; venues: string[] }[]>;
   
   // Coach registration operations  
@@ -254,6 +255,11 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .returning();
+    return result;
+  }
+
+  async getScheduleById(id: string): Promise<Schedule | undefined> {
+    const [result] = await db.select().from(schedules).where(eq(schedules.id, id));
     return result;
   }
 

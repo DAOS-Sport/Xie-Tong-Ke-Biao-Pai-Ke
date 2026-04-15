@@ -6,9 +6,9 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertScheduleSchema, insertCoachRegistrationSchema, insertTeacherFeedbackSchema } from "@shared/schema";
 import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { schedules, teachers, teacherFeedbacks, coachUsers, venues, lineNotifyLogs } from "@shared/schema";
-import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications } from "./line-notify";
+import { eq, and, gte, lte, sql, between } from "drizzle-orm";
+import { schedules, teachers, teacherFeedbacks, coachUsers, venues, lineNotifyLogs, coachAvailability, coachVenuePreferences, timeSlots } from "@shared/schema";
+import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications, notifyCoachAssigned, notifyScheduleUnlocked, sendFillReminderToCoaches } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
 async function runStartupFixes(): Promise<void> {
@@ -279,6 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing venueId, startDate, or endDate" });
       }
       await storage.unlockSchedules(venueId, startDate, endDate);
+      notifyScheduleUnlocked(venueId, startDate, endDate).catch(() => {});
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to unlock schedules" });
@@ -309,10 +310,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       const { coachName, coachName2, coach1IsTeaching, coach2IsTeaching } = req.body;
+
+      const oldSchedule = await storage.getScheduleById(req.params.id);
+      const prevCoach1 = oldSchedule?.coachName || null;
+      const prevCoach2 = oldSchedule?.coachName2 || null;
+
       if (coachName2 !== undefined) {
         const updateData: any = { coachName2: coachName2 || null };
         if (!coachName2) updateData.coach2IsTeaching = false;
         const schedule = await storage.updateSchedule(req.params.id, updateData);
+        if (oldSchedule && (coachName2 !== prevCoach2)) {
+          const [venueRow] = await db.select({ name: venues.name }).from(venues).where(eq(venues.id, oldSchedule.venueId));
+          const [tsRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, oldSchedule.timeSlotId));
+          const tsLabel = tsRow ? `第${tsRow.order}節 ${tsRow.startTime}-${tsRow.endTime}` : '';
+          notifyCoachAssigned(schedule, prevCoach1, prevCoach2, venueRow?.name || '', tsLabel).catch(() => {});
+        }
         return res.json(schedule);
       }
       if (coach1IsTeaching !== undefined) {
@@ -324,6 +336,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(schedule);
       }
       const schedule = await storage.assignCoach(req.params.id, coachName || null);
+      if (oldSchedule && coachName !== prevCoach1) {
+        const [venueRow] = await db.select({ name: venues.name }).from(venues).where(eq(venues.id, oldSchedule.venueId));
+        const [tsRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, oldSchedule.timeSlotId));
+        const tsLabel = tsRow ? `第${tsRow.order}節 ${tsRow.startTime}-${tsRow.endTime}` : '';
+        notifyCoachAssigned(schedule, prevCoach1, prevCoach2, venueRow?.name || '', tsLabel).catch(() => {});
+      }
       res.json(schedule);
     } catch (error) {
       res.status(500).json({ message: "Failed to assign coach" });
@@ -1404,6 +1422,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SWIM-04: 教練填寫狀態（公開端點，供教練端自我檢視）
+  app.get('/api/coach-portal/fill-status', async (req, res) => {
+    try {
+      const { coachName } = req.query as { coachName: string };
+      if (!coachName) return res.status(400).json({ message: "Missing coachName" });
+      const avail = await db.select({ id: coachAvailability.id }).from(coachAvailability).where(eq(coachAvailability.coachName, coachName)).limit(1);
+      const prefs = await db.select({ id: coachVenuePreferences.id }).from(coachVenuePreferences).where(eq(coachVenuePreferences.coachName, coachName)).limit(1);
+      res.json({ hasAvailability: avail.length > 0, hasVenuePrefs: prefs.length > 0 });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch fill status" });
+    }
+  });
+
   app.get('/api/admin/coach-venue-preferences', async (req, res) => {
     try {
       const password = req.headers['x-admin-password'] || req.query?.password;
@@ -1660,6 +1691,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Individual notify error:', error);
       res.status(500).json({ message: '推播發送失敗' });
+    }
+  });
+
+  // SWIM-03: 教練填寫率儀表板
+  app.get('/api/admin/coach-fillrate', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.query?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const approved = await storage.getApprovedCoachUsers();
+      const coachDataList = await Promise.all(approved.map(async (coach) => {
+        const coachName = coach.linkedCoachName || coach.name;
+        const avail = await db.select({ id: coachAvailability.id }).from(coachAvailability).where(eq(coachAvailability.coachName, coachName));
+        const prefs = await db.select({ id: coachVenuePreferences.id }).from(coachVenuePreferences).where(eq(coachVenuePreferences.coachName, coachName));
+        return {
+          name: coachName,
+          lineId: coach.lineId || null,
+          hasAvailability: avail.length > 0,
+          availabilitySlots: avail.length,
+          hasVenuePrefs: prefs.length > 0,
+          venuePrefsCount: prefs.length,
+        };
+      }));
+      const summary = {
+        total: coachDataList.length,
+        filledAvailability: coachDataList.filter(c => c.hasAvailability).length,
+        filledVenuePrefs: coachDataList.filter(c => c.hasVenuePrefs).length,
+        linkedLine: coachDataList.filter(c => c.lineId).length,
+      };
+      res.json({ coaches: coachDataList, summary });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch fillrate" });
+    }
+  });
+
+  // SWIM-03: 發送填寫提醒
+  app.post('/api/admin/send-fill-reminder', async (req, res) => {
+    const password = req.headers['x-admin-password'] || req.body?.password;
+    if (password !== 'dream0935314711') {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const result = await sendFillReminderToCoaches();
+      res.json({ success: true, sent: result.sent });
+    } catch (error) {
+      res.status(500).json({ message: "推播發送失敗" });
     }
   });
 

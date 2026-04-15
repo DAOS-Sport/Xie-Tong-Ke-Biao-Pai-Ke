@@ -485,6 +485,22 @@ function ApprovedDashboard({
     enabled: !!coachName,
   });
 
+  const scheduleLastModified = useMemo(() => {
+    if (!mySchedules.length) return null;
+    const maxTime = Math.max(...mySchedules.map(s => s.updatedAt ? new Date(s.updatedAt).getTime() : 0));
+    return maxTime > 0 ? new Date(maxTime) : null;
+  }, [mySchedules]);
+
+  const { data: fillStatus } = useQuery<{ hasAvailability: boolean; hasVenuePrefs: boolean }>({
+    queryKey: ["/api/coach-portal/fill-status", coachName],
+    queryFn: async () => {
+      const res = await fetch(`/api/coach-portal/fill-status?coachName=${encodeURIComponent(coachName)}`);
+      if (!res.ok) return { hasAvailability: false, hasVenuePrefs: false };
+      return res.json();
+    },
+    enabled: !!coachName,
+  });
+
   const { toast } = useToast();
 
   const [localVenuePrefs, setLocalVenuePrefs] = useState<Set<string>>(new Set());
@@ -658,6 +674,33 @@ function ApprovedDashboard({
           </Card>
         )}
 
+        {/* SWIM-04: 填寫進度自我檢視 */}
+        {fillStatus && (
+          <div className="flex gap-2 flex-wrap">
+            {!fillStatus.hasAvailability && (
+              <button
+                className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+                onClick={() => document.getElementById('availability-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                ⚠ 尚未填寫可用時段
+              </button>
+            )}
+            {!fillStatus.hasVenuePrefs && (
+              <button
+                className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+                onClick={() => document.getElementById('venue-prefs-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                ⚠ 尚未選擇場館偏好
+              </button>
+            )}
+            {fillStatus.hasAvailability && fillStatus.hasVenuePrefs && (
+              <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full">
+                ✓ 時段與場館資料已填寫完整
+              </span>
+            )}
+          </div>
+        )}
+
         <Card>
           <CardHeader className="py-3">
             <div className="flex items-center justify-between">
@@ -677,6 +720,11 @@ function ApprovedDashboard({
                 </Button>
               </div>
             </div>
+            {scheduleLastModified && (
+              <p className="text-xs text-gray-400 mt-1">
+                課表最後更新：{format(scheduleLastModified, 'M/d HH:mm')}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="py-2">
             {isLoading ? (
@@ -807,7 +855,7 @@ function ApprovedDashboard({
           </Card>
         )}
 
-        <Card>
+        <Card id="venue-prefs-section">
           <CardHeader className="py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -847,7 +895,7 @@ function ApprovedDashboard({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="availability-section">
           <CardHeader className="py-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">

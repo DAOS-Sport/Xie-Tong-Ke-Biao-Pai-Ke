@@ -80,6 +80,15 @@ function CoachApprovalContent() {
   );
 }
 
+interface CoachFillRate {
+  name: string;
+  lineId: string | null;
+  hasAvailability: boolean;
+  availabilitySlots: number;
+  hasVenuePrefs: boolean;
+  venuePrefsCount: number;
+}
+
 function CoachUsersSection() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -87,6 +96,7 @@ function CoachUsersSection() {
   const [editName, setEditName] = useState("");
   const [editingLineCoachId, setEditingLineCoachId] = useState<string | null>(null);
   const [lineIdInput, setLineIdInput] = useState("");
+  const [showFillRate, setShowFillRate] = useState(false);
 
   const { data: coachUsers = [], isLoading } = useQuery<CoachUser[]>({
     queryKey: ["/api/admin/coach-users", filter],
@@ -106,6 +116,35 @@ function CoachUsersSection() {
       const res = await fetch(`/api/admin/coach-venue-preferences?password=${adminPassword}`);
       if (!res.ok) return {};
       return res.json();
+    },
+  });
+
+  const { data: fillRateData, isLoading: fillRateLoading } = useQuery<{ coaches: CoachFillRate[]; summary: { total: number; filledAvailability: number; filledVenuePrefs: number; linkedLine: number } }>({
+    queryKey: ["/api/admin/coach-fillrate"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/coach-fillrate?password=${adminPassword}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: showFillRate,
+  });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/send-fill-reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "發送失敗");
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({ title: "發送完成", description: `已成功推播 ${data.sent} 位教練` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "發送失敗", description: err.message, variant: "destructive" });
     },
   });
 
@@ -452,6 +491,81 @@ function CoachUsersSection() {
           </div>
         )}
       </CardContent>
+    </Card>
+
+    {/* SWIM-03: 教練填寫狀態 */}
+    <Card>
+      <CardHeader className="py-3 cursor-pointer" onClick={() => setShowFillRate(v => !v)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            教練填寫狀態
+          </CardTitle>
+          <div className="flex items-center gap-3">
+            {fillRateData && (
+              <span className="text-xs text-gray-400">
+                時段：{fillRateData.summary.filledAvailability}/{fillRateData.summary.total} ·
+                場館：{fillRateData.summary.filledVenuePrefs}/{fillRateData.summary.total} ·
+                LINE：{fillRateData.summary.linkedLine}/{fillRateData.summary.total}
+              </span>
+            )}
+            <span className="text-gray-400 text-sm">{showFillRate ? "▲" : "▼"}</span>
+          </div>
+        </div>
+      </CardHeader>
+      {showFillRate && (
+        <CardContent className="py-2">
+          {fillRateLoading ? (
+            <div className="text-center py-4 text-muted-foreground text-sm">載入中...</div>
+          ) : fillRateData ? (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-gray-500">
+                  {fillRateData.coaches.filter(c => !c.hasAvailability || !c.hasVenuePrefs).length} 位教練尚未完整填寫
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs border-green-200 text-green-700 hover:bg-green-50 h-7"
+                  onClick={() => sendReminderMutation.mutate()}
+                  disabled={sendReminderMutation.isPending || fillRateData.summary.linkedLine === 0}
+                >
+                  <Send className="h-3 w-3" />
+                  {sendReminderMutation.isPending ? "發送中..." : "發送填寫提醒"}
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {fillRateData.coaches.map(coach => (
+                  <div key={coach.name} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50 text-sm">
+                    <span className="font-medium min-w-[80px]">{coach.name}</span>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-400">時段</span>
+                        {coach.hasAvailability
+                          ? <span className="text-xs text-green-600 font-medium">✓ {coach.availabilitySlots}/49</span>
+                          : <span className="text-xs text-red-500 font-medium">未填</span>
+                        }
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-400">場館</span>
+                        {coach.hasVenuePrefs
+                          ? <span className="text-xs text-green-600 font-medium">✓ {coach.venuePrefsCount}個</span>
+                          : <span className="text-xs text-red-500 font-medium">未填</span>
+                        }
+                      </div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        coach.lineId ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {coach.lineId ? 'LINE ✓' : 'LINE 未綁'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </CardContent>
+      )}
     </Card>
 
     {editingUser && (
