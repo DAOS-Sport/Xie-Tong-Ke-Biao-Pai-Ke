@@ -246,9 +246,16 @@ function CoachAssignmentContent() {
     return map;
   }, [availability]);
 
-  // 教練可跨區，只依時段可用性判斷（不做場館偏好過濾）
-  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number, _venueName?: string): Set<string> => {
-    return availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
+  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number, venueName?: string): Set<string> => {
+    const timeAvailable = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
+    if (!venueName) return timeAvailable;
+    const result = new Set<string>();
+    for (const coach of timeAvailable) {
+      const prefs = venuePrefsMap[coach];
+      if (!prefs || prefs.length === 0) result.add(coach);
+      else if (prefs.includes(venueName)) result.add(coach);
+    }
+    return result;
   };
 
   const getConflictingCoaches = (date: string, timeSlotId: string, currentScheduleId: string): Set<string> => {
@@ -362,8 +369,36 @@ function CoachAssignmentContent() {
 
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
-  // 教練可跨區，下拉選單顯示全部教練（不做場館過濾）
-  const venueEligibleCoaches = coaches;
+  // 依教練場館偏好篩選：只保留「未填偏好」或「有勾選此場館」的教練
+  const venueEligibleCoaches = useMemo(() => {
+    const venueName = selectedVenueData?.name;
+    if (!venueName) return coaches;
+    return coaches.filter((coach) => {
+      const prefs = venuePrefsMap[coach];
+      return !prefs || prefs.length === 0 || prefs.includes(venueName);
+    });
+  }, [coaches, selectedVenueData, venuePrefsMap]);
+
+  // SWIM-05: 依 (isAvailable, prefersVenue) 評分，優先指派最合適教練
+  const scoredCandidates = (dayOfWeek: number, timeSlotOrder: number, venueName: string, excludeSet: Set<string>): string[] => {
+    const timeAvailSet = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
+    const scored: { coach: string; score: number }[] = [];
+    for (const coach of venueEligibleCoaches) {
+      if (excludeSet.has(coach)) continue;
+      const isAvailable = timeAvailSet.has(coach);
+      const prefs = venuePrefsMap[coach];
+      const prefersVenue = !!(prefs && prefs.length > 0 && prefs.includes(venueName));
+      const noPrefsSet = !prefs || prefs.length === 0;
+      let score = 0;
+      if (isAvailable && prefersVenue) score = 3;
+      else if (isAvailable && noPrefsSet) score = 2;
+      else if (isAvailable) score = 2;
+      else if (prefersVenue) score = 1;
+      else continue; // neither: exclude
+      scored.push({ coach, score });
+    }
+    return scored.sort((a, b) => b.score - a.score).map((x) => x.coach);
+  };
 
   const handleAutoFill = () => {
     const unfilled = schedules.filter(
@@ -372,25 +407,44 @@ function CoachAssignmentContent() {
     let filled = 0;
     const localCounts: Record<string, number> = {};
     for (const coach of coaches) localCounts[coach] = weeklyStats[coach]?.assigned || 0;
+    const venueName = selectedVenueData?.name || "";
+
+    const pickBest = (candidates: string[], timeAvailSet: Set<string>): string | undefined => {
+      return candidates.sort((a, b) => {
+        const scoreOf = (c: string) => {
+          const prefs = venuePrefsMap[c];
+          const inAvail = timeAvailSet.has(c);
+          const prefV = !!(prefs && prefs.length > 0 && prefs.includes(venueName));
+          return inAvail && prefV ? 3 : inAvail ? 2 : 1;
+        };
+        const diff = scoreOf(b) - scoreOf(a);
+        return diff !== 0 ? diff : (localCounts[a] || 0) - (localCounts[b] || 0);
+      })[0];
+    };
+
     for (const schedule of unfilled) {
       const date = new Date(schedule.date);
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
       const timeSlotOrder = schedule.timeSlot?.order || 0;
-      const available = getAvailableCoaches(dayOfWeek, timeSlotOrder, schedule.venue?.name);
+      const timeAvailSet = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
       const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
-      const candidates = Array.from(available).filter((c) => !conflicting.has(c));
       let assignedCoach1 = schedule.coachName || "";
-      if (!schedule.coachName && candidates.length > 0) {
-        const best = candidates.sort((a, b) => (localCounts[a] || 0) - (localCounts[b] || 0))[0];
-        assignCoachMutation.mutate({ scheduleId: schedule.id, coachName: best });
-        localCounts[best] = (localCounts[best] || 0) + 1;
-        assignedCoach1 = best;
-        filled++;
+      if (!schedule.coachName) {
+        const candidates = scoredCandidates(dayOfWeek, timeSlotOrder, venueName, conflicting);
+        if (candidates.length > 0) {
+          const best = pickBest(candidates, timeAvailSet)!;
+          assignCoachMutation.mutate({ scheduleId: schedule.id, coachName: best });
+          localCounts[best] = (localCounts[best] || 0) + 1;
+          assignedCoach1 = best;
+          filled++;
+        }
       }
       if ((schedule.coachCount || 1) >= 2 && !schedule.coachName2) {
-        const candidates2 = candidates.filter((c) => c !== assignedCoach1);
+        const exclude2 = new Set(conflicting);
+        if (assignedCoach1) exclude2.add(assignedCoach1);
+        const candidates2 = scoredCandidates(dayOfWeek, timeSlotOrder, venueName, exclude2);
         if (candidates2.length > 0) {
-          const best2 = candidates2.sort((a, b) => (localCounts[a] || 0) - (localCounts[b] || 0))[0];
+          const best2 = pickBest(candidates2, timeAvailSet)!;
           assignCoachMutation.mutate({ scheduleId: schedule.id, coachName2: best2 });
           localCounts[best2] = (localCounts[best2] || 0) + 1;
           filled++;

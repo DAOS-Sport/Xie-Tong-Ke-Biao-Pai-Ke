@@ -682,12 +682,20 @@ function ApprovedDashboard({
                 className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
                 onClick={() => document.getElementById('availability-section')?.scrollIntoView({ behavior: 'smooth' })}
               >
-                ⚠ 尚未填寫可用時段，請點此前往填寫
+                ⚠ 尚未填寫可用時段
               </button>
             )}
-            {fillStatus.hasAvailability && (
+            {!fillStatus.hasVenuePrefs && (
+              <button
+                className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
+                onClick={() => document.getElementById('venue-prefs-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                ⚠ 尚未選擇場館偏好
+              </button>
+            )}
+            {fillStatus.hasAvailability && fillStatus.hasVenuePrefs && (
               <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full">
-                ✓ 可用時段已填寫
+                ✓ 時段與場館資料已填寫完整
               </span>
             )}
           </div>
@@ -847,6 +855,45 @@ function ApprovedDashboard({
           </Card>
         )}
 
+        <Card id="venue-prefs-section">
+          <CardHeader className="py-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              可排課地點
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            <p className="text-xs text-muted-foreground mb-3">請勾選您可以前往上課的場館</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {venues.map(venue => {
+                const isSelected = localVenuePrefs.has(venue.name);
+                return (
+                  <button
+                    key={venue.id}
+                    onClick={() => toggleVenuePreference(venue.name)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-colors text-left ${
+                      isSelected
+                        ? "bg-green-50 border-green-400 text-green-800"
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                      isSelected ? "bg-green-500 border-green-600 text-white" : "border-gray-300"
+                    }`}>
+                      {isSelected ? "✓" : ""}
+                    </span>
+                    <span className="truncate">{venue.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {localVenuePrefs.size > 0 && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                已選 {localVenuePrefs.size} 個場館
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card id="availability-section">
           <CardHeader className="py-3">
