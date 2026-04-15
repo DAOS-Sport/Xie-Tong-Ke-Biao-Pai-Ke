@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Check, Users, Zap, BarChart3, AlertTriangle, ChevronDown, X, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Users, BarChart3, AlertTriangle, ChevronDown, X, Search } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import PasswordProtect from "@/components/password-protect";
@@ -379,84 +379,6 @@ function CoachAssignmentContent() {
     });
   }, [coaches, selectedVenueData, venuePrefsMap]);
 
-  // SWIM-05: 依 (isAvailable, prefersVenue) 評分，優先指派最合適教練
-  const scoredCandidates = (dayOfWeek: number, timeSlotOrder: number, venueName: string, excludeSet: Set<string>): string[] => {
-    const timeAvailSet = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
-    const scored: { coach: string; score: number }[] = [];
-    for (const coach of venueEligibleCoaches) {
-      if (excludeSet.has(coach)) continue;
-      const isAvailable = timeAvailSet.has(coach);
-      const prefs = venuePrefsMap[coach];
-      const prefersVenue = !!(prefs && prefs.length > 0 && prefs.includes(venueName));
-      const noPrefsSet = !prefs || prefs.length === 0;
-      let score = 0;
-      if (isAvailable && prefersVenue) score = 3;
-      else if (isAvailable && noPrefsSet) score = 2;
-      else if (isAvailable) score = 2;
-      else if (prefersVenue) score = 1;
-      else continue; // neither: exclude
-      scored.push({ coach, score });
-    }
-    return scored.sort((a, b) => b.score - a.score).map((x) => x.coach);
-  };
-
-  const handleAutoFill = () => {
-    const unfilled = schedules.filter(
-      (s) => s.className && s.venue.id === selectedVenue && (!s.coachName || ((s.coachCount || 1) >= 2 && !s.coachName2))
-    );
-    let filled = 0;
-    const localCounts: Record<string, number> = {};
-    for (const coach of coaches) localCounts[coach] = weeklyStats[coach]?.assigned || 0;
-    const venueName = selectedVenueData?.name || "";
-
-    const pickBest = (candidates: string[], timeAvailSet: Set<string>): string | undefined => {
-      return candidates.sort((a, b) => {
-        const scoreOf = (c: string) => {
-          const prefs = venuePrefsMap[c];
-          const inAvail = timeAvailSet.has(c);
-          const prefV = !!(prefs && prefs.length > 0 && prefs.includes(venueName));
-          return inAvail && prefV ? 3 : inAvail ? 2 : 1;
-        };
-        const diff = scoreOf(b) - scoreOf(a);
-        return diff !== 0 ? diff : (localCounts[a] || 0) - (localCounts[b] || 0);
-      })[0];
-    };
-
-    for (const schedule of unfilled) {
-      const date = new Date(schedule.date);
-      const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
-      const timeSlotOrder = schedule.timeSlot?.order || 0;
-      const timeAvailSet = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
-      const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
-      let assignedCoach1 = schedule.coachName || "";
-      if (!schedule.coachName) {
-        const candidates = scoredCandidates(dayOfWeek, timeSlotOrder, venueName, conflicting);
-        if (candidates.length > 0) {
-          const best = pickBest(candidates, timeAvailSet)!;
-          assignCoachMutation.mutate({ scheduleId: schedule.id, coachName: best });
-          localCounts[best] = (localCounts[best] || 0) + 1;
-          assignedCoach1 = best;
-          filled++;
-        }
-      }
-      if ((schedule.coachCount || 1) >= 2 && !schedule.coachName2) {
-        const exclude2 = new Set(conflicting);
-        if (assignedCoach1) exclude2.add(assignedCoach1);
-        const candidates2 = scoredCandidates(dayOfWeek, timeSlotOrder, venueName, exclude2);
-        if (candidates2.length > 0) {
-          const best2 = pickBest(candidates2, timeAvailSet)!;
-          assignCoachMutation.mutate({ scheduleId: schedule.id, coachName2: best2 });
-          localCounts[best2] = (localCounts[best2] || 0) + 1;
-          filled++;
-        }
-      }
-    }
-    if (filled === 0) {
-      toast({ title: "無可用教練", description: "沒有符合條件的教練可自動指派", variant: "destructive" });
-    } else {
-      toast({ title: "自動指派完成", description: `已嘗試指派 ${filled} 個教練` });
-    }
-  };
 
   const sidebarAvailableCoaches = selectedCell
     ? (() => {
@@ -625,16 +547,6 @@ function CoachAssignmentContent() {
                 尚有 <strong>{missingCoachCount}</strong> 個教練缺口未指派
               </span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs border-purple-300 text-purple-600 hover:bg-purple-50"
-              onClick={handleAutoFill}
-              disabled={assignCoachMutation.isPending}
-            >
-              <Zap className="h-3 w-3 mr-1" />
-              自動指派
-            </Button>
           </div>
         )}
 
