@@ -369,6 +369,16 @@ function CoachAssignmentContent() {
 
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
+  // 依教練場館偏好篩選：只保留「未填偏好」或「有勾選此場館」的教練
+  const venueEligibleCoaches = useMemo(() => {
+    const venueName = selectedVenueData?.name;
+    if (!venueName) return coaches;
+    return coaches.filter((coach) => {
+      const prefs = venuePrefsMap[coach];
+      return !prefs || prefs.length === 0 || prefs.includes(venueName);
+    });
+  }, [coaches, selectedVenueData, venuePrefsMap]);
+
   const handleAutoFill = () => {
     const unfilled = schedules.filter(
       (s) => s.className && s.venue.id === selectedVenue && (!s.coachName || ((s.coachCount || 1) >= 2 && !s.coachName2))
@@ -687,7 +697,7 @@ function CoachAssignmentContent() {
                                         coachName: value === "__clear__" ? "" : value,
                                       });
                                     }}
-                                    coaches={coaches}
+                                    coaches={venueEligibleCoaches}
                                     available={available}
                                     conflicts={coach1Conflicts}
                                     placeholder="教練1"
@@ -734,7 +744,7 @@ function CoachAssignmentContent() {
                                             coachName2: value === "__clear__" ? "" : value,
                                           });
                                         }}
-                                        coaches={coaches}
+                                        coaches={venueEligibleCoaches}
                                         available={available}
                                         conflicts={coach2Conflicts}
                                         placeholder="教練2"
