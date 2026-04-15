@@ -1,0 +1,187 @@
+# 五泳池課表系統｜緊急修正 Prompt
+# 不重構、不改動頁面結構、只針對以下三個問題精確修改
+
+---
+
+## 問題一：教練端「場館偏好選擇」暫時隱藏
+
+**需求釐清：**
+教練端的功能應該是「教練選可用時段」，不是「選場館」。
+場館偏好選擇（coach_venue_preferences）這個功能目前先隱藏，
+時段選擇（7×7 矩陣）保留不動。
+
+**修改範圍：Coach Portal 前端**
+
+找到教練端頁面中「場館偏好」或「可排課地點」的區塊，
+在最外層容器加上 `hidden` 或直接條件渲染為 `null`：
+
+```tsx
+{/* 場館偏好區塊 — 暫時隱藏，功能程式碼保留勿刪除 */}
+{false && (
+  <div id="venue-preferences-section">
+    {/* 原有場館偏好 UI 內容，整段保留但不渲染 */}
+    ...
+  </div>
+)}
+```
+
+**同步隱藏管理後台中的場館偏好相關顯示：**
+- SWIM-03 填寫率儀表板中的「場館偏好」欄位也一併隱藏（`venuePrefsCount` 不顯示）
+- 自動填入的候選教練標記中，`🏊` 場館偏好標記移除，只保留 `✅` 時段標記
+
+**確認保留不動的功能：**
+- 7×7 可用時段矩陣 ✅ 保留
+- 個人課表查看 ✅ 保留
+- Google Calendar 匯出 ✅ 保留
+- 同場館同事查看 ✅ 保留
+- 教練規則顯示 ✅ 保留
+
+**驗收：**
+1. 教練端頁面看不到「場館偏好」區塊
+2. 7×7 時段矩陣正常運作不受影響
+3. 相關 API（`/api/coach/venue-preferences`）和資料表保留，只是 UI 不顯示
+
+---
+
+## 問題二：自動派發（Auto-fill）功能暫時關閉
+
+**需求：** 群組確認自動派發功能暫時關閉，界面上先隱藏入口。
+
+**修改範圍：Admin 後台 — 教練指派頁面（Phase 2）**
+
+找到「自動填入」按鈕（auto-fill button），加上隱藏處理：
+
+```tsx
+{/* 自動填入按鈕 — 暫時隱藏 */}
+{false && (
+  <Button onClick={handleAutoFill} variant="outline" size="sm">
+    自動填入
+  </Button>
+)}
+```
+
+同時找到 sidebar 中「可用教練」面板裡的自動填入相關按鈕，一併隱藏。
+
+後端 `POST /api/admin/auto-fill` 路由**保留不刪**，只是前端不顯示入口。
+
+**驗收：**
+1. 教練指派頁面看不到自動填入按鈕
+2. 手動指派教練的下拉選單和其他功能不受影響
+3. API 路由保留（日後需要可隨時開啟）
+
+---
+
+## 問題三：教練下拉選單無法找到「LB 小宇」
+
+**問題描述：**
+士林國中在 Phase 2 指派教練時，
+下拉選單（或 autocomplete）搜尋「LB 小宇」找不到這個人。
+截圖顯示選單中出現「LB (小宇...」文字被截斷，
+且實際無法選取或搜尋不到。
+
+**可能根因（逐一排查）：**
+
+### 根因 A：教練名稱格式問題
+`coachUsers` 表中這位教練的 `linkedCoachName` 或 `name` 欄位，
+可能儲存的是 `LB 小宇` 或 `小宇(LB)` 等格式，
+而搜尋邏輯只比對開頭或完整字串。
+
+**修復：**
+```ts
+// 在教練搜尋/autocomplete 的查詢中，改用 ilike 模糊搜尋
+const coaches = await db.query.coachUsers.findMany({
+  where: and(
+    eq(coachUsers.status, 'approved'),
+    or(
+      ilike(coachUsers.name, `%${searchTerm}%`),
+      ilike(coachUsers.linkedCoachName, `%${searchTerm}%`)
+    )
+  )
+})
+```
+
+### 根因 B：Ragic 同步的名稱格式
+Ragic 同步時，若教練名稱含有括號或空格（`LB 小宇`），
+同步後可能被截斷或格式化錯誤。
+
+**確認 `server/ragic.ts` 中同步名稱時：**
+```ts
+// 確保名稱欄位 trim() 後完整儲存，不被截斷
+name: ragicData.name?.trim() ?? '',
+```
+
+### 根因 C：下拉選單 UI 顯示截斷
+截圖中看到「LB (小宇...」顯示不完整，可能是 `<SelectItem>` 或 option 的寬度限制。
+
+**修復顯示截斷：**
+```tsx
+// 找到教練選擇的下拉選單元件
+// 通常是 <Select> 或 <Combobox> 的 item 渲染
+
+// 修改 SelectItem 或 option 樣式，允許完整顯示
+<SelectItem
+  key={coach.name}
+  value={coach.name}
+  className="truncate max-w-none"  // 移除截斷，允許換行或完整顯示
+>
+  {coach.linkedCoachName ?? coach.name}
+</SelectItem>
+
+// 或若使用 Combobox（Command + Popover）：
+<CommandItem
+  key={coach.name}
+  value={coach.name}
+  className="whitespace-normal"    // 允許長名稱換行
+>
+  {coach.linkedCoachName ?? coach.name}
+</CommandItem>
+```
+
+### 根因 D：陳柏榮排序邏輯影響搜尋
+系統設定「陳柏榮永遠排第一」的排序邏輯，
+確認這個自訂排序沒有在搜尋過濾時意外移除其他教練：
+
+```ts
+// 確認排序邏輯不影響篩選結果
+const sorted = coaches.sort((a, b) => {
+  if (a.name === '陳柏榮') return -1
+  if (b.name === '陳柏榮') return 1
+  return a.name.localeCompare(b.name, 'zh-TW')
+})
+// 排序應在篩選之後執行，不影響 ilike 查詢結果
+```
+
+**完整修復步驟：**
+1. 先查資料庫確認「LB 小宇」這位教練在 `coachUsers` 表的實際名稱格式
+   ```sql
+   SELECT id, name, linkedCoachName, status
+   FROM coach_users
+   WHERE name ILIKE '%小宇%' OR name ILIKE '%LB%'
+      OR "linkedCoachName" ILIKE '%小宇%' OR "linkedCoachName" ILIKE '%LB%';
+   ```
+2. 根據查詢結果，決定是修名稱格式還是修搜尋邏輯
+3. 修改 autocomplete/select 的搜尋為 ilike 模糊比對
+4. 修改 SelectItem 的顯示截斷問題
+
+**驗收：**
+1. 在士林國中的教練指派下拉選單中，搜尋「小宇」或「LB」都能找到這位教練
+2. 選單中顯示完整名稱，不再截斷
+3. 其他教練的搜尋不受影響
+
+---
+
+## 執行優先順序
+
+| 優先 | 問題 | 預估改動量 |
+|------|------|-----------|
+| 1️⃣ 最高 | 問題三：LB 小宇搜尋不到 | 小（資料查詢 + 樣式修改） |
+| 2️⃣ 高 | 問題一：場館偏好隱藏 | 小（條件渲染） |
+| 3️⃣ 高 | 問題二：自動派發隱藏 | 極小（一行 false） |
+
+---
+
+## 注意事項
+
+- 三個問題的修改**互相獨立**，可分開 commit
+- 所有「隱藏」的功能**只隱藏 UI，程式碼和 API 完整保留**，未來可隨時開啟
+- 問題三需要先查資料庫確認名稱格式，再決定修法

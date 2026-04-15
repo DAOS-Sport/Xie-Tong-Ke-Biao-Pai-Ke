@@ -67,10 +67,14 @@ function CoachSearchSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const normalize = (s: string) => s.toLowerCase().replace(/[\s\(\)\（\）\-_]/g, "");
   const filtered = (list: string[]) =>
     search.trim() === ""
       ? list
-      : list.filter((c) => c.toLowerCase().includes(search.toLowerCase()));
+      : list.filter((c) => {
+          const q = search.toLowerCase().trim();
+          return c.toLowerCase().includes(q) || normalize(c).includes(normalize(q));
+        });
 
   const availableList = filtered(coaches.filter((c) => available.has(c)));
   const otherList = filtered(coaches.filter((c) => !available.has(c)));
@@ -110,7 +114,7 @@ function CoachSearchSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-white border border-gray-200 rounded shadow-lg">
+        <div className="absolute z-50 top-full left-0 mt-0.5 min-w-[220px] w-max max-w-[320px] bg-white border border-gray-200 rounded shadow-lg">
           <div className="p-1.5 border-b flex items-center gap-1">
             <Search className="h-3 w-3 text-gray-400 flex-shrink-0" />
             <input
@@ -625,6 +629,8 @@ function CoachAssignmentContent() {
                 尚有 <strong>{missingCoachCount}</strong> 個教練缺口未指派
               </span>
             </div>
+            {/* 自動指派按鈕 — 暫時隱藏 */}
+            {false && (
             <Button
               size="sm"
               variant="outline"
@@ -635,6 +641,7 @@ function CoachAssignmentContent() {
               <Zap className="h-3 w-3 mr-1" />
               自動指派
             </Button>
+            )}
           </div>
         )}
 

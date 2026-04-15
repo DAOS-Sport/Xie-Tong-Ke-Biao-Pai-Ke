@@ -505,7 +505,6 @@ function CoachUsersSection() {
             {fillRateData && (
               <span className="text-xs text-gray-400">
                 時段：{fillRateData.summary.filledAvailability}/{fillRateData.summary.total} ·
-                場館：{fillRateData.summary.filledVenuePrefs}/{fillRateData.summary.total} ·
                 LINE：{fillRateData.summary.linkedLine}/{fillRateData.summary.total}
               </span>
             )}
@@ -521,7 +520,7 @@ function CoachUsersSection() {
             <>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs text-gray-500">
-                  {fillRateData.coaches.filter(c => !c.hasAvailability || !c.hasVenuePrefs).length} 位教練尚未完整填寫
+                  {fillRateData.coaches.filter(c => !c.hasAvailability).length} 位教練尚未填寫可用時段
                 </span>
                 <Button
                   size="sm"
@@ -546,13 +545,7 @@ function CoachUsersSection() {
                           : <span className="text-xs text-red-500 font-medium">未填</span>
                         }
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-400">場館</span>
-                        {coach.hasVenuePrefs
-                          ? <span className="text-xs text-green-600 font-medium">✓ {coach.venuePrefsCount}個</span>
-                          : <span className="text-xs text-red-500 font-medium">未填</span>
-                        }
-                      </div>
+                      {/* 場館偏好欄位 — 暫時隱藏 */}
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         coach.lineId ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-400'
                       }`}>

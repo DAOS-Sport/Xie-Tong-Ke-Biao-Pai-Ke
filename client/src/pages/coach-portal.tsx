@@ -685,17 +685,9 @@ function ApprovedDashboard({
                 ⚠ 尚未填寫可用時段
               </button>
             )}
-            {!fillStatus.hasVenuePrefs && (
-              <button
-                className="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-colors"
-                onClick={() => document.getElementById('venue-prefs-section')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                ⚠ 尚未選擇場館偏好
-              </button>
-            )}
-            {fillStatus.hasAvailability && fillStatus.hasVenuePrefs && (
+            {fillStatus.hasAvailability && (
               <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-full">
-                ✓ 時段與場館資料已填寫完整
+                ✓ 可用時段已填寫
               </span>
             )}
           </div>
@@ -855,7 +847,8 @@ function ApprovedDashboard({
           </Card>
         )}
 
-        <Card id="venue-prefs-section">
+        {/* 場館偏好區塊 — 暫時隱藏，功能程式碼保留勿刪除 */}
+        {false && <Card id="venue-prefs-section">
           <CardHeader className="py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -893,7 +886,7 @@ function ApprovedDashboard({
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card id="availability-section">
           <CardHeader className="py-3">
