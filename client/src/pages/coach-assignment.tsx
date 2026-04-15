@@ -246,16 +246,9 @@ function CoachAssignmentContent() {
     return map;
   }, [availability]);
 
-  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number, venueName?: string): Set<string> => {
-    const timeAvailable = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
-    if (!venueName) return timeAvailable;
-    const result = new Set<string>();
-    for (const coach of timeAvailable) {
-      const prefs = venuePrefsMap[coach];
-      if (!prefs || prefs.length === 0) result.add(coach);
-      else if (prefs.includes(venueName)) result.add(coach);
-    }
-    return result;
+  // 教練可跨區，只依時段可用性判斷（不做場館偏好過濾）
+  const getAvailableCoaches = (dayOfWeek: number, timeSlotOrder: number, _venueName?: string): Set<string> => {
+    return availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
   };
 
   const getConflictingCoaches = (date: string, timeSlotId: string, currentScheduleId: string): Set<string> => {
@@ -369,15 +362,8 @@ function CoachAssignmentContent() {
 
   const selectedVenueData = venues?.find((v) => v.id === selectedVenue);
 
-  // 依教練場館偏好篩選：只保留「未填偏好」或「有勾選此場館」的教練
-  const venueEligibleCoaches = useMemo(() => {
-    const venueName = selectedVenueData?.name;
-    if (!venueName) return coaches;
-    return coaches.filter((coach) => {
-      const prefs = venuePrefsMap[coach];
-      return !prefs || prefs.length === 0 || prefs.includes(venueName);
-    });
-  }, [coaches, selectedVenueData, venuePrefsMap]);
+  // 教練可跨區，下拉選單顯示全部教練（不做場館過濾）
+  const venueEligibleCoaches = coaches;
 
   const handleAutoFill = () => {
     const unfilled = schedules.filter(
