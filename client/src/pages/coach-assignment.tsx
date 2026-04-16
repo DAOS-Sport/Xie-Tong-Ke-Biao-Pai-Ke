@@ -351,14 +351,28 @@ function CoachAssignmentContent() {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({
         predicate: (query) =>
           typeof query.queryKey[0] === "string" &&
           (query.queryKey[0].includes("/api/schedules") || query.queryKey[0].includes("/api/conflicts")),
       });
       localStorage.setItem("scheduleLastModified", Date.now().toString());
-      toast({ title: "指派成功", description: "教練已更新" });
+      const notified: string[] = data?.lineNotified || [];
+      const noLineId: string[] = data?.lineNoId || [];
+      if (notified.length > 0) {
+        toast({
+          title: "指派成功",
+          description: `已推播 LINE 通知給：${notified.join("、")}`,
+        });
+      } else if (noLineId.length > 0) {
+        toast({
+          title: "指派成功",
+          description: `${noLineId.join("、")} 尚未綁定 LINE，未發送通知`,
+        });
+      } else {
+        toast({ title: "指派成功", description: "教練已更新" });
+      }
     },
     onError: (error) => {
       toast({ title: "指派失敗", description: error.message, variant: "destructive" });
