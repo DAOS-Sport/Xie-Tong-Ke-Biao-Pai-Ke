@@ -176,64 +176,98 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
   }
 
   try {
-    const now = new Date();
-    const tomorrowDate = addDays(now, 1);
-    const tomorrowStr = format(tomorrowDate, 'yyyy-MM-dd');
-    const tomorrowDisplay = format(tomorrowDate, 'M/d', { locale: zhTW });
+    // ── 1. 計算台灣明天日期（UTC+8 明確處理，避免時區錯誤）
+    const nowUtc = Date.now();
+    const taiwanNow = new Date(nowUtc + 8 * 60 * 60 * 1000); // 轉成 UTC+8
+    const taiwanTomorrow = new Date(taiwanNow.getTime() + 24 * 60 * 60 * 1000);
+    const yy = taiwanTomorrow.getUTCFullYear();
+    const mm = String(taiwanTomorrow.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(taiwanTomorrow.getUTCDate()).padStart(2, '0');
+    const tomorrowStr = `${yy}-${mm}-${dd}`;
+    const tomorrowDisplay = `${taiwanTomorrow.getUTCMonth() + 1}/${taiwanTomorrow.getUTCDate()}`;
     const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-    const tomorrowDayName = dayNames[tomorrowDate.getDay()];
+    const tomorrowDayName = dayNames[taiwanTomorrow.getUTCDay()];
 
+    console.log(`[LINE Notify] Daily: targeting date ${tomorrowStr}`);
+
+    // ── 2. 取得明天所有課程（含場館、時段 join）
     const tomorrowSchedules = await storage.getSchedulesByDateRange(tomorrowStr, tomorrowStr);
-
     if (tomorrowSchedules.length === 0) {
       console.log(`[LINE Notify] No schedules for tomorrow (${tomorrowStr}), skipping`);
       return;
     }
 
-    const approvedCoaches = await storage.getApprovedCoachUsers();
-    const withLine = approvedCoaches.filter(c => c.lineId && (c.linkedCoachName || c.name));
-    console.log(`[LINE Notify] Approved coaches total: ${approvedCoaches.length}, with LINE ID: ${withLine.length}`);
-    const tomorrowCoaches = [...new Set(tomorrowSchedules.flatMap(s => [s.coachName, s.coachName2]).filter(Boolean))];
-    console.log(`[LINE Notify] Tomorrow schedules: ${tomorrowSchedules.length} classes, coaches: ${tomorrowCoaches.join(', ')}`);
-    // 優先用 linkedCoachName，沒有則用 name 作為比對鍵
-    const coachMap = new Map<string, typeof approvedCoaches[0]>();
-    withLine.forEach(c => {
-      const matchName = c.linkedCoachName || c.name;
-      if (matchName) coachMap.set(matchName, c);
-    });
-    console.log(`[LINE Notify] LINE-bound coach names: ${[...coachMap.keys()].join(', ')}`);
-    const matched = tomorrowCoaches.filter(n => coachMap.has(n!));
-    const unmatched = tomorrowCoaches.filter(n => !coachMap.has(n!));
-    console.log(`[LINE Notify] Matched: ${matched.join(', ') || '(無)'}, Unmatched: ${unmatched.join(', ') || '(無)'}`);
+    // ── 3. 取得今天已推播紀錄，用來防止重複推播
+    const alreadySentRows = await db
+      .select({ coachName: lineNotifyLogs.coachName })
+      .from(lineNotifyLogs)
+      .where(and(eq(lineNotifyLogs.notifyType, 'daily'), eq(lineNotifyLogs.scheduleDate, tomorrowStr)));
+    const alreadySent = new Set(alreadySentRows.map(r => r.coachName));
 
+    // ── 4. 建立 coachName → coachUser 對照表（用 linkedCoachName 優先）
+    const approvedCoaches = await storage.getApprovedCoachUsers();
+    const coachMap = new Map<string, typeof approvedCoaches[0]>();
+    for (const c of approvedCoaches) {
+      if (!c.lineId) continue;
+      const key = c.linkedCoachName || c.name;
+      if (key && !coachMap.has(key)) {
+        // 避免同名覆蓋：先登記者保留
+        coachMap.set(key, c);
+      }
+    }
+
+    // ── 5. 收集明天有課的教練名單（去重）
+    const scheduledCoachNames = new Set<string>();
+    for (const s of tomorrowSchedules) {
+      if (s.coachName) scheduledCoachNames.add(s.coachName);
+      if (s.coachName2) scheduledCoachNames.add(s.coachName2);
+    }
+
+    const noLineIdCoaches: string[] = [];
     let sentCount = 0;
+    let skipDupCount = 0;
     let failCount = 0;
 
-    for (const [coachName, coach] of coachMap) {
-      const mySchedules = tomorrowSchedules.filter(
-        s => s.coachName === coachName || s.coachName2 === coachName
-      );
+    // ── 6. 對每位有課的教練，組訊息並推播
+    for (const coachName of scheduledCoachNames) {
+      // 6a. 有無 LINE ID
+      const coach = coachMap.get(coachName);
+      if (!coach) {
+        noLineIdCoaches.push(coachName);
+        continue;
+      }
 
+      // 6b. 防止重複推播（同一天 daily 只推一次）
+      if (alreadySent.has(coachName)) {
+        console.log(`[LINE Notify] Daily: skip ${coachName} (already sent)`);
+        skipDupCount++;
+        continue;
+      }
+
+      // 6c. 找出這位教練的所有明天課程，依節次排序
+      const mySchedules = tomorrowSchedules
+        .filter(s => s.coachName === coachName || s.coachName2 === coachName)
+        .sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
       if (mySchedules.length === 0) continue;
 
-      const sorted = [...mySchedules].sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
-
+      // 6d. 組訊息
       let message = `📋 明日課程提醒\n`;
       message += `${tomorrowDisplay}(${tomorrowDayName})\n\n`;
       message += `${coachName} 教練，您好！\n`;
-      message += `明天共有 ${sorted.length} 堂課：\n`;
-
-      for (const s of sorted) {
-        message += `\n🏊 ${s.venue.name}\n`;
-        message += `⏰ ${s.timeSlot.startTime}-${s.timeSlot.endTime}`;
-        if (s.className) {
-          message += ` - ${s.className}`;
-        }
-        message += `\n`;
+      message += `明天共有 ${mySchedules.length} 堂課：\n`;
+      for (const s of mySchedules) {
+        const isCoach1 = s.coachName === coachName;
+        const role = isCoach1
+          ? (s.coach1IsTeaching ? '當班教學' : '教練')
+          : (s.coach2IsTeaching ? '當班教學' : '協助');
+        message += `\n🏊 ${s.venue.name}`;
+        if (s.className) message += ` ${s.className}`;
+        message += `\n⏰ ${s.timeSlot.startTime}-${s.timeSlot.endTime}`;
+        message += ` [${role}]\n`;
       }
+      message += `\n請務必準時抵達場館！`;
 
-      message += `\n請教練務必準時抵達場館！`;
-
+      // 6e. 發送
       const success = await sendLinePushMessage(coach.lineId!, message);
       if (success) {
         sentCount++;
@@ -247,10 +281,14 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
         }).catch(e => console.error('[LINE Notify] Failed to log daily push:', e));
       } else {
         failCount++;
+        console.error(`[LINE Notify] Daily: failed for ${coachName}`);
       }
     }
 
-    console.log(`[LINE Notify] Daily done. Sent: ${sentCount}, Failed: ${failCount}, Date: ${tomorrowStr}`);
+    if (noLineIdCoaches.length > 0) {
+      console.log(`[LINE Notify] No LINE ID: ${noLineIdCoaches.join(', ')}`);
+    }
+    console.log(`[LINE Notify] Daily done. Date=${tomorrowStr} Sent=${sentCount} SkipDup=${skipDupCount} Failed=${failCount} NoLineId=${noLineIdCoaches.length}`);
   } catch (error) {
     console.error('[LINE Notify] Error sending daily notifications:', error);
   }
