@@ -293,64 +293,6 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
   }
 }
 
-// SWIM-01: 教練指派通知，回傳成功推播的教練姓名列表
-export async function notifyCoachAssigned(
-  schedule: { id: string; date: string; coachName: string | null; coachName2: string | null; coach1IsTeaching: boolean; coach2IsTeaching: boolean; className: string | null },
-  prevCoach1: string | null,
-  prevCoach2: string | null,
-  venueName: string,
-  timeSlotLabel: string
-): Promise<{ notified: string[]; noLineId: string[] }> {
-  const notified: string[] = [];
-  const noLineId: string[] = [];
-
-  const affectedCoaches: { name: string; role: string }[] = [];
-  if (schedule.coachName && schedule.coachName !== prevCoach1) {
-    affectedCoaches.push({ name: schedule.coachName, role: schedule.coach1IsTeaching ? '當班教學' : '教練' });
-  }
-  if (schedule.coachName2 && schedule.coachName2 !== prevCoach2) {
-    affectedCoaches.push({ name: schedule.coachName2, role: schedule.coach2IsTeaching ? '當班教學' : '協助' });
-  }
-
-  // 被移除的教練 → 發送移除通知
-  if (prevCoach1 && !schedule.coachName) {
-    const byLinked = await db.select().from(coachUsers).where(eq(coachUsers.linkedCoachName, prevCoach1)).limit(1);
-    const byName = await db.select().from(coachUsers).where(eq(coachUsers.name, prevCoach1)).limit(1);
-    const coach = byLinked[0] || byName[0];
-    if (coach?.lineId) {
-      const dateStr = format(parseISO(schedule.date), 'M/d (EEEE)', { locale: zhTW });
-      const msg = `📋 課程異動通知\n${dateStr} ${timeSlotLabel}\n場館：${venueName}\n班級：${schedule.className || ''}\n\n您已被從上述課程中移除。`;
-      await sendLinePushMessage(coach.lineId, msg).catch(() => {});
-    }
-  }
-
-  // 新指派的教練 → 發送指派通知
-  for (const { name, role } of affectedCoaches) {
-    const byLinked = await db.select().from(coachUsers).where(eq(coachUsers.linkedCoachName, name)).limit(1);
-    const byName = await db.select().from(coachUsers).where(eq(coachUsers.name, name)).limit(1);
-    const coach = byLinked[0] || byName[0];
-    if (!coach?.lineId) {
-      noLineId.push(name);
-      continue;
-    }
-    const dateStr = format(parseISO(schedule.date), 'M/d (EEEE)', { locale: zhTW });
-    const msg =
-      `📋 課程指派通知\n` +
-      `您已被排入以下課程：\n` +
-      `日期：${dateStr}\n` +
-      `時段：${timeSlotLabel}\n` +
-      `場館：${venueName}\n` +
-      `班級：${schedule.className || '（待定）'}\n` +
-      `角色：${role}\n\n` +
-      `請前往教練端確認您的課表。`;
-    const ok = await sendLinePushMessage(coach.lineId, msg).then(() => true).catch(() => false);
-    if (ok) notified.push(name);
-    else noLineId.push(name);
-  }
-
-  return { notified, noLineId };
-}
-
 // SWIM-02: 課表解鎖通知
 export async function notifyScheduleUnlocked(venueId: string, startDate: string, endDate: string): Promise<void> {
   try {

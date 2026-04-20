@@ -116,7 +116,8 @@ async function fetchPersonalInfo(): Promise<Map<string, PersonalInfo>> {
   const records = await fetchRagicRecords(RAGIC_EMPLOYEE_API_URL, 500);
   const infoMap = new Map<string, PersonalInfo>();
   for (const r of records) {
-    const name = r["姓名"] as string;
+    const rawName = r["姓名"] as string;
+    const name = rawName ? rawName.trim() : "";
     const personalLineId = r["個人LINE ID"] as string;
     const employeeId = r["員工編號"] as string;
     if (name) {
@@ -149,7 +150,8 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
   let employeeIdsSynced = 0;
 
   for (const coach of activeCoaches) {
-    const name = coach["姓名"] as string;
+    const rawName = coach["姓名"] as string;
+    const name = rawName.trim();
     const phone = (coach["手機"] as string) || null;
     const email = (coach["E-mail"] as string) || null;
     const info = personalInfoMap.get(name);

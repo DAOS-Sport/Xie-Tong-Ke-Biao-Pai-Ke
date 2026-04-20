@@ -201,6 +201,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/schedules/:id', async (req: any, res) => {
     try {
+      const password = req.headers['x-admin-password'] || req.query.password;
+      if (password !== 'dream0935314711') {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const existing = await storage.getScheduleById(req.params.id);
+      if (existing?.isClassLocked) {
+        return res.status(409).json({ message: "課表已鎖定，請先解鎖該週才能刪除" });
+      }
       await storage.deleteSchedule(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -221,10 +229,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sourceSchedules = await storage.getSchedulesByDateRange(sourceStartDate, sourceEndDate);
       const venueSchedules = sourceSchedules.filter(s => s.venueId === venueId && s.className);
 
-      let copied = 0;
       const sourceStart = new Date(sourceStartDate + 'T00:00:00');
       const targetStart = new Date(targetStartDate + 'T00:00:00');
 
+      // 預先取得目標週同場館的既有課表，檢查是否有任何已鎖定
+      const targetEndDate = format(addDays(targetStart, 6), 'yyyy-MM-dd');
+      const targetExisting = await storage.getSchedulesByDateRange(targetStartDate, targetEndDate);
+      const lockedTargets = targetExisting.filter(s => s.venueId === venueId && s.isClassLocked);
+      if (lockedTargets.length > 0) {
+        return res.status(409).json({
+          message: `目標週已有 ${lockedTargets.length} 筆鎖定的課表，請先解鎖才能覆蓋`,
+        });
+      }
+
+      let copied = 0;
       for (const schedule of venueSchedules) {
         const scheduleDate = new Date(schedule.date + 'T00:00:00');
         const dayOffset = Math.round((scheduleDate.getTime() - sourceStart.getTime()) / (1000 * 60 * 60 * 24));
