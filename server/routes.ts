@@ -8,7 +8,7 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { getSchoolDb, initializeSchoolSchema, isValidSchoolCode } from "./multi-school-db";
 import { eq, and, gte, lte, sql, between } from "drizzle-orm";
 import { schedules, teachers, teacherFeedbacks, coachUsers, venues, lineNotifyLogs, coachAvailability, coachVenuePreferences, timeSlots } from "@shared/schema";
-import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications, notifyCoachAssigned, notifyScheduleUnlocked, sendFillReminderToCoaches } from "./line-notify";
+import { setupWeeklyNotificationCron, setupDailyNotificationCron, sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications, notifyScheduleUnlocked, sendFillReminderToCoaches } from "./line-notify";
 import { setupRagicSyncCron, syncRagicAll, getRagicSyncStatus } from "./ragic";
 
 async function runStartupFixes(): Promise<void> {
@@ -319,14 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updateData: any = { coachName2: coachName2 || null };
         if (!coachName2) updateData.coach2IsTeaching = false;
         const schedule = await storage.updateSchedule(req.params.id, updateData);
-        let lineResult = { notified: [] as string[], noLineId: [] as string[] };
-        if (oldSchedule && (coachName2 !== prevCoach2)) {
-          const [venueRow] = await db.select({ name: venues.name }).from(venues).where(eq(venues.id, oldSchedule.venueId));
-          const [tsRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, oldSchedule.timeSlotId));
-          const tsLabel = tsRow ? `第${tsRow.order}節 ${tsRow.startTime}-${tsRow.endTime}` : '';
-          lineResult = await notifyCoachAssigned(schedule, prevCoach1, prevCoach2, venueRow?.name || '', tsLabel).catch(() => ({ notified: [], noLineId: [] }));
-        }
-        return res.json({ ...schedule, lineNotified: lineResult.notified, lineNoId: lineResult.noLineId });
+        return res.json(schedule);
       }
       if (coach1IsTeaching !== undefined) {
         const schedule = await storage.updateSchedule(req.params.id, { coach1IsTeaching: !!coach1IsTeaching });
@@ -337,14 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(schedule);
       }
       const schedule = await storage.assignCoach(req.params.id, coachName || null);
-      let lineResult = { notified: [] as string[], noLineId: [] as string[] };
-      if (oldSchedule && coachName !== prevCoach1) {
-        const [venueRow] = await db.select({ name: venues.name }).from(venues).where(eq(venues.id, oldSchedule.venueId));
-        const [tsRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, oldSchedule.timeSlotId));
-        const tsLabel = tsRow ? `第${tsRow.order}節 ${tsRow.startTime}-${tsRow.endTime}` : '';
-        lineResult = await notifyCoachAssigned(schedule, prevCoach1, prevCoach2, venueRow?.name || '', tsLabel).catch(() => ({ notified: [], noLineId: [] }));
-      }
-      res.json({ ...schedule, lineNotified: lineResult.notified, lineNoId: lineResult.noLineId });
+      res.json(schedule);
     } catch (error) {
       res.status(500).json({ message: "Failed to assign coach" });
     }
