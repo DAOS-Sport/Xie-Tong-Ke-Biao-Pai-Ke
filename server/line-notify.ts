@@ -197,14 +197,7 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
       return;
     }
 
-    // ── 3. 取得今天已推播紀錄，用來防止重複推播
-    const alreadySentRows = await db
-      .select({ coachName: lineNotifyLogs.coachName })
-      .from(lineNotifyLogs)
-      .where(and(eq(lineNotifyLogs.notifyType, 'daily'), eq(lineNotifyLogs.scheduleDate, tomorrowStr)));
-    const alreadySent = new Set(alreadySentRows.map(r => r.coachName));
-
-    // ── 4. 建立 coachName → coachUser 對照表（用 linkedCoachName 優先）
+    // ── 3. 建立 coachName → coachUser 對照表（用 linkedCoachName 優先）
     const approvedCoaches = await storage.getApprovedCoachUsers();
     const coachMap = new Map<string, typeof approvedCoaches[0]>();
     for (const c of approvedCoaches) {
@@ -237,20 +230,13 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
         continue;
       }
 
-      // 6b. 防止重複推播（同一天 daily 只推一次）
-      if (alreadySent.has(coachName)) {
-        console.log(`[LINE Notify] Daily: skip ${coachName} (already sent)`);
-        skipDupCount++;
-        continue;
-      }
-
-      // 6c. 找出這位教練的所有明天課程，依節次排序
+      // 6b. 找出這位教練的所有明天課程，依節次排序
       const mySchedules = tomorrowSchedules
         .filter(s => s.coachName === coachName || s.coachName2 === coachName)
         .sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
       if (mySchedules.length === 0) continue;
 
-      // 6d. 組訊息
+      // 6c. 組訊息
       let message = `📋 明日課程提醒\n`;
       message += `${tomorrowDisplay}(${tomorrowDayName})\n\n`;
       message += `${coachName} 教練，您好！\n`;
@@ -267,21 +253,34 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
       }
       message += `\n請務必準時抵達場館！`;
 
-      // 6e. 發送
+      // 6d. 原子防重：先 INSERT log（ON CONFLICT DO NOTHING）搶到「鎖」才推
+      //     若 returning 為空 → 同一秒被別的執行緒搶走，跳過
+      const inserted = await db.insert(lineNotifyLogs).values({
+        coachName,
+        lineId: coach.lineId!,
+        content: message,
+        notifyType: 'daily',
+        scheduleDate: tomorrowStr,
+      }).onConflictDoNothing({
+        target: [lineNotifyLogs.coachName, lineNotifyLogs.notifyType, lineNotifyLogs.scheduleDate],
+      }).returning({ id: lineNotifyLogs.id });
+
+      if (inserted.length === 0) {
+        console.log(`[LINE Notify] Daily: skip ${coachName} (already sent)`);
+        skipDupCount++;
+        continue;
+      }
+
+      // 6e. 發送；若失敗，刪掉剛插入的 log 讓下次 cron 可重試
       const success = await sendLinePushMessage(coach.lineId!, message);
       if (success) {
         sentCount++;
         console.log(`[LINE Notify] Daily: sent to ${coachName}`);
-        await db.insert(lineNotifyLogs).values({
-          coachName,
-          lineId: coach.lineId!,
-          content: message,
-          notifyType: 'daily',
-          scheduleDate: tomorrowStr,
-        }).catch(e => console.error('[LINE Notify] Failed to log daily push:', e));
       } else {
         failCount++;
-        console.error(`[LINE Notify] Daily: failed for ${coachName}`);
+        console.error(`[LINE Notify] Daily: failed for ${coachName}, rolling back log`);
+        await db.delete(lineNotifyLogs).where(eq(lineNotifyLogs.id, inserted[0].id))
+          .catch(e => console.error('[LINE Notify] Failed to rollback log:', e));
       }
     }
 
@@ -412,12 +411,12 @@ export async function sendFillReminderToCoaches(): Promise<{ sent: number }> {
 }
 
 export function setupDailyNotificationCron(): void {
-  cron.schedule('0 11 * * *', () => {
-    console.log('[LINE Notify] Cron triggered: daily 19:00 TST (11:00 UTC)');
+  cron.schedule('0 19 * * *', () => {
+    console.log('[LINE Notify] Cron triggered: daily 19:00 Asia/Taipei');
     sendDailyTomorrowNotifications();
-  });
+  }, { timezone: 'Asia/Taipei' });
 
-  console.log('[LINE Notify] Daily notify cron scheduled (19:00 TST = 11:00 UTC)');
+  console.log('[LINE Notify] Daily notify cron scheduled (19:00 Asia/Taipei)');
 }
 
 export { sendWeeklyScheduleNotifications, sendDailyTomorrowNotifications };

@@ -10,6 +10,7 @@ import {
   date,
   integer,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -165,7 +166,9 @@ export const lineNotifyLogs = pgTable("line_notify_logs", {
   content: text("content").notNull(),
   notifyType: varchar("notify_type").notNull(), // 'weekly' | 'daily' | 'manual'
   scheduleDate: date("schedule_date").notNull(), // the date the notified classes are on
-});
+}, (table) => [
+  uniqueIndex("uniq_daily_notify").on(table.coachName, table.notifyType, table.scheduleDate),
+]);
 
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {

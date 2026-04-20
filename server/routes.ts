@@ -311,10 +311,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const { coachName, coachName2, coach1IsTeaching, coach2IsTeaching } = req.body;
 
-      const oldSchedule = await storage.getScheduleById(req.params.id);
-      const prevCoach1 = oldSchedule?.coachName || null;
-      const prevCoach2 = oldSchedule?.coachName2 || null;
-
       if (coachName2 !== undefined) {
         const updateData: any = { coachName2: coachName2 || null };
         if (!coachName2) updateData.coach2IsTeaching = false;
