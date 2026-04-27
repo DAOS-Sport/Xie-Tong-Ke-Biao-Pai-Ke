@@ -17,6 +17,16 @@ import { zhTW } from "date-fns/locale";
 import PasswordProtect from "@/components/password-protect";
 import FloatingConflictAlert from "@/components/floating-conflict-alert";
 import AdminLayout from "@/components/admin-layout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Venue, TimeSlot, Schedule, CoachAvailability } from "@shared/schema";
 import {
   getExtendedWeekDays,
@@ -24,13 +34,17 @@ import {
   getExtendedWeekEnd,
 } from "@/utils/special-workdays";
 
+type ConflictDetail = { venueName: string; className: string };
+
 interface CoachSearchSelectProps {
   value: string;
   onValueChange: (value: string) => void;
   coaches: string[];       // 場館教練（已篩選）
   allCoaches: string[];    // 全部教練（代班模式用）
   available: Set<string>;
-  conflicts: Set<string>;
+  softConflicts?: Map<string, ConflictDetail[]>; // 跨課衝堂：可點選但需確認
+  hardDisabled?: Set<string>;                     // 同筆 schedule 的另一位教練：硬擋
+  onSoftConflictSelect?: (coach: string, details: ConflictDetail[]) => void;
   placeholder: string;
   triggerClassName?: string;
   hasValue?: boolean;
@@ -42,7 +56,9 @@ function CoachSearchSelect({
   coaches,
   allCoaches,
   available,
-  conflicts,
+  softConflicts,
+  hardDisabled,
+  onSoftConflictSelect,
   placeholder,
   triggerClassName = "",
   hasValue = false,
@@ -86,6 +102,12 @@ function CoachSearchSelect({
   const noResults = availableList.length === 0 && otherList.length === 0;
 
   const handleSelect = (coach: string) => {
+    const softDetails = softConflicts?.get(coach);
+    if (softDetails && softDetails.length > 0 && onSoftConflictSelect) {
+      setOpen(false);
+      onSoftConflictSelect(coach, softDetails);
+      return;
+    }
     onValueChange(coach);
     setOpen(false);
   };
@@ -147,18 +169,22 @@ function CoachSearchSelect({
               <>
                 <div className="px-2 py-0.5 text-[10px] text-green-600 font-medium bg-green-50">✅ 可用教練</div>
                 {availableList.map((coach) => {
-                  const isConflict = conflicts.has(coach);
+                  const isHard = !!hardDisabled?.has(coach);
+                  const isSoft = !isHard && !!softConflicts?.has(coach);
                   return (
                     <button
                       key={coach}
                       type="button"
-                      disabled={isConflict}
-                      onClick={() => !isConflict && handleSelect(coach)}
+                      disabled={isHard}
+                      onClick={() => !isHard && handleSelect(coach)}
                       className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 flex items-center gap-1 ${
-                        isConflict ? "opacity-40 line-through cursor-not-allowed" : ""
-                      } ${value === coach ? "bg-blue-50 font-medium" : ""}`}
+                        isHard ? "opacity-40 line-through cursor-not-allowed" : ""
+                      } ${isSoft ? "text-orange-600 bg-orange-50/50 hover:bg-orange-100" : ""} ${
+                        value === coach ? "bg-blue-50 font-medium" : ""
+                      }`}
                     >
-                      ✅ {coach}{isConflict ? " (衝突)" : ""}
+                      {isSoft ? "⚠️" : "✅"} {coach}
+                      {isHard ? " (同筆)" : isSoft ? " (衝堂)" : ""}
                     </button>
                   );
                 })}
@@ -170,18 +196,22 @@ function CoachSearchSelect({
                   {substituteMode ? "全部教練" : "場館教練"}
                 </div>
                 {otherList.map((coach) => {
-                  const isConflict = conflicts.has(coach);
+                  const isHard = !!hardDisabled?.has(coach);
+                  const isSoft = !isHard && !!softConflicts?.has(coach);
                   return (
                     <button
                       key={coach}
                       type="button"
-                      disabled={isConflict}
-                      onClick={() => !isConflict && handleSelect(coach)}
-                      className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 text-gray-500 ${
-                        isConflict ? "opacity-40 line-through cursor-not-allowed" : ""
-                      } ${value === coach ? "bg-blue-50 font-medium" : ""}`}
+                      disabled={isHard}
+                      onClick={() => !isHard && handleSelect(coach)}
+                      className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 ${
+                        isHard ? "opacity-40 line-through cursor-not-allowed text-gray-500" : ""
+                      } ${isSoft ? "text-orange-600 bg-orange-50/50 hover:bg-orange-100" : "text-gray-500"} ${
+                        value === coach ? "bg-blue-50 font-medium" : ""
+                      }`}
                     >
-                      {coach}{isConflict ? " (衝突)" : ""}
+                      {isSoft ? "⚠️ " : ""}{coach}
+                      {isHard ? " (同筆)" : isSoft ? " (衝堂)" : ""}
                     </button>
                   );
                 })}
@@ -236,6 +266,11 @@ function CoachAssignmentContent() {
   } | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [conflictConfirm, setConflictConfirm] = useState<{
+    coach: string;
+    details: ConflictDetail[];
+    onConfirm: () => void;
+  } | null>(null);
 
   const { data: venues } = useQuery<Venue[]>({ queryKey: ["/api/venues"] });
   const { data: timeSlots } = useQuery<TimeSlot[]>({ queryKey: ["/api/time-slots"] });
@@ -295,26 +330,41 @@ function CoachAssignmentContent() {
     return result;
   };
 
-  const getConflictingCoaches = (date: string, timeSlotId: string, currentScheduleId: string): Set<string> => {
-    const conflicting = new Set<string>();
+  const getConflictingCoaches = (
+    date: string,
+    timeSlotId: string,
+    currentScheduleId: string
+  ): Map<string, ConflictDetail[]> => {
+    const conflicting = new Map<string, ConflictDetail[]>();
+    const push = (name: string, detail: ConflictDetail) => {
+      const arr = conflicting.get(name);
+      if (arr) arr.push(detail);
+      else conflicting.set(name, [detail]);
+    };
     allSchedules.forEach((s) => {
       if (s.id === currentScheduleId || s.date !== date || s.timeSlotId !== timeSlotId) return;
-      if (s.coachName) conflicting.add(s.coachName);
-      if (s.coachName2) conflicting.add(s.coachName2);
+      const detail: ConflictDetail = {
+        venueName: s.venue?.name || "",
+        className: s.className || "(未命名班級)",
+      };
+      if (s.coachName) push(s.coachName, detail);
+      if (s.coachName2) push(s.coachName2, detail);
     });
     return conflicting;
   };
 
-  const getCoach1Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }): Set<string> => {
-    const conflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
-    if (schedule.coachName2) conflicts.add(schedule.coachName2);
-    return conflicts;
+  const getCoach1Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }) => {
+    const softConflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+    const hardDisabled = new Set<string>();
+    if (schedule.coachName2) hardDisabled.add(schedule.coachName2);
+    return { softConflicts, hardDisabled };
   };
 
-  const getCoach2Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }): Set<string> => {
-    const conflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
-    if (schedule.coachName) conflicts.add(schedule.coachName);
-    return conflicts;
+  const getCoach2Conflicts = (schedule: Schedule & { venue: Venue; timeSlot: TimeSlot }) => {
+    const softConflicts = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+    const hardDisabled = new Set<string>();
+    if (schedule.coachName) hardDisabled.add(schedule.coachName);
+    return { softConflicts, hardDisabled };
   };
 
   const getAssignedCoachesForSlot = (date: string, timeSlotId: string): Set<string> => {
@@ -464,7 +514,8 @@ function CoachAssignmentContent() {
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
       const timeSlotOrder = schedule.timeSlot?.order || 0;
       const timeAvailSet = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
-      const conflicting = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+      const conflictingMap = getConflictingCoaches(schedule.date, schedule.timeSlotId, schedule.id);
+      const conflicting = new Set<string>(conflictingMap.keys());
       let assignedCoach1 = schedule.coachName || "";
       if (!schedule.coachName) {
         const candidates = scoredCandidates(dayOfWeek, timeSlotOrder, venueName, conflicting);
@@ -738,8 +789,8 @@ function CoachAssignmentContent() {
                               const hasCoach = !!schedule.coachName;
                               const hasCoach2 = !!schedule.coachName2;
                               const needsTwo = (schedule.coachCount || 1) >= 2;
-                              const coach1Conflicts = getCoach1Conflicts(schedule);
-                              const coach2Conflicts = getCoach2Conflicts(schedule);
+                              const coach1Info = getCoach1Conflicts(schedule);
+                              const coach2Info = getCoach2Conflicts(schedule);
                               const available = getAvailableCoaches(
                                 dayOfWeek,
                                 timeSlot.order,
@@ -780,7 +831,19 @@ function CoachAssignmentContent() {
                                     coaches={venueEligibleCoaches}
                                     allCoaches={coaches}
                                     available={available}
-                                    conflicts={coach1Conflicts}
+                                    softConflicts={coach1Info.softConflicts}
+                                    hardDisabled={coach1Info.hardDisabled}
+                                    onSoftConflictSelect={(coach, details) =>
+                                      setConflictConfirm({
+                                        coach,
+                                        details,
+                                        onConfirm: () =>
+                                          assignCoachMutation.mutate({
+                                            scheduleId: schedule.id,
+                                            coachName: coach,
+                                          }),
+                                      })
+                                    }
                                     placeholder="教練1"
                                     hasValue={hasCoach}
                                     triggerClassName={
@@ -828,7 +891,19 @@ function CoachAssignmentContent() {
                                         coaches={venueEligibleCoaches}
                                         allCoaches={coaches}
                                         available={available}
-                                        conflicts={coach2Conflicts}
+                                        softConflicts={coach2Info.softConflicts}
+                                        hardDisabled={coach2Info.hardDisabled}
+                                        onSoftConflictSelect={(coach, details) =>
+                                          setConflictConfirm({
+                                            coach,
+                                            details,
+                                            onConfirm: () =>
+                                              assignCoachMutation.mutate({
+                                                scheduleId: schedule.id,
+                                                coachName2: coach,
+                                              }),
+                                          })
+                                        }
                                         placeholder="教練2"
                                         hasValue={hasCoach2}
                                         triggerClassName={
@@ -886,6 +961,51 @@ function CoachAssignmentContent() {
         )}
       </div>
       <FloatingConflictAlert weekStart={currentWeek} />
+      <AlertDialog
+        open={!!conflictConfirm}
+        onOpenChange={(open) => {
+          if (!open) setConflictConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              教練衝堂提醒
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <div>
+                  教練 <strong className="text-orange-700">{conflictConfirm?.coach}</strong>{" "}
+                  在此時段已被指派以下課程：
+                </div>
+                <ul className="list-disc list-inside bg-orange-50 border border-orange-200 rounded p-2 text-sm space-y-0.5">
+                  {conflictConfirm?.details.map((d, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{d.venueName}</span>
+                      {d.venueName && d.className ? "：" : ""}
+                      {d.className}
+                    </li>
+                  ))}
+                </ul>
+                <div className="text-sm text-muted-foreground">是否仍要繼續指派？</div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={() => {
+                conflictConfirm?.onConfirm();
+                setConflictConfirm(null);
+              }}
+            >
+              確認新增
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
