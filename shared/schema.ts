@@ -77,7 +77,7 @@ export const schedules = pgTable("schedules", {
 // 教練用戶表 - LINE 登入的教練帳號（前台系統）
 export const coachUsers = pgTable("coach_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  lineId: varchar("line_id").unique(),
+  lineId: varchar("line_id").unique("coach_users_line_id_key"),
   name: varchar("name").notNull(),
   phone: varchar("phone"),
   email: varchar("email"),
@@ -118,7 +118,7 @@ export const teacherFeedbacks = pgTable("teacher_feedbacks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   // 同一老師對同一課程只保留最後一次回覆
-  unique().on(table.scheduleId, table.teacherName),
+  unique("teacher_feedbacks_schedule_id_teacher_name_unique").on(table.scheduleId, table.teacherName),
 ]);
 
 // 系統設定表 - 存儲教練守則等設定
@@ -131,7 +131,7 @@ export const systemSettings = pgTable("system_settings", {
 // 場館資訊表 - 存儲場館影片連結等資訊
 export const venueInfos = pgTable("venue_infos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  venueName: varchar("venue_name").notNull().unique(),
+  venueName: varchar("venue_name").notNull().unique("venue_infos_venue_name_key"),
   videoUrl: text("video_url"),
   description: text("description"),
   mapUrl: text("map_url"),
@@ -144,7 +144,7 @@ export const coachVenuePreferences = pgTable("coach_venue_preferences", {
   venueName: varchar("venue_name").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  unique().on(table.coachName, table.venueName),
+  unique("coach_venue_preferences_coach_name_venue_name_key").on(table.coachName, table.venueName),
 ]);
 
 export const coachAvailability = pgTable("coach_availability", {
@@ -155,7 +155,13 @@ export const coachAvailability = pgTable("coach_availability", {
   timeSlotOrder: integer("time_slot_order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  unique().on(table.coachName, table.weekStart, table.dayOfWeek, table.timeSlotOrder),
+  // 名稱明確指定為 DB 既有 constraint（PG 自動截斷至 63 字元，以 _time_s_key 結尾）
+  unique("coach_availability_coach_name_week_start_day_of_week_time_s_key").on(
+    table.coachName,
+    table.weekStart,
+    table.dayOfWeek,
+    table.timeSlotOrder,
+  ),
 ]);
 
 export const lineNotifyLogs = pgTable("line_notify_logs", {
