@@ -18,6 +18,33 @@ interface ScheduleItem {
   timeSlotOrder: number;
 }
 
+/**
+ * App-level fast-path dedup check for daily notifications.
+ *
+ * The DB unique index `uniq_daily_notify` on
+ * (coach_name, notify_type, schedule_date) is the ultimate source of
+ * truth — this helper is a cheap optimization that lets us skip
+ * message assembly and the INSERT round-trip when we can already see
+ * a row exists.
+ */
+async function dailyLogAlreadyExists(
+  coachName: string,
+  scheduleDate: string,
+): Promise<boolean> {
+  const existing = await db
+    .select({ id: lineNotifyLogs.id })
+    .from(lineNotifyLogs)
+    .where(
+      and(
+        eq(lineNotifyLogs.coachName, coachName),
+        eq(lineNotifyLogs.notifyType, 'daily'),
+        eq(lineNotifyLogs.scheduleDate, scheduleDate),
+      ),
+    )
+    .limit(1);
+  return existing.length > 0;
+}
+
 async function sendLinePushMessage(lineId: string, message: string): Promise<boolean> {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!token) {
@@ -236,6 +263,14 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
         .sort((a, b) => (a.timeSlot?.order ?? 0) - (b.timeSlot?.order ?? 0));
       if (mySchedules.length === 0) continue;
 
+      // 6b'. 應用層快路徑：若已有當日記錄，直接跳過，省下訊息組裝與 INSERT
+      //      （DB unique index 仍是最終事實來源，下面的 ON CONFLICT 才是真正的鎖）
+      if (await dailyLogAlreadyExists(coachName, tomorrowStr)) {
+        console.log(`[LINE Notify] Daily: skip ${coachName} (pre-check: already logged)`);
+        skipDupCount++;
+        continue;
+      }
+
       // 6c. 組訊息
       let message = `📋 明日課程提醒\n`;
       message += `${tomorrowDisplay}(${tomorrowDayName})\n\n`;
@@ -266,7 +301,8 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
       }).returning({ id: lineNotifyLogs.id });
 
       if (inserted.length === 0) {
-        console.log(`[LINE Notify] Daily: skip ${coachName} (already sent)`);
+        // 索引層真正擋下：可能是同秒併發、或 pre-check 與 INSERT 之間插入
+        console.log(`[LINE Notify] Daily: skip ${coachName} (race lost on uniq_daily_notify)`);
         skipDupCount++;
         continue;
       }

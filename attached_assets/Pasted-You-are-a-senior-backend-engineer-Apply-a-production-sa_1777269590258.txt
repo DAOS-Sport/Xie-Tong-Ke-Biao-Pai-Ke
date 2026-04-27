@@ -1,0 +1,105 @@
+You are a senior backend engineer. Apply a production-safe fix for a failed migration on PostgreSQL.
+
+## 🎯 Problem
+Migration failed when creating:
+
+CREATE UNIQUE INDEX uniq_daily_notify
+ON line_notify_logs (coach_name, notify_type, schedule_date)
+
+Cause:
+Existing duplicate rows in production violate the unique constraint.
+
+---
+
+## ⚠️ STRICT RULES
+- DO NOT drop tables
+- DO NOT truncate data
+- DO NOT overwrite production database
+- Must be SAFE, IDEMPOTENT, and AUDITABLE
+
+---
+
+## 🧠 TASKS
+
+### 1️⃣ Create a manual SQL migration file
+
+Path:
+migrations/manual/2026_dedup_uniq_daily_notify.sql
+
+Content must:
+
+- Wrap everything in a transaction (BEGIN/COMMIT)
+- Backup duplicate rows into:
+  line_notify_logs_dedup_backup
+- Keep only ONE row per:
+  (coach_name, notify_type, schedule_date)
+  → choose MIN(id) as survivor
+- Delete all other duplicates
+- Verify NO duplicates remain (RAISE EXCEPTION if still exists)
+- Create index safely:
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_daily_notify
+ON line_notify_logs (coach_name, notify_type, schedule_date);
+
+---
+
+### 2️⃣ Ensure script is idempotent
+
+- Running multiple times must NOT break
+- Backup table must use:
+  CREATE TABLE IF NOT EXISTS
+- Index must use:
+  IF NOT EXISTS
+
+---
+
+### 3️⃣ Apply backend protection
+
+File:
+server/line-notify.ts
+
+Add function:
+
+async function dailyLogAlreadyExists(coachName, scheduleDate)
+
+Then modify notification flow:
+
+1. First check if log exists → skip
+2. Still use:
+   INSERT ... ON CONFLICT DO NOTHING
+3. If insert fails → treat as duplicate
+4. If push fails → rollback inserted row
+
+---
+
+### 4️⃣ Ensure atomic safety
+
+- DB unique index is final source of truth
+- App-level check is only optimization
+
+---
+
+### 5️⃣ Provide execution instructions
+
+Include:
+
+psql "$DATABASE_URL" -f migrations/manual/2026_dedup_uniq_daily_notify.sql
+
+---
+
+## 🧩 OUTPUT FORMAT
+
+1. Full SQL file
+2. Modified backend code snippet
+3. Short explanation (why safe)
+
+---
+
+## 🚨 CRITICAL
+
+DO NOT:
+- suggest copying dev DB
+- suggest dropping table
+- suggest ignoring duplicates
+
+This must be a clean production fix.
