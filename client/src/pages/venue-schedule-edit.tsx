@@ -107,10 +107,16 @@ function VenueScheduleEditContent() {
 
   const deleteMutation = useMutation({
     mutationFn: async (scheduleId: string) => {
-      const response = await apiRequest(
-        "DELETE",
-        `/api/schedules/${scheduleId}`
-      );
+      const response = await fetch(`/api/schedules/${scheduleId}`, {
+        method: "DELETE",
+        headers: {
+          "x-admin-password": adminPassword,
+        },
+      });
+      if (!response.ok) {
+        const text = (await response.text()) || response.statusText;
+        throw new Error(`${response.status}: ${text}`);
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -118,6 +124,21 @@ function VenueScheduleEditContent() {
         predicate: (query) =>
           typeof query.queryKey[0] === "string" &&
           query.queryKey[0].includes("/api/schedules"),
+      });
+      toast({ title: "已刪除" });
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      let description = `刪除失敗：${msg}`;
+      if (msg.includes("409") || msg.includes("課表已鎖定")) {
+        description = "課表已鎖定，請先解鎖該週才能刪除";
+      } else if (msg.includes("401")) {
+        description = "密碼驗證失敗，請重新登入";
+      }
+      toast({
+        title: "刪除失敗",
+        description,
+        variant: "destructive",
       });
     },
   });
