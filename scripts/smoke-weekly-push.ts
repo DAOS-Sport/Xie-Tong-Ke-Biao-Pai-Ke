@@ -11,8 +11,8 @@
  * Set DRY_RUN=0 to attempt a wet run — only do this with real LINE
  * tokens and a populated coach roster you actually want to push to.
  */
-import { promises as fs } from "fs";
 import { startBoss, stopBoss, getBoss } from "../server/infra/queue/boss";
+import { readReport } from "../server/infra/files/reportStorage";
 import { queues } from "../server/infra/queue/queues";
 import { startWeeklyPushWorkers } from "../server/modules/weeklyPush/weeklyPush.worker";
 import {
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   if (!run?.reportPath) {
     throw new Error("[smoke] FAIL — run.reportPath is not set");
   }
-  const csv = await fs.readFile(run.reportPath, "utf8");
+  const csv = (await readReport(run.reportPath)).toString("utf8");
   console.log(`[smoke] report (${run.reportPath}):`);
   console.log(csv.split("\n").slice(0, 6).join("\n"));
 

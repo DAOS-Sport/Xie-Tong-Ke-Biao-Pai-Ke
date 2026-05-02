@@ -15,8 +15,8 @@ import {
   retryFailedRecipients,
 } from "./weeklyPush.service";
 import {
-  readReport,
   reportExists,
+  streamReport,
 } from "../../infra/files/reportStorage";
 
 const enqueueBodySchema = z.object({
@@ -127,13 +127,13 @@ export function registerWeeklyPushRoutes(app: Express): void {
             .status(404)
             .json({ message: "報表尚未產生或已被清除" });
         }
-        const buf = await readReport(run.reportPath);
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader(
           "Content-Disposition",
           `attachment; filename="weekly-push-${runId}.csv"`,
         );
-        return res.send(buf);
+        await streamReport(run.reportPath, res, "csv");
+        return;
       } catch (err) {
         console.error("[weeklyPush.routes] report error", err);
         return res.status(500).json({ message: "下載報表失敗" });
