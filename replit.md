@@ -26,6 +26,15 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL session store
 - **Authentication**: Replit Auth with OpenID Connect integration
 - **API Design**: RESTful endpoints with role-based access control
+- **Module layout** (refactored Task #22):
+  - `server/routes.ts` — thin coordinator only (setup auth → run startup fixes → init multi-school → register modules → start crons)
+  - `server/modules/_registry.ts` — wires every feature module into Express
+  - `server/modules/<feature>.routes.ts` — one file per feature (auth, venue, timeSlot, schedule, coach, coachPortal, coachAdmin, notify, ragic, school, diagnostic)
+  - `server/modules/school.repo.ts` — only place allowed to use `sql.raw` for per-school schemas; school code is regex-validated before interpolation
+  - `server/shared/auth/adminPassword.ts` — `verifyAdminPassword` + `requireAdminPassword` middleware (reads `x-admin-password` header / `?password` query / body)
+  - `server/config/env.ts` — typed env wrapper; `env.adminPassword` throws in production if `ADMIN_PASSWORD` is unset
+  - `server/infra/startup.ts` — extracted `runStartupFixes` and `initializeAppData`
+  - `server/storage.ts` — kept as the storage façade (unchanged interface)
 
 ## Database Design
 - **Primary Database**: PostgreSQL with Neon serverless driver
@@ -142,7 +151,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Password Protection
 - **Admin Functions**: Course schedule editing and statistics require password authentication
-- **Password**: `dream0935314711` (stored in component, session-based authentication)
+- **Password**: stored in env var `ADMIN_PASSWORD` (shared environment); production refuses to start without it. The frontend still reads `dream0935314711` from sessionStorage as the user-facing default; all server-side validation now goes through `requireAdminPassword`.
 - **Admin URL Prefix**: `/mgt-x9k7p2/` (complex prefix to prevent URL guessing)
   - Schedule: `/mgt-x9k7p2/schedule`
   - Class Edit (Phase 1): `/mgt-x9k7p2/class-edit`
