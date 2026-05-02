@@ -5,6 +5,11 @@ import { storage } from "../storage";
 import { initializeSchoolSchema, getAvailableSchools } from "../multi-school-db";
 import { env, validateConfig } from "../config/env";
 import { featureFlags } from "../config/featureFlags";
+import cron from "node-cron";
+import { startBoss, getBoss } from "./queue/boss";
+import { queues } from "./queue/queues";
+import { startWeeklyPushWorkers } from "../modules/weeklyPush/weeklyPush.worker";
+import { enqueueWeeklyPush } from "../modules/weeklyPush/weeklyPush.service";
 
 /**
  * Hard-fails the boot if required configuration is missing.
@@ -105,5 +110,68 @@ export async function initializeAppData(): Promise<void> {
         error
       );
     }
+  }
+}
+
+/**
+ * Starts the pg-boss based weekly push pipeline (Task #23).
+ *
+ * Three independent gates:
+ *   1. enableWeeklyPushQueue — boots pg-boss + ensures the queues
+ *      exist so the admin enqueue endpoints have somewhere to publish.
+ *   2. enableWeeklyPushWorker — registers the worker handlers so this
+ *      process actually drains the queues. Disabled deployments can
+ *      run the API without a worker if a separate process owns it.
+ *   3. isDeployment + queue flag — only production schedules the
+ *      Sunday cron so dev environments never auto-push real groups.
+ *
+ * Failures here only log; the rest of the app must keep serving.
+ */
+export async function startWeeklyPushQueue(): Promise<void> {
+  if (!featureFlags.enableWeeklyPushQueue) {
+    console.log("[boot] weekly push queue disabled — skipping");
+    return;
+  }
+
+  try {
+    await startBoss();
+    const boss = getBoss();
+    await boss.createQueue(queues.weeklyPush);
+    await boss.createQueue(queues.weeklyPushRecipient);
+    await boss.createQueue(queues.weeklyPushReport);
+    console.log("[boot] pg-boss queues ready for weekly push");
+
+    if (featureFlags.enableWeeklyPushWorker) {
+      await startWeeklyPushWorkers();
+    } else {
+      console.log("[boot] weekly push worker disabled — queue will accumulate");
+    }
+
+    // Cron only in production deployment. Dev never auto-fires.
+    // We deliberately use node-cron here (NOT boss.schedule on the
+    // weeklyPush queue) so the orchestrator queue keeps exactly one
+    // worker — otherwise the cron router and the orchestrator handler
+    // would race for jobs on the same queue.
+    if (env.isDeployment) {
+      cron.schedule(
+        env.weeklyPushCron,
+        () => {
+          console.log("[boot] weekly push cron tick — enqueueing run");
+          enqueueWeeklyPush({ triggerSource: "cron" }).catch((err) => {
+            console.error("[boot] cron enqueue failed:", err);
+          });
+        },
+        { timezone: env.weeklyPushTimezone },
+      );
+      console.log(
+        `[boot] weekly push cron scheduled (${env.weeklyPushCron} ${env.weeklyPushTimezone})`,
+      );
+    } else {
+      console.log(
+        "[boot] dev environment — weekly push cron NOT scheduled (REPLIT_DEPLOYMENT!=1)",
+      );
+    }
+  } catch (err) {
+    console.error("[boot] weekly push queue init failed:", err);
   }
 }

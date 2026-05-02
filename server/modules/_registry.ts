@@ -22,6 +22,7 @@ import { registerNotifyRoutes } from "./notify.routes";
 import { registerRagicRoutes } from "./ragic.routes";
 import { registerSchoolRoutes } from "./school.routes";
 import { registerDiagnosticRoutes } from "./diagnostic.routes";
+import { registerWeeklyPushRoutes } from "./weeklyPush/weeklyPush.routes";
 import { featureFlags } from "../config/featureFlags";
 
 export function registerAllModules(app: Express): void {
@@ -53,6 +54,16 @@ export function registerAllModules(app: Express): void {
     registerSchoolRoutes(app);
   } else {
     console.log("[modules] Multi-school module disabled via feature flag");
+  }
+
+  // Task #23 — weekly push admin endpoints. The routes themselves are
+  // safe to register even when the queue is off (they only enqueue
+  // through pg-boss which is started elsewhere), but we honour the
+  // flag so a disabled deployment can't accidentally trigger pushes.
+  if (featureFlags.enableWeeklyPushQueue) {
+    registerWeeklyPushRoutes(app);
+  } else {
+    console.log("[modules] Weekly push queue disabled via feature flag");
   }
 
   // Operational endpoints

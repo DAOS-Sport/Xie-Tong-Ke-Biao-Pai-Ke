@@ -23,6 +23,7 @@ import {
   setupDailyNotificationCron,
 } from "./line-notify";
 import { setupRagicSyncCron } from "./ragic";
+import { startWeeklyPushQueue } from "./infra/startup";
 import { featureFlags } from "./config/featureFlags";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -43,12 +44,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 5. Background jobs (gated by feature flags)
   if (featureFlags.enableLineNotify) {
-    setupWeeklyNotificationCron();
+    // The legacy node-cron weekly path is suppressed once the new
+    // pg-boss queue is enabled — they would otherwise both fire
+    // on Sunday 20:00 TST and double-push every coach.
+    if (!featureFlags.enableWeeklyPushQueue) {
+      setupWeeklyNotificationCron();
+    } else {
+      console.log(
+        "[boot] legacy weekly cron skipped — pg-boss weekly-push queue is enabled",
+      );
+    }
     setupDailyNotificationCron();
   }
   if (featureFlags.enableRagicSync) {
     setupRagicSyncCron();
   }
+
+  // 6. Weekly push queue + worker + cron (Task #23). All gated.
+  await startWeeklyPushQueue();
 
   return createServer(app);
 }

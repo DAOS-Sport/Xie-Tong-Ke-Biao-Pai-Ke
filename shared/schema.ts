@@ -164,6 +164,58 @@ export const coachAvailability = pgTable("coach_availability", {
   ),
 ]);
 
+// ─── Task #23: Weekly push pipeline (pg-boss) ────────────────────────
+// One row per attempted batch run (manual or cron-triggered).
+// Status flow: queued → running → success | partial_failed | failed.
+export const weeklyPushRuns = pgTable("weekly_push_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pushType: varchar("push_type").notNull(), // 'weekly' (reserved for future variants)
+  weekStartDate: date("week_start_date").notNull(),
+  weekEndDate: date("week_end_date").notNull(),
+  triggerSource: varchar("trigger_source").notNull(), // 'cron' | 'manual' | 'retry'
+  status: varchar("status").notNull(), // queued|running|success|partial_failed|failed
+  dryRun: boolean("dry_run").notNull().default(false),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  totalCount: integer("total_count").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  failureCount: integer("failure_count").notNull().default(0),
+  skippedCount: integer("skipped_count").notNull().default(0),
+  reportPath: text("report_path"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_weekly_push_runs_status").on(table.status),
+  index("idx_weekly_push_runs_week").on(table.weekStartDate, table.weekEndDate),
+]);
+
+// One row per recipient per run; the worker updates each row as it sends.
+export const weeklyPushRecipients = pgTable("weekly_push_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").notNull().references(() => weeklyPushRuns.id, { onDelete: 'cascade' }),
+  recipientType: varchar("recipient_type").notNull(), // 'coach' (future: 'group')
+  recipientId: varchar("recipient_id"), // coachUsers.id when known
+  recipientName: varchar("recipient_name").notNull(),
+  lineUserId: varchar("line_user_id"), // null when coach has no LINE binding
+  status: varchar("status").notNull(), // pending|success|failed|skipped
+  attemptCount: integer("attempt_count").notNull().default(0),
+  sentAt: timestamp("sent_at"),
+  errorCode: varchar("error_code"),
+  errorMessage: text("error_message"),
+  payloadJson: jsonb("payload_json"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_weekly_push_recipients_run").on(table.runId),
+  index("idx_weekly_push_recipients_status").on(table.runId, table.status),
+]);
+
+export type WeeklyPushRun = typeof weeklyPushRuns.$inferSelect;
+export type InsertWeeklyPushRun = typeof weeklyPushRuns.$inferInsert;
+export type WeeklyPushRecipient = typeof weeklyPushRecipients.$inferSelect;
+export type InsertWeeklyPushRecipient = typeof weeklyPushRecipients.$inferInsert;
+
 export const lineNotifyLogs = pgTable("line_notify_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   coachName: varchar("coach_name").notNull(),

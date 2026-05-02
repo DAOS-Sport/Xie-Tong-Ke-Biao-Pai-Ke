@@ -60,6 +60,16 @@ export const env = {
   ),
   // Admin password — resolved eagerly above so prod throws at boot
   adminPassword: ADMIN_PASSWORD,
+  // Weekly push (Task #23)
+  healthchecksWeeklyPushUrl: process.env.HEALTHCHECKS_WEEKLY_PUSH_URL || null,
+  healthchecksWeeklyPushEnabled: !["0", "false", "off", "no"].includes(
+    (process.env.HEALTHCHECKS_WEEKLY_PUSH_ENABLED || "").toLowerCase().trim()
+  ),
+  weeklyPushReportFormat: (
+    process.env.WEEKLY_PUSH_REPORT_FORMAT || "csv"
+  ).toLowerCase(),
+  weeklyPushCron: optional("WEEKLY_PUSH_CRON", "0 19 * * 0"),
+  weeklyPushTimezone: optional("WEEKLY_PUSH_TIMEZONE", "Asia/Taipei"),
 };
 
 export type AppEnv = typeof env;
