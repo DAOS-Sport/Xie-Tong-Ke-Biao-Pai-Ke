@@ -209,14 +209,19 @@ async function handleWeeklyPushJob(
         await pushRunSummary({ run: updated, recipients: allRecipients });
       }
 
-      if (finalStatus === "failed") {
-        await pingFail(
-          runErrorMessage ??
-            `runId=${runId} failure=${counts.failed}/${counts.total}`,
+      // Watchdog policy: any failed recipient (or pending after timeout)
+      // should fire the alert. Only a clean run pings success — partial
+      // failures are operationally significant and must be surfaced via
+      // Healthchecks so on-call sees them.
+      if (finalStatus === "success") {
+        await pingSuccess(
+          `runId=${runId} success=${counts.success} skip=${counts.skipped}`,
         );
       } else {
-        await pingSuccess(
-          `runId=${runId} success=${counts.success} fail=${counts.failed} skip=${counts.skipped}`,
+        await pingFail(
+          runErrorMessage ??
+            `runId=${runId} status=${finalStatus} ` +
+              `success=${counts.success} fail=${counts.failed} skip=${counts.skipped}`,
         );
       }
     } catch (err) {

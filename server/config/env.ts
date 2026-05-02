@@ -65,9 +65,9 @@ export const env = {
   healthchecksWeeklyPushEnabled: !["0", "false", "off", "no"].includes(
     (process.env.HEALTHCHECKS_WEEKLY_PUSH_ENABLED || "").toLowerCase().trim()
   ),
-  weeklyPushReportFormat: (
-    process.env.WEEKLY_PUSH_REPORT_FORMAT || "csv"
-  ).toLowerCase(),
+  // NOTE: report format is CSV-only for Task #23. The WEEKLY_PUSH_REPORT_FORMAT
+  // env var was intentionally not added to avoid implying xlsx/json switching
+  // that doesn't exist yet. Add it back when a second format is implemented.
   weeklyPushCron: optional("WEEKLY_PUSH_CRON", "0 19 * * 0"),
   weeklyPushTimezone: optional("WEEKLY_PUSH_TIMEZONE", "Asia/Taipei"),
 };

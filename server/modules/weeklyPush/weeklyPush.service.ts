@@ -209,9 +209,14 @@ export async function enqueueWeeklyPush(
     weekEndDate,
   );
   if (existing && !dryRun) {
-    // Real-push idempotency: refuse to schedule a second wet run for
-    // the same week. Dry-runs are always allowed because they cost
-    // nothing and admins use them to preview rosters.
+    // Wet-run idempotency: refuse to schedule a second real run for the
+    // same week while one in {queued|running|success} already exists.
+    //
+    // Dry-runs are intentionally NOT deduped against this set — they
+    // cost nothing (no LINE messages sent), admins use them as repeated
+    // previews of the current roster, and forcing re-use would surface
+    // stale recipient lists / dryRun=false runs to the operator. This
+    // divergence from strict (pushType, week) idempotency is by design.
     return { run: existing, reused: true, recipientsCreated: 0 };
   }
 
