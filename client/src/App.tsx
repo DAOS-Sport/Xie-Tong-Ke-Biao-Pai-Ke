@@ -16,6 +16,7 @@ import MultiSchoolAdmin from "@/pages/multi-school-admin";
 import CoachPortal from "@/pages/coach-portal";
 import CoachApproval from "@/pages/coach-approval";
 import CoachAssignment from "@/pages/coach-assignment";
+import WeeklyPush from "@/pages/weekly-push";
 import SchoolView from "@/pages/school-view";
 import PasswordProtect from "@/components/password-protect";
 
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/mgt-x9k7p2/assign" component={CoachAssignment} />
       <Route path="/mgt-x9k7p2/stats" component={Statistics} />
       <Route path="/mgt-x9k7p2/approval" component={CoachApproval} />
+      <Route path="/mgt-x9k7p2/weekly-push" component={WeeklyPush} />
       
       {/* Auth pages */}
       <Route path="/home" component={Home} />
