@@ -2,6 +2,19 @@ import type { Request, Response, NextFunction } from "express";
 import { env } from "../../config/env";
 
 /**
+ * Narrow lookup helper — pulls a string field from a record-shaped value
+ * without resorting to `any`. Returns undefined for any non-string value.
+ */
+function readStringField(
+  source: unknown,
+  field: string
+): string | undefined {
+  if (!source || typeof source !== "object") return undefined;
+  const value = (source as Record<string, unknown>)[field];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
  * Pulls the admin password from a request, looking at:
  *   - x-admin-password header
  *   - ?password= query parameter
@@ -10,17 +23,20 @@ import { env } from "../../config/env";
 function extractPassword(req: Request): string | undefined {
   const headerVal = req.headers["x-admin-password"];
   if (typeof headerVal === "string" && headerVal.length > 0) return headerVal;
-  const queryVal = (req.query as any)?.password;
-  if (typeof queryVal === "string" && queryVal.length > 0) return queryVal;
-  const bodyVal = (req.body as any)?.password;
-  if (typeof bodyVal === "string" && bodyVal.length > 0) return bodyVal;
+
+  const fromQuery = readStringField(req.query, "password");
+  if (fromQuery) return fromQuery;
+
+  const fromBody = readStringField(req.body, "password");
+  if (fromBody) return fromBody;
+
   return undefined;
 }
 
 /**
  * Returns true when the request carries a valid admin password.
- * Throws at startup (via env.adminPassword getter) if the env var is
- * missing in production.
+ * `env.adminPassword` is resolved eagerly at module load — production
+ * boot fails if the env var is missing.
  */
 export function verifyAdminPassword(req: Request): boolean {
   const provided = extractPassword(req);

@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { storage } from "../storage";
 import { isAuthenticated } from "../replitAuth";
 import { env } from "../config/env";
@@ -6,6 +6,15 @@ import { env } from "../config/env";
 const LINE_AUTH_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
 const LINE_PROFILE_URL = "https://api.line.me/v2/profile";
+
+/**
+ * Replit-Auth attaches passport's user object to `req.user`. The shape
+ * carries OIDC claims under `claims.sub`. We narrow it explicitly so the
+ * route handler stays free of `any`.
+ */
+type AuthenticatedRequest = Request & {
+  user?: { claims?: { sub?: string } };
+};
 
 export type LineLoginToken = {
   lineId: string;
@@ -22,7 +31,7 @@ export const lineLoginTokens = new Map<string, LineLoginToken>();
 
 const lineOAuthStates = new Map<string, number>();
 
-function getLineRedirectUri(_req: any) {
+function getLineRedirectUri(): string {
   return `${env.publicOrigin}/api/auth/line/callback`;
 }
 
@@ -38,9 +47,12 @@ function generateToken(): string {
 
 export function registerAuthRoutes(app: Express): void {
   // Replit Auth — current user
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req as AuthenticatedRequest).user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -61,7 +73,7 @@ export function registerAuthRoutes(app: Express): void {
     const nonce = generateToken();
     lineOAuthStates.set(state, Date.now() + 10 * 60 * 1000);
 
-    const redirectUri = getLineRedirectUri(req);
+    const redirectUri = getLineRedirectUri();
     const params = new URLSearchParams({
       response_type: "code",
       client_id: LINE_CLIENT_ID,
@@ -101,7 +113,7 @@ export function registerAuthRoutes(app: Express): void {
     }
 
     try {
-      const redirectUri = getLineRedirectUri(req);
+      const redirectUri = getLineRedirectUri();
       const tokenRes = await fetch(LINE_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

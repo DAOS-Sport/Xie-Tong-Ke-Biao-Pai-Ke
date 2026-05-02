@@ -6,6 +6,7 @@ import {
 } from "../multi-school-db";
 import * as schoolRepo from "./school.repo";
 import { env } from "../config/env";
+import { requireAdminPassword } from "../shared/auth/adminPassword";
 
 /**
  * Defence-in-depth: schoolCode must pass BOTH the regex (no SQL-unsafe chars)
@@ -23,7 +24,7 @@ const validateSchoolCode = (req: Request, res: Response, next: NextFunction) => 
 };
 
 export function registerSchoolRoutes(app: Express): void {
-  app.post("/api/admin/init-school/:schoolCode", async (req, res) => {
+  app.post("/api/admin/init-school/:schoolCode", requireAdminPassword, async (req, res) => {
     try {
       const { schoolCode } = req.params;
       if (!isValidSchoolCode(schoolCode)) {
@@ -37,7 +38,7 @@ export function registerSchoolRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/admin/import-schedule/:schoolCode", async (req, res) => {
+  app.post("/api/admin/import-schedule/:schoolCode", requireAdminPassword, async (req, res) => {
     try {
       const { schoolCode } = req.params;
       if (!isValidSchoolCode(schoolCode)) {
