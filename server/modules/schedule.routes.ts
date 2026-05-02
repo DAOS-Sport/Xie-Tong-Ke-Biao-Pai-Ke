@@ -5,6 +5,8 @@ import { insertScheduleSchema } from "@shared/schema";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
 import { notifyScheduleUnlocked } from "../line-notify";
 
+type ScheduleUpdate = Parameters<typeof storage.updateSchedule>[1];
+
 export function registerScheduleRoutes(app: Express): void {
   app.get("/api/schedules/:date", async (req, res) => {
     try {
@@ -207,7 +209,7 @@ export function registerScheduleRoutes(app: Express): void {
           req.body;
 
         if (coachName2 !== undefined) {
-          const updateData: any = { coachName2: coachName2 || null };
+          const updateData: ScheduleUpdate = { coachName2: coachName2 || null };
           if (!coachName2) updateData.coach2IsTeaching = false;
           const schedule = await storage.updateSchedule(
             req.params.id,
@@ -250,7 +252,7 @@ export function registerScheduleRoutes(app: Express): void {
           coach1IsTeaching,
           coach2IsTeaching,
         } = req.body;
-        const updateData: any = {};
+        const updateData: ScheduleUpdate = {};
         if (coachCount !== undefined) {
           const count = parseInt(coachCount);
           if (count !== 1 && count !== 2)

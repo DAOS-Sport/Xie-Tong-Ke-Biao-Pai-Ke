@@ -249,7 +249,7 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
     let failCount = 0;
 
     // ── 6. 對每位有課的教練，組訊息並推播
-    for (const coachName of scheduledCoachNames) {
+    for (const coachName of Array.from(scheduledCoachNames)) {
       // 6a. 有無 LINE ID
       const coach = coachMap.get(coachName);
       if (!coach) {

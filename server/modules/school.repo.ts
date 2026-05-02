@@ -5,16 +5,23 @@
  * this module so the unsafe parts (string concatenation around schema
  * names, dynamic table targets) are isolated and validated here.
  *
- * `schoolCode` is restricted to /^[a-zA-Z0-9_]+$/ by `isValidSchoolCode`,
- * so it is safe to interpolate into identifiers.
+ * `schoolCode` must pass `assertSchool` (regex + whitelist) before any
+ * identifier is interpolated into SQL.
  */
-import { sql, and, eq, gte, lte } from "drizzle-orm";
+import { sql, and, eq, gte, lte, type SQL } from "drizzle-orm";
 import { schedules, insertScheduleSchema } from "@shared/schema";
-import { getSchoolDb, isValidSchoolCode } from "../multi-school-db";
+import {
+  getSchoolDb,
+  isValidSchoolCode,
+  getAvailableSchools,
+} from "../multi-school-db";
 
-function assertSchool(schoolCode: string) {
+function assertSchool(schoolCode: string): void {
   if (!isValidSchoolCode(schoolCode)) {
     throw new Error(`Invalid school code: ${schoolCode}`);
+  }
+  if (!getAvailableSchools().includes(schoolCode)) {
+    throw new Error(`Unknown school code: ${schoolCode}`);
   }
 }
 
@@ -22,6 +29,12 @@ export type SchoolTeacher = {
   teacherName: string;
   subject: string | null;
   createdAt: string | null;
+};
+
+type TeacherRow = {
+  teacher_name: string;
+  subject: string | null;
+  created_at: string | null;
 };
 
 export async function listTeachers(
@@ -36,7 +49,7 @@ export async function listTeachers(
       ORDER BY teacher_name
     `)
   );
-  return result.rows.map((row: any) => ({
+  return (result.rows as TeacherRow[]).map((row) => ({
     teacherName: row.teacher_name,
     subject: row.subject,
     createdAt: row.created_at,
@@ -50,7 +63,7 @@ export async function listSchedules(
   assertSchool(schoolCode);
   const db = await getSchoolDb(schoolCode);
 
-  const whereConditions: any[] = [];
+  const whereConditions: SQL[] = [];
   if (filters.teacher) {
     whereConditions.push(eq(schedules.coachName, filters.teacher));
   }
@@ -59,7 +72,7 @@ export async function listSchedules(
       and(
         gte(schedules.date, filters.startDate),
         lte(schedules.date, filters.endDate)
-      )
+      )!
     );
   }
 
@@ -68,14 +81,16 @@ export async function listSchedules(
     : await db.select().from(schedules);
 }
 
+export type SchoolFeedback = Record<string, unknown>;
+
 export async function listFeedbacks(
   schoolCode: string,
   filters: { teacher?: string; scheduleId?: string }
-): Promise<any[]> {
+): Promise<SchoolFeedback[]> {
   assertSchool(schoolCode);
   const db = await getSchoolDb(schoolCode);
 
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
   if (filters.teacher) {
     conditions.push(sql`teacher_name = ${filters.teacher}`);
   }
@@ -94,7 +109,7 @@ export async function listFeedbacks(
     ORDER BY updated_at DESC
   `);
 
-  return (result.rows as any[]) || [];
+  return (result.rows ?? []) as SchoolFeedback[];
 }
 
 export type FeedbackInput = {
@@ -109,7 +124,7 @@ export type FeedbackInput = {
 export async function upsertFeedback(
   schoolCode: string,
   data: FeedbackInput
-) {
+): Promise<SchoolFeedback> {
   assertSchool(schoolCode);
   const db = await getSchoolDb(schoolCode);
   const result = await db.execute(sql`
@@ -136,7 +151,7 @@ export async function upsertFeedback(
   if (!result.rows || result.rows.length === 0) {
     throw new Error("Database insert failed - no rows returned");
   }
-  return result.rows[0];
+  return result.rows[0] as SchoolFeedback;
 }
 
 export async function createSchoolSchedule(

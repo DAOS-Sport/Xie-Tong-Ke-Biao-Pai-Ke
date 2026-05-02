@@ -2,14 +2,22 @@ import type { Express, Request, Response, NextFunction } from "express";
 import {
   initializeSchoolSchema,
   isValidSchoolCode,
+  getAvailableSchools,
 } from "../multi-school-db";
 import * as schoolRepo from "./school.repo";
 import { env } from "../config/env";
 
+/**
+ * Defence-in-depth: schoolCode must pass BOTH the regex (no SQL-unsafe chars)
+ * AND the whitelist of registered schools. Either fail short-circuits.
+ */
 const validateSchoolCode = (req: Request, res: Response, next: NextFunction) => {
   const { schoolCode } = req.params;
   if (!isValidSchoolCode(schoolCode)) {
     return res.status(400).json({ message: "Invalid school code" });
+  }
+  if (!getAvailableSchools().includes(schoolCode)) {
+    return res.status(404).json({ message: "Unknown school code" });
   }
   next();
 };
@@ -85,7 +93,11 @@ export function registerSchoolRoutes(app: Express): void {
 
   app.get("/api/:schoolCode/schedules", validateSchoolCode, async (req, res) => {
     try {
-      const { teacher, startDate, endDate } = req.query as any;
+      const { teacher, startDate, endDate } = req.query as {
+        teacher?: string;
+        startDate?: string;
+        endDate?: string;
+      };
       const list = await schoolRepo.listSchedules(req.params.schoolCode, {
         teacher,
         startDate,
@@ -100,7 +112,10 @@ export function registerSchoolRoutes(app: Express): void {
 
   app.get("/api/:schoolCode/feedbacks", validateSchoolCode, async (req, res) => {
     try {
-      const { teacher, scheduleId } = req.query as any;
+      const { teacher, scheduleId } = req.query as {
+        teacher?: string;
+        scheduleId?: string;
+      };
       const list = await schoolRepo.listFeedbacks(req.params.schoolCode, {
         teacher,
         scheduleId,

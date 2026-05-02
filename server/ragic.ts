@@ -127,8 +127,9 @@ async function fetchPersonalInfo(): Promise<Map<string, PersonalInfo>> {
       });
     }
   }
-  const lineIdCount = [...infoMap.values()].filter(v => v.lineId).length;
-  const empIdCount = [...infoMap.values()].filter(v => v.employeeId).length;
+  const allInfoValues = Array.from(infoMap.values());
+  const lineIdCount = allInfoValues.filter(v => v.lineId).length;
+  const empIdCount = allInfoValues.filter(v => v.employeeId).length;
   console.log(`[Ragic] Fetched personal info: ${lineIdCount} LINE IDs, ${empIdCount} employee IDs`);
   return infoMap;
 }

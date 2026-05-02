@@ -5,6 +5,9 @@
  * Modules are intentionally loose-coupled: each `register*Routes` only
  * touches its own URL space and the shared `storage` façade. New modules
  * should be added here, never inlined into routes.ts.
+ *
+ * Optional modules (school, notify, ragic) are gated behind feature
+ * flags so individual deployments can turn them off without code changes.
  */
 import type { Express } from "express";
 
@@ -19,23 +22,38 @@ import { registerNotifyRoutes } from "./notify.routes";
 import { registerRagicRoutes } from "./ragic.routes";
 import { registerSchoolRoutes } from "./school.routes";
 import { registerDiagnosticRoutes } from "./diagnostic.routes";
+import { featureFlags } from "../config/featureFlags";
 
 export function registerAllModules(app: Express): void {
   // Auth must come first so downstream modules can rely on req.user etc.
   registerAuthRoutes(app);
 
-  // Domain modules
+  // Always-on domain modules
   registerVenueRoutes(app);
   registerTimeSlotRoutes(app);
   registerScheduleRoutes(app);
   registerCoachRoutes(app);
   registerCoachPortalRoutes(app);
   registerCoachAdminRoutes(app);
-  registerNotifyRoutes(app);
-  registerRagicRoutes(app);
 
-  // Multi-school is isolated and uses its own repository.
-  registerSchoolRoutes(app);
+  // Feature-flagged modules
+  if (featureFlags.enableLineNotify) {
+    registerNotifyRoutes(app);
+  } else {
+    console.log("[modules] LINE notify module disabled via feature flag");
+  }
+
+  if (featureFlags.enableRagicSync) {
+    registerRagicRoutes(app);
+  } else {
+    console.log("[modules] Ragic sync module disabled via feature flag");
+  }
+
+  if (featureFlags.enableSchoolModule) {
+    registerSchoolRoutes(app);
+  } else {
+    console.log("[modules] Multi-school module disabled via feature flag");
+  }
 
   // Operational endpoints
   registerDiagnosticRoutes(app);

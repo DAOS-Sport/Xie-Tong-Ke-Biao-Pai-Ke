@@ -2,8 +2,17 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { coachUsers, venues } from "@shared/schema";
 import { storage } from "../storage";
-import { initializeSchoolSchema } from "../multi-school-db";
-import { env } from "../config/env";
+import { initializeSchoolSchema, getAvailableSchools } from "../multi-school-db";
+import { env, validateConfig } from "../config/env";
+import { featureFlags } from "../config/featureFlags";
+
+/**
+ * Hard-fails the boot if required configuration is missing.
+ * Called once from server/routes.ts before any module is wired up.
+ */
+export function assertBootConfig(): void {
+  validateConfig();
+}
 
 /**
  * One-time, idempotent data fixes applied at boot.
@@ -57,6 +66,11 @@ export async function initializeAppData(): Promise<void> {
 
   const tag = env.isDeployment ? "🚀 PRODUCTION" : "🛠️ DEVELOPMENT";
 
+  if (!featureFlags.enableSchoolModule) {
+    console.log(`${tag}: Multi-school module disabled via feature flag — skipping init`);
+    return;
+  }
+
   try {
     console.log(`${tag}: Initializing multi-school system...`);
 
@@ -67,14 +81,10 @@ export async function initializeAppData(): Promise<void> {
     }
 
     console.log(`${tag}: Creating schemas...`);
-    await initializeSchoolSchema("demo");
-    console.log(`${tag}: ✅ school_demo initialized`);
-
-    await initializeSchoolSchema("school1");
-    console.log(`${tag}: ✅ school_school1 initialized`);
-
-    await initializeSchoolSchema("school2");
-    console.log(`${tag}: ✅ school_school2 initialized`);
+    for (const code of getAvailableSchools()) {
+      await initializeSchoolSchema(code);
+      console.log(`${tag}: ✅ school_${code} initialized`);
+    }
 
     console.log(`${tag}: ✅ Multi-school system initialized successfully`);
   } catch (error) {

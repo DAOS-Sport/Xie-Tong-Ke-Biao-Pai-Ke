@@ -48,4 +48,3 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-ADMIN_PASSWORD = "dream0935314711"

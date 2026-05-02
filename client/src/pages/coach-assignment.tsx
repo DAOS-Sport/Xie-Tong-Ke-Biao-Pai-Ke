@@ -322,11 +322,11 @@ function CoachAssignmentContent() {
     const timeAvailable = availabilityMap.get(`${dayOfWeek}-${timeSlotOrder}`) || new Set<string>();
     if (!venueName) return timeAvailable;
     const result = new Set<string>();
-    for (const coach of timeAvailable) {
+    Array.from(timeAvailable).forEach((coach) => {
       const prefs = venuePrefsMap[coach];
       if (!prefs || prefs.length === 0) result.add(coach);
       else if (prefs.includes(venueName)) result.add(coach);
-    }
+    });
     return result;
   };
 

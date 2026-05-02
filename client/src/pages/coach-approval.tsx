@@ -27,6 +27,7 @@ import AdminLayout from "@/components/admin-layout";
 const adminPassword = "dream0935314711";
 
 function CoachApprovalContent() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"users" | "rules" | "venues" | "notify">("users");
 
   const headerRight = (
@@ -90,6 +91,7 @@ interface CoachFillRate {
 }
 
 function CoachUsersSection() {
+  const { toast } = useToast();
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [editingUser, setEditingUser] = useState<{ id: string; name: string } | null>(null);
