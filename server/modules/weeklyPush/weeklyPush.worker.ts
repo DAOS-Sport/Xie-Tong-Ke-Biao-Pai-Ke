@@ -7,17 +7,24 @@
  *   - weekly-push          : orchestrator. Pings Healthchecks /start,
  *                            marks the run running, fans out per-recipient
  *                            jobs (or short-circuits for dry-run), polls
- *                            until all recipients are non-pending,
- *                            generates the CSV report, pushes the
- *                            summary to LINE groups, and pings
- *                            Healthchecks success/fail.
+ *                            until pending===0 or the workload-aware
+ *                            timeout fires. If pending recipients remain
+ *                            after the timeout the run is forced to
+ *                            'failed' with errorMessage='orchestrator_timeout'
+ *                            and Healthchecks is pinged /fail — the run is
+ *                            never reported as success while work is still
+ *                            in flight. The CSV report and the LINE summary
+ *                            are always emitted last (after the run row is
+ *                            in its final state) so what observers see
+ *                            matches the DB.
  *
  *   - weekly-push-recipient: sends the LINE message for a single
  *                            recipient and updates that row's status.
- *                            Errors are caught and recorded — we do
- *                            NOT use pg-boss native retry; failed
- *                            recipients are re-driven by the manual
- *                            "retry-failed" admin endpoint instead.
+ *                            Uses pg-boss native retries; only the
+ *                            final attempt marks the row as 'failed'.
+ *                            Hard input errors (no LINE id / bad
+ *                            payload) are marked failed immediately
+ *                            and not retried.
  *
  *   - weekly-push-report   : generates / re-generates the CSV report
  *                            for an existing run on demand.
@@ -46,14 +53,30 @@ import type {
 } from "./types";
 
 const ORCHESTRATOR_POLL_MS = 2_000;
-// Worst-case for one recipient with retries 3 + delay 60 + backoff:
-// 60 + 120 + 240 = 420s. Add slack so the orchestrator outlasts even
-// the slowest recipient's full retry budget.
-const ORCHESTRATOR_MAX_WAIT_MS =
-  (RECIPIENT_RETRY_DELAY_SECONDS *
-    (Math.pow(2, RECIPIENT_RETRY_LIMIT) - 1) +
-    120) *
+
+// Worst-case for one recipient with native pg-boss retries (limit=3, delay=60s, backoff):
+// 60 + 120 + 240 = 420s of wait, plus per-attempt processing.
+const RECIPIENT_RETRY_BUDGET_MS =
+  RECIPIENT_RETRY_DELAY_SECONDS *
+  (Math.pow(2, RECIPIENT_RETRY_LIMIT) - 1) *
   1_000;
+const PER_RECIPIENT_PROCESS_MS = 2_000;
+const ORCHESTRATOR_BASE_SLACK_MS = 60_000;
+const ORCHESTRATOR_HARD_CAP_MS = 30 * 60 * 1_000;
+
+/**
+ * Workload-aware orchestrator timeout. Scales with recipient count so a
+ * large roster (especially one hitting LINE retries) doesn't time out
+ * before pg-boss exhausts its retry budget. Capped at 30 minutes so a
+ * pathologically large run can't wedge the worker forever.
+ */
+function computeOrchestratorMaxWaitMs(recipientCount: number): number {
+  const ms =
+    RECIPIENT_RETRY_BUDGET_MS +
+    PER_RECIPIENT_PROCESS_MS * recipientCount +
+    ORCHESTRATOR_BASE_SLACK_MS;
+  return Math.min(ms, ORCHESTRATOR_HARD_CAP_MS);
+}
 
 let workersRegistered = false;
 
@@ -72,16 +95,24 @@ function readRecipientPayload(value: unknown): RecipientPayload | null {
   };
 }
 
-async function waitForRecipientsToFinish(runId: string): Promise<void> {
+/**
+ * Polls the recipients table until `pending === 0` or `maxWaitMs`
+ * elapses. Returns whether the wait completed cleanly so the
+ * orchestrator can branch on success vs timeout.
+ */
+async function waitForRecipientsToFinish(
+  runId: string,
+  maxWaitMs: number,
+): Promise<{ pendingDrained: boolean; waitedMs: number }> {
   const start = Date.now();
-  while (Date.now() - start < ORCHESTRATOR_MAX_WAIT_MS) {
+  while (Date.now() - start < maxWaitMs) {
     const counts = await weeklyPushRepo.countRecipientStatuses(runId);
-    if (counts.pending === 0) return;
+    if (counts.pending === 0) {
+      return { pendingDrained: true, waitedMs: Date.now() - start };
+    }
     await new Promise((r) => setTimeout(r, ORCHESTRATOR_POLL_MS));
   }
-  console.warn(
-    `[weeklyPush.worker] orchestrator timeout — pending recipients remain for run ${runId}`,
-  );
+  return { pendingDrained: false, waitedMs: Date.now() - start };
 }
 
 async function handleWeeklyPushJob(
@@ -107,6 +138,10 @@ async function handleWeeklyPushJob(
 
       const recipients = await weeklyPushRepo.listRecipientsByRun(runId);
 
+      let timedOut = false;
+      let waitedMs = 0;
+      let maxWaitMs = 0;
+
       if (run.dryRun) {
         // Dry-run: recipients were inserted as "skipped" by the
         // service, so there's nothing to send. Just produce the report
@@ -120,16 +155,38 @@ async function handleWeeklyPushJob(
         for (const r of pending) {
           await enqueueRecipientJob(runId, r.id);
         }
-        await waitForRecipientsToFinish(runId);
+        maxWaitMs = computeOrchestratorMaxWaitMs(pending.length);
+        const result = await waitForRecipientsToFinish(runId, maxWaitMs);
+        timedOut = !result.pendingDrained;
+        waitedMs = result.waitedMs;
+        if (timedOut) {
+          console.warn(
+            `[weeklyPush.worker] orchestrator timeout runId=${runId} ` +
+              `waitedMs=${waitedMs} maxWaitMs=${maxWaitMs} — recipients still pending`,
+          );
+        }
       }
 
+      // Final status MUST account for pending rows. Never report success
+      // (or partial_failed, which implies completion) while work remains
+      // in flight; that would lie in the CSV/summary/Healthchecks ping.
       const counts = await weeklyPushRepo.countRecipientStatuses(runId);
-      const finalStatus =
-        counts.failed === 0
-          ? "success"
-          : counts.success === 0 && counts.skipped === 0
-            ? "failed"
-            : "partial_failed";
+      let finalStatus: "success" | "partial_failed" | "failed";
+      let runErrorMessage: string | null = null;
+
+      if (counts.pending > 0) {
+        finalStatus = "failed";
+        runErrorMessage =
+          `orchestrator_timeout: ${counts.pending}/${counts.total} ` +
+          `recipient(s) still pending after ${waitedMs}ms ` +
+          `(maxWaitMs=${maxWaitMs})`;
+      } else if (counts.failed === 0) {
+        finalStatus = "success";
+      } else if (counts.success === 0 && counts.skipped === 0) {
+        finalStatus = "failed";
+      } else {
+        finalStatus = "partial_failed";
+      }
 
       await weeklyPushRepo.updateRun(runId, {
         status: finalStatus,
@@ -138,8 +195,11 @@ async function handleWeeklyPushJob(
         skippedCount: counts.skipped,
         totalCount: counts.total,
         completedAt: new Date(),
+        errorMessage: runErrorMessage,
       });
 
+      // Generate report + push summary AFTER the run row is in its
+      // terminal state so observers see counts/status that match the DB.
       const reportPath = await generateAndStoreReport(runId);
       console.log(`[weeklyPush.worker] report ready at ${reportPath}`);
 
@@ -151,7 +211,8 @@ async function handleWeeklyPushJob(
 
       if (finalStatus === "failed") {
         await pingFail(
-          `runId=${runId} failure=${counts.failed}/${counts.total}`,
+          runErrorMessage ??
+            `runId=${runId} failure=${counts.failed}/${counts.total}`,
         );
       } else {
         await pingSuccess(

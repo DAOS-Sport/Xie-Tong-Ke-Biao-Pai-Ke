@@ -43,6 +43,16 @@ function formatSummaryMessage(
   lines.push(`成功: ${run.successCount}`);
   lines.push(`失敗: ${run.failureCount}`);
   lines.push(`略過: ${run.skippedCount}`);
+  // Surface any recipients still in 'pending' (e.g. orchestrator timeout)
+  // so the LINE summary reflects the same reality the CSV does.
+  const pending = recipients.filter((r) => r.status === "pending").length;
+  if (pending > 0) {
+    lines.push(`等待中: ${pending} (orchestrator timeout — 請重跑或手動 retry-failed)`);
+  }
+  if (run.errorMessage) {
+    lines.push("");
+    lines.push(`⚠️ ${run.errorMessage}`);
+  }
 
   if (failed.length > 0) {
     lines.push("");
