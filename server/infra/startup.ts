@@ -8,6 +8,7 @@ import { featureFlags } from "../config/featureFlags";
 import cron from "node-cron";
 import { startBoss, getBoss } from "./queue/boss";
 import { queues } from "./queue/queues";
+import { lineGroups } from "../config/lineGroups";
 import { startWeeklyPushWorkers } from "../modules/weeklyPush/weeklyPush.worker";
 import { enqueueWeeklyPush } from "../modules/weeklyPush/weeklyPush.service";
 
@@ -153,19 +154,38 @@ export async function startWeeklyPushQueue(): Promise<void> {
     // worker — otherwise the cron router and the orchestrator handler
     // would race for jobs on the same queue.
     if (env.isDeployment) {
-      cron.schedule(
-        env.weeklyPushCron,
-        () => {
-          console.log("[boot] weekly push cron tick — enqueueing run");
-          enqueueWeeklyPush({ triggerSource: "cron" }).catch((err) => {
-            console.error("[boot] cron enqueue failed:", err);
-          });
-        },
-        { timezone: env.weeklyPushTimezone },
-      );
-      console.log(
-        `[boot] weekly push cron scheduled (${env.weeklyPushCron} ${env.weeklyPushTimezone})`,
-      );
+      // Production preconditions per task spec — refuse to register
+      // the auto-cron when observability/destination envs are missing.
+      // The admin can still trigger pushes manually via the REST API,
+      // but un-monitored auto-fires are blocked so a silently broken
+      // run can't go undetected for a week.
+      const missing: string[] = [];
+      if (!env.healthchecksWeeklyPushUrl || !env.healthchecksWeeklyPushEnabled) {
+        missing.push("HEALTHCHECKS_WEEKLY_PUSH_URL");
+      }
+      if (!lineGroups.itGroupId) missing.push("LINE_IT_GROUP_ID");
+
+      if (missing.length > 0) {
+        console.warn(
+          `[boot] weekly push cron NOT scheduled — missing required envs: ${missing.join(
+            ", ",
+          )}. Manual /api/admin/weekly-push/enqueue still works.`,
+        );
+      } else {
+        cron.schedule(
+          env.weeklyPushCron,
+          () => {
+            console.log("[boot] weekly push cron tick — enqueueing run");
+            enqueueWeeklyPush({ triggerSource: "cron" }).catch((err) => {
+              console.error("[boot] cron enqueue failed:", err);
+            });
+          },
+          { timezone: env.weeklyPushTimezone },
+        );
+        console.log(
+          `[boot] weekly push cron scheduled (${env.weeklyPushCron} ${env.weeklyPushTimezone})`,
+        );
+      }
     } else {
       console.log(
         "[boot] dev environment — weekly push cron NOT scheduled (REPLIT_DEPLOYMENT!=1)",

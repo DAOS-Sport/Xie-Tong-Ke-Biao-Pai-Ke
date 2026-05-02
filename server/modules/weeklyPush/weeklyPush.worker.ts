@@ -32,7 +32,11 @@ import {
 } from "../../infra/healthchecks/healthchecks.client";
 import { weeklyPushRepo } from "./weeklyPush.repository";
 import { generateAndStoreReport } from "./weeklyPush.report";
-import { enqueueRecipientJob } from "./weeklyPush.service";
+import {
+  enqueueRecipientJob,
+  RECIPIENT_RETRY_LIMIT,
+  RECIPIENT_RETRY_DELAY_SECONDS,
+} from "./weeklyPush.service";
 import { sendTextMessage } from "../notification/lineNotify.adapter";
 import { pushRunSummary } from "../notification/notification.service";
 import type {
@@ -42,7 +46,14 @@ import type {
 } from "./types";
 
 const ORCHESTRATOR_POLL_MS = 2_000;
-const ORCHESTRATOR_MAX_WAIT_MS = 5 * 60 * 1_000; // 5 min ceiling
+// Worst-case for one recipient with retries 3 + delay 60 + backoff:
+// 60 + 120 + 240 = 420s. Add slack so the orchestrator outlasts even
+// the slowest recipient's full retry budget.
+const ORCHESTRATOR_MAX_WAIT_MS =
+  (RECIPIENT_RETRY_DELAY_SECONDS *
+    (Math.pow(2, RECIPIENT_RETRY_LIMIT) - 1) +
+    120) *
+  1_000;
 
 let workersRegistered = false;
 
@@ -162,11 +173,31 @@ async function handleWeeklyPushJob(
   }
 }
 
+/**
+ * Recipient handler — `includeMetadata: true` so we can read
+ * `job.retrycount` and decide whether to re-throw (let pg-boss
+ * retry per its `retryLimit/retryDelay/retryBackoff` policy) or
+ * mark the recipient as final-failed.
+ *
+ * Status semantics during retries:
+ *   - success                → status='success', attemptCount=N+1
+ *   - failure, retries left  → status='pending' (pg-boss will redrive),
+ *                               attemptCount/errorCode updated, THROW
+ *   - failure, final attempt → status='failed', no throw
+ *   - hard input error (no LINE id / bad payload) → status='failed' immediately,
+ *     no throw — these would never succeed on retry
+ *
+ * pg-boss exposes the metadata field as `retryCount` (camelCase) on
+ * the TS surface even though the underlying column is `retrycount`.
+ */
 async function handleRecipientJob(
-  jobs: PgBoss.Job<WeeklyPushRecipientJobData>[],
+  jobs: PgBoss.JobWithMetadata<WeeklyPushRecipientJobData>[],
 ): Promise<void> {
   for (const job of jobs) {
     const { runId, recipientId } = job.data;
+    const attemptNumber = (job.retryCount ?? 0) + 1;
+    const isFinalAttempt = (job.retryCount ?? 0) >= RECIPIENT_RETRY_LIMIT;
+
     const recipient = await weeklyPushRepo.getRecipientById(recipientId);
     if (!recipient) {
       console.warn(
@@ -174,25 +205,28 @@ async function handleRecipientJob(
       );
       continue;
     }
+    // Only `pending` (incl. mid-retry) is actionable. Anything else means
+    // a previous attempt already settled the row — idempotent skip so a
+    // pg-boss redelivery doesn't double-send a successful message.
     if (recipient.status !== "pending") {
-      // Already processed — happens if pg-boss redelivers; idempotent skip.
       continue;
     }
+
+    // Hard input errors — never retried, no throw.
     if (!recipient.lineUserId) {
       await weeklyPushRepo.updateRecipient(recipientId, {
         status: "failed",
-        attemptCount: recipient.attemptCount + 1,
+        attemptCount: attemptNumber,
         errorCode: "no_line_id",
         errorMessage: "recipient has no LINE user id",
       });
       continue;
     }
-
     const payload = readRecipientPayload(recipient.payloadJson);
     if (!payload) {
       await weeklyPushRepo.updateRecipient(recipientId, {
         status: "failed",
-        attemptCount: recipient.attemptCount + 1,
+        attemptCount: attemptNumber,
         errorCode: "missing_payload",
         errorMessage: "recipient payload is missing or malformed",
       });
@@ -200,22 +234,42 @@ async function handleRecipientJob(
     }
 
     const result = await sendTextMessage(recipient.lineUserId, payload.message);
+
     if (result.ok) {
       await weeklyPushRepo.updateRecipient(recipientId, {
         status: "success",
-        attemptCount: recipient.attemptCount + 1,
+        attemptCount: attemptNumber,
         sentAt: new Date(),
         errorCode: null,
         errorMessage: null,
       });
-    } else {
+      continue;
+    }
+
+    if (isFinalAttempt) {
       await weeklyPushRepo.updateRecipient(recipientId, {
         status: "failed",
-        attemptCount: recipient.attemptCount + 1,
+        attemptCount: attemptNumber,
         errorCode: result.errorCode,
         errorMessage: result.errorMessage,
       });
+      // Don't throw — accept the failure as final so pg-boss marks the job complete.
+      continue;
     }
+
+    // Transient failure — keep status='pending', persist the latest error
+    // for visibility, and THROW so pg-boss applies its retry policy.
+    await weeklyPushRepo.updateRecipient(recipientId, {
+      status: "pending",
+      attemptCount: attemptNumber,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+    });
+    throw new Error(
+      `recipient ${recipientId} send failed (attempt ${attemptNumber}/${
+        RECIPIENT_RETRY_LIMIT + 1
+      }): ${result.errorCode ?? "unknown"} ${result.errorMessage ?? ""}`,
+    );
   }
 }
 
@@ -257,7 +311,7 @@ export async function startWeeklyPushWorkers(): Promise<void> {
   );
   await boss.work<WeeklyPushRecipientJobData>(
     queues.weeklyPushRecipient,
-    { batchSize: 4 },
+    { batchSize: 4, includeMetadata: true },
     handleRecipientJob,
   );
   await boss.work<WeeklyPushReportJobData>(

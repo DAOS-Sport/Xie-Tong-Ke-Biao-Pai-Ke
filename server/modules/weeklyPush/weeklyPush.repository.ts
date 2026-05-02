@@ -39,9 +39,13 @@ export const weeklyPushRepo = {
 
   /**
    * Idempotency lookup — returns the most recent run for the same
-   * (pushType, weekStart, weekEnd) whose status is "active" so the
-   * caller can short-circuit a duplicate enqueue. Failed runs are
-   * intentionally NOT considered active so admins can re-trigger.
+   * (pushType, weekStart, weekEnd) whose status is in-flight or
+   * already-succeeded so the caller can short-circuit a duplicate
+   * enqueue.
+   *
+   * Per task spec: only `queued|running|success` block a new run.
+   * `partial_failed` and `failed` deliberately allow re-trigger so
+   * admins can recover from a bad week without manual DB surgery.
    */
   async findActiveRunForWeek(
     pushType: string,
@@ -56,7 +60,7 @@ export const weeklyPushRepo = {
           eq(weeklyPushRuns.pushType, pushType),
           eq(weeklyPushRuns.weekStartDate, weekStartDate),
           eq(weeklyPushRuns.weekEndDate, weekEndDate),
-          inArray(weeklyPushRuns.status, ["queued", "running", "success", "partial_failed"]),
+          inArray(weeklyPushRuns.status, ["queued", "running", "success"]),
         ),
       )
       .orderBy(desc(weeklyPushRuns.createdAt))

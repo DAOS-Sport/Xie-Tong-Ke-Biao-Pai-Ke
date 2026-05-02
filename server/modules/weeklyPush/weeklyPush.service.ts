@@ -312,9 +312,24 @@ export async function retryFailedRecipients(
 }
 
 /**
+ * Per-recipient retry policy — three retries with 60s backoff
+ * doubling per attempt, so the worst case is roughly
+ * 60 + 120 + 240 = 7 minutes before a recipient lands in `failed`.
+ * Centralized here so `enqueueRecipientJob` and the orchestrator's
+ * timeout stay in agreement.
+ */
+export const RECIPIENT_RETRY_LIMIT = 3;
+export const RECIPIENT_RETRY_DELAY_SECONDS = 60;
+
+/**
  * Enqueue a per-recipient send job. Wet-run only — dry-run paths
  * never reach this function because the orchestrator sets all
  * recipients to `skipped` up-front.
+ *
+ * Retry options are attached on the publish so transient LINE/API
+ * failures are auto-retried by pg-boss without intervention. The
+ * worker handler treats `retrycount === RETRY_LIMIT` as the final
+ * attempt and stops throwing.
  */
 export async function enqueueRecipientJob(
   runId: string,
@@ -324,7 +339,9 @@ export async function enqueueRecipientJob(
   const data: WeeklyPushRecipientJobData = { runId, recipientId };
   await boss.send(queues.weeklyPushRecipient, data, {
     singletonKey: `${runId}:${recipientId}`,
-    retryLimit: 0,
+    retryLimit: RECIPIENT_RETRY_LIMIT,
+    retryDelay: RECIPIENT_RETRY_DELAY_SECONDS,
+    retryBackoff: true,
   });
 }
 
