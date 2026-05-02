@@ -24,12 +24,11 @@ import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 
-// The actual password is held in sessionStorage by PasswordProtect after the
-// user authenticates against /api/admin/verify-password. The literal must
-// never be inlined here.
-const getAdminPassword = (): string =>
+// Read from sessionStorage on every call so we always pick up whatever
+// PasswordProtect wrote after the user signed in — never a stale empty
+// string captured at module load. The literal is never embedded in source.
+const adminPassword = (): string =>
   (typeof window !== "undefined" && sessionStorage.getItem("admin-password")) || "";
-const adminPassword = getAdminPassword();
 
 function CoachApprovalContent() {
   const { toast } = useToast();
@@ -109,8 +108,8 @@ function CoachUsersSection() {
     queryKey: ["/api/admin/coach-users", filter],
     queryFn: async () => {
       const url = filter === "pending"
-        ? `/api/admin/coach-users?status=pending&password=${adminPassword}`
-        : `/api/admin/coach-users?password=${adminPassword}`;
+        ? `/api/admin/coach-users?status=pending&password=${adminPassword()}`
+        : `/api/admin/coach-users?password=${adminPassword()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -120,7 +119,7 @@ function CoachUsersSection() {
   const { data: venuePrefsMap = {} } = useQuery<Record<string, string[]>>({
     queryKey: ["/api/admin/coach-venue-preferences"],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/coach-venue-preferences?password=${adminPassword}`);
+      const res = await fetch(`/api/admin/coach-venue-preferences?password=${adminPassword()}`);
       if (!res.ok) return {};
       return res.json();
     },
@@ -129,7 +128,7 @@ function CoachUsersSection() {
   const { data: fillRateData, isLoading: fillRateLoading } = useQuery<{ coaches: CoachFillRate[]; summary: { total: number; filledAvailability: number; filledVenuePrefs: number; linkedLine: number } }>({
     queryKey: ["/api/admin/coach-fillrate"],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/coach-fillrate?password=${adminPassword}`);
+      const res = await fetch(`/api/admin/coach-fillrate?password=${adminPassword()}`);
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -140,7 +139,7 @@ function CoachUsersSection() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/send-fill-reminder", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -159,7 +158,7 @@ function CoachUsersSection() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await fetch(`/api/admin/coach-users/${id}/status`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -174,7 +173,7 @@ function CoachUsersSection() {
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const res = await fetch(`/api/admin/coach-users/${id}/name`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ name }),
       });
       if (!res.ok) throw new Error("更新失敗");
@@ -190,7 +189,7 @@ function CoachUsersSection() {
     mutationFn: async ({ coachUserId, lineId }: { coachUserId: string; lineId: string }) => {
       const res = await fetch(`/api/admin/set-coach-line-id`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ coachUserId, lineId }),
       });
       const data = await res.json();
@@ -211,7 +210,7 @@ function CoachUsersSection() {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/clear-coach-line-id/${id}`, {
         method: "DELETE",
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       if (!res.ok) throw new Error("清除失敗");
       return res.json();
@@ -225,7 +224,7 @@ function CoachUsersSection() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/ragic-sync", {
         method: "POST",
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "同步失敗");
@@ -626,7 +625,7 @@ function CoachRulesSection() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/settings/coach-rules", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -693,7 +692,7 @@ function RagicSyncSection() {
     queryKey: ["/api/admin/ragic-status"],
     queryFn: async () => {
       const res = await fetch("/api/admin/ragic-status", {
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -705,7 +704,7 @@ function RagicSyncSection() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/ragic-sync", {
         method: "POST",
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -834,7 +833,7 @@ function VenueInfoSection() {
     mutationFn: async () => {
       const res = await fetch("/api/admin/venues", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ name: newVenueName.trim(), color: newVenueColor }),
       });
       if (!res.ok) {
@@ -855,7 +854,7 @@ function VenueInfoSection() {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/venues/${id}`, {
         method: "DELETE",
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
@@ -1053,7 +1052,7 @@ function VenueInfoEditor({
     mutationFn: async () => {
       const res = await fetch(`/api/admin/venue-infos/${encodeURIComponent(venueName)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ videoUrl, description, mapUrl }),
       });
       if (!res.ok) throw new Error("Failed");
@@ -1159,7 +1158,7 @@ function NotificationSection() {
     queryKey: [notifyLogsKey],
     queryFn: async () => {
       const res = await fetch(`/api/admin/notify-logs?date=${selectedDate}`, {
-        headers: { "x-admin-password": adminPassword },
+        headers: { "x-admin-password": adminPassword() },
       });
       if (!res.ok) return [];
       return res.json();
@@ -1245,7 +1244,7 @@ function NotificationSection() {
     mutationFn: async (coachNames: string[]) => {
       const res = await fetch("/api/admin/send-notify-individual", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
         body: JSON.stringify({ coachNames, date: selectedDate }),
       });
       if (!res.ok) throw new Error((await res.json()).message || "發送失敗");
@@ -1267,7 +1266,7 @@ function NotificationSection() {
     try {
       const res = await fetch("/api/admin/send-weekly-notifications", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword },
+        headers: { "Content-Type": "application/json", "x-admin-password": adminPassword() },
       });
       const data = await res.json();
       setWeeklyResult(res.ok ? "推播已成功發送！" : `失敗：${data.message || "未知錯誤"}`);

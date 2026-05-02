@@ -151,7 +151,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Password Protection
 - **Admin Functions**: Course schedule editing and statistics require password authentication
-- **Password**: stored in env var `ADMIN_PASSWORD` (shared environment); production refuses to start without it. The frontend still reads `dream0935314711` from sessionStorage as the user-facing default; all server-side validation now goes through `requireAdminPassword`.
+- **Password**: stored in env var `ADMIN_PASSWORD` (Replit Secret); production refuses to start without it. In development a `dev-admin` fallback is used. The frontend never holds the literal: `PasswordProtect` POSTs the typed password to `/api/admin/verify-password` and stores it in sessionStorage only on success; all server-side validation flows through `requireAdminPassword`.
 - **Admin URL Prefix**: `/mgt-x9k7p2/` (complex prefix to prevent URL guessing)
   - Schedule: `/mgt-x9k7p2/schedule`
   - Class Edit (Phase 1): `/mgt-x9k7p2/class-edit`
