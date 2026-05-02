@@ -6,6 +6,12 @@ import { coachAvailability, coachVenuePreferences } from "@shared/schema";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
 
 export function registerCoachAdminRoutes(app: Express): void {
+  // Used by the client password screen to validate the typed password
+  // against the server-side ADMIN_PASSWORD without leaking the literal.
+  app.post("/api/admin/verify-password", requireAdminPassword, (_req, res) => {
+    res.json({ ok: true });
+  });
+
   app.get(
     "/api/admin/coach-users",
     requireAdminPassword,

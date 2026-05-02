@@ -7,44 +7,60 @@ import { useLocation } from "wouter";
 
 interface PasswordProtectProps {
   children: React.ReactNode;
-  requiredPassword?: string;
 }
 
-export default function PasswordProtect({ children, requiredPassword = "dream0935314711" }: PasswordProtectProps) {
+export default function PasswordProtect({ children }: PasswordProtectProps) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("admin_authorized");
-    if (stored === "true") {
+    if (sessionStorage.getItem("admin_authorized") === "true") {
       setIsAuthorized(true);
-      if (!sessionStorage.getItem("admin-password")) {
-        sessionStorage.setItem("admin-password", requiredPassword);
-      }
     }
     setIsLoading(false);
-  }, [requiredPassword]);
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === requiredPassword) {
-      setIsAuthorized(true);
-      sessionStorage.setItem("admin_authorized", "true");
-      sessionStorage.setItem("admin-password", password);
-      toast({
-        title: "驗證成功",
-        description: "歡迎使用管理功能",
+    if (!password) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({}),
       });
-    } else {
+      if (res.ok) {
+        setIsAuthorized(true);
+        sessionStorage.setItem("admin_authorized", "true");
+        sessionStorage.setItem("admin-password", password);
+        toast({
+          title: "驗證成功",
+          description: "歡迎使用管理功能",
+        });
+      } else {
+        toast({
+          title: "密碼錯誤",
+          description: "請輸入正確的管理密碼",
+          variant: "destructive",
+        });
+        setPassword("");
+      }
+    } catch {
       toast({
-        title: "密碼錯誤",
-        description: "請輸入正確的管理密碼",
+        title: "連線失敗",
+        description: "無法連到伺服器，請稍後再試",
         variant: "destructive",
       });
-      setPassword("");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -75,14 +91,15 @@ export default function PasswordProtect({ children, requiredPassword = "dream093
                 />
               </div>
               <div className="space-y-2">
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full"
+                  disabled={submitting}
                   data-testid="button-submit"
                 >
-                  驗證
+                  {submitting ? "驗證中…" : "驗證"}
                 </Button>
-                <Button 
+                <Button
                   type="button"
                   variant="outline"
                   className="w-full"

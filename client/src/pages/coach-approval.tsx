@@ -24,7 +24,12 @@ import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
 import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 
-const adminPassword = "dream0935314711";
+// The actual password is held in sessionStorage by PasswordProtect after the
+// user authenticates against /api/admin/verify-password. The literal must
+// never be inlined here.
+const getAdminPassword = (): string =>
+  (typeof window !== "undefined" && sessionStorage.getItem("admin-password")) || "";
+const adminPassword = getAdminPassword();
 
 function CoachApprovalContent() {
   const { toast } = useToast();
