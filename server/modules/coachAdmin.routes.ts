@@ -1,8 +1,5 @@
 import type { Express } from "express";
-import { eq } from "drizzle-orm";
 import { storage } from "../storage";
-import { db } from "../db";
-import { coachAvailability, coachVenuePreferences } from "@shared/schema";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
 
 export function registerCoachAdminRoutes(app: Express): void {
@@ -101,21 +98,15 @@ export function registerCoachAdminRoutes(app: Express): void {
         const coachDataList = await Promise.all(
           approved.map(async (coach) => {
             const coachName = coach.linkedCoachName || coach.name;
-            const avail = await db
-              .select({ id: coachAvailability.id })
-              .from(coachAvailability)
-              .where(eq(coachAvailability.coachName, coachName));
-            const prefs = await db
-              .select({ id: coachVenuePreferences.id })
-              .from(coachVenuePreferences)
-              .where(eq(coachVenuePreferences.coachName, coachName));
+            const { availabilitySlots, venuePrefsCount } =
+              await storage.getCoachFillStatus(coachName);
             return {
               name: coachName,
               lineId: coach.lineId || null,
-              hasAvailability: avail.length > 0,
-              availabilitySlots: avail.length,
-              hasVenuePrefs: prefs.length > 0,
-              venuePrefsCount: prefs.length,
+              hasAvailability: availabilitySlots > 0,
+              availabilitySlots,
+              hasVenuePrefs: venuePrefsCount > 0,
+              venuePrefsCount,
             };
           })
         );

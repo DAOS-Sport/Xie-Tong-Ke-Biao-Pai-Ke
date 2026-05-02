@@ -1,12 +1,6 @@
 import type { Express } from "express";
-import { eq } from "drizzle-orm";
 import { storage } from "../storage";
-import { db } from "../db";
-import {
-  coachAvailability,
-  coachVenuePreferences,
-  insertCoachRegistrationSchema,
-} from "@shared/schema";
+import { insertCoachRegistrationSchema } from "@shared/schema";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
 
 export function registerCoachRoutes(app: Express): void {

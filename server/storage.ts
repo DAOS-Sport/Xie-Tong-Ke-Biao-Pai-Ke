@@ -26,6 +26,8 @@ import {
   type VenueInfo,
   type CoachAvailability,
   type CoachVenuePreference,
+  type LineNotifyLog,
+  type InsertLineNotifyLog,
 } from "@shared/schema";
 
 import { VenueRepository } from "./repositories/venue.repository";
@@ -35,6 +37,7 @@ import {
 } from "./repositories/schedule.repository";
 import { CoachRepository } from "./repositories/coach.repository";
 import { SettingsRepository } from "./repositories/settings.repository";
+import { NotifyRepository } from "./repositories/notify.repository";
 
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
@@ -182,6 +185,13 @@ export interface IStorage {
     coachName: string,
     venueNames: string[]
   ): Promise<void>;
+  getCoachFillStatus(
+    coachName: string
+  ): Promise<{ availabilitySlots: number; venuePrefsCount: number }>;
+
+  // LINE notify logs
+  getNotifyLogsByDate(date: string): Promise<LineNotifyLog[]>;
+  insertNotifyLog(log: InsertLineNotifyLog): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -189,6 +199,7 @@ export class DatabaseStorage implements IStorage {
   private readonly scheduleRepo = new ScheduleRepository();
   private readonly coachRepo = new CoachRepository();
   private readonly settingsRepo = new SettingsRepository();
+  private readonly notifyRepo = new NotifyRepository();
 
   // ── Users (auth) ──────────────────────────────────────────────
   getUser = (id: string) => this.settingsRepo.getUser(id);
@@ -293,6 +304,14 @@ export class DatabaseStorage implements IStorage {
     this.coachRepo.getAllCoachVenuePreferences();
   setCoachVenuePreferences = (coachName: string, venueNames: string[]) =>
     this.coachRepo.setCoachVenuePreferences(coachName, venueNames);
+  getCoachFillStatus = (coachName: string) =>
+    this.coachRepo.getCoachFillStatus(coachName);
+
+  // ── LINE notify logs ─────────────────────────────────────────
+  getNotifyLogsByDate = (date: string) =>
+    this.notifyRepo.getNotifyLogsByDate(date);
+  insertNotifyLog = (log: InsertLineNotifyLog) =>
+    this.notifyRepo.insertNotifyLog(log);
 
   // ── System settings ──────────────────────────────────────────
   getSetting = (key: string) => this.settingsRepo.getSetting(key);

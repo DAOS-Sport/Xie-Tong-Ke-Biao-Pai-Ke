@@ -8,15 +8,8 @@ import { notifyScheduleUnlocked } from "../line-notify";
 type ScheduleUpdate = Parameters<typeof storage.updateSchedule>[1];
 
 export function registerScheduleRoutes(app: Express): void {
-  app.get("/api/schedules/:date", async (req, res) => {
-    try {
-      const { date } = req.params;
-      const schedules = await storage.getSchedulesByDate(date);
-      res.json(schedules);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch schedules" });
-    }
-  });
+  // ── Static `/api/schedules/...` routes FIRST so Express does not match
+  //    them against the `/:date` parameter route below.
 
   app.get("/api/schedules", async (req, res) => {
     try {
@@ -43,37 +36,26 @@ export function registerScheduleRoutes(app: Express): void {
     }
   });
 
-  app.put("/api/schedules/:id", async (req, res) => {
+  app.get("/api/schedules/lock-status", async (req, res) => {
     try {
-      const { className, coachName } = req.body;
-      const schedule = await storage.updateSchedule(req.params.id, {
-        className,
-        coachName,
-      });
-      res.json(schedule);
+      const { venueId, startDate, endDate } = req.query as {
+        venueId: string;
+        startDate: string;
+        endDate: string;
+      };
+      if (!venueId || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing parameters" });
+      }
+      const locked = await storage.getScheduleLockStatus(
+        venueId,
+        startDate,
+        endDate
+      );
+      res.json({ isLocked: locked });
     } catch (error) {
-      res.status(500).json({ message: "Failed to update schedule" });
+      res.status(500).json({ message: "Failed to check lock status" });
     }
   });
-
-  app.delete(
-    "/api/schedules/:id",
-    requireAdminPassword,
-    async (req, res) => {
-      try {
-        const existing = await storage.getScheduleById(req.params.id);
-        if (existing?.isClassLocked) {
-          return res
-            .status(409)
-            .json({ message: "課表已鎖定，請先解鎖該週才能刪除" });
-        }
-        await storage.deleteSchedule(req.params.id);
-        res.json({ success: true });
-      } catch (error) {
-        res.status(500).json({ message: "Failed to delete schedule" });
-      }
-    }
-  );
 
   app.post(
     "/api/schedules/copy-week",
@@ -179,27 +161,6 @@ export function registerScheduleRoutes(app: Express): void {
     }
   );
 
-  app.get("/api/schedules/lock-status", async (req, res) => {
-    try {
-      const { venueId, startDate, endDate } = req.query as {
-        venueId: string;
-        startDate: string;
-        endDate: string;
-      };
-      if (!venueId || !startDate || !endDate) {
-        return res.status(400).json({ message: "Missing parameters" });
-      }
-      const locked = await storage.getScheduleLockStatus(
-        venueId,
-        startDate,
-        endDate
-      );
-      res.json({ isLocked: locked });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to check lock status" });
-    }
-  });
-
   app.put(
     "/api/schedules/:id/assign-coach",
     requireAdminPassword,
@@ -240,6 +201,19 @@ export function registerScheduleRoutes(app: Express): void {
     }
   );
 
+  app.put("/api/schedules/:id", async (req, res) => {
+    try {
+      const { className, coachName } = req.body;
+      const schedule = await storage.updateSchedule(req.params.id, {
+        className,
+        coachName,
+      });
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update schedule" });
+    }
+  });
+
   app.patch(
     "/api/schedules/:id",
     requireAdminPassword,
@@ -277,6 +251,37 @@ export function registerScheduleRoutes(app: Express): void {
       }
     }
   );
+
+  app.delete(
+    "/api/schedules/:id",
+    requireAdminPassword,
+    async (req, res) => {
+      try {
+        const existing = await storage.getScheduleById(req.params.id);
+        if (existing?.isClassLocked) {
+          return res
+            .status(409)
+            .json({ message: "課表已鎖定，請先解鎖該週才能刪除" });
+        }
+        await storage.deleteSchedule(req.params.id);
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ message: "Failed to delete schedule" });
+      }
+    }
+  );
+
+  // `/:date` MUST come last so Express tries every static path above first.
+  // (Schedule date strings collide with names like "lock-status" otherwise.)
+  app.get("/api/schedules/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      const schedules = await storage.getSchedulesByDate(date);
+      res.json(schedules);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch schedules" });
+    }
+  });
 
   // Conflicts
   app.get("/api/conflicts/:date", async (req, res) => {

@@ -225,4 +225,26 @@ export class CoachRepository {
       );
     }
   }
+
+  /**
+   * Returns availability-slot count and venue-preference count for one
+   * coach. Used by both the admin fill-rate dashboard and the coach-portal
+   * fill-status badge so the SQL lives in one place.
+   */
+  async getCoachFillStatus(
+    coachName: string
+  ): Promise<{ availabilitySlots: number; venuePrefsCount: number }> {
+    const [availRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(coachAvailability)
+      .where(eq(coachAvailability.coachName, coachName));
+    const [prefsRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(coachVenuePreferences)
+      .where(eq(coachVenuePreferences.coachName, coachName));
+    return {
+      availabilitySlots: availRow?.count ?? 0,
+      venuePrefsCount: prefsRow?.count ?? 0,
+    };
+  }
 }

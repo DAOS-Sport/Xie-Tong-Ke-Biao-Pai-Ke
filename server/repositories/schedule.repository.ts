@@ -5,7 +5,7 @@
  * and derived statistics/conflict queries. The IStorage façade in
  * `server/storage.ts` delegates its schedule-shaped methods here.
  */
-import { and, between, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, between, eq, like, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   schedules,
@@ -467,6 +467,3 @@ export class ScheduleRepository {
     return result.every((s) => s.isClassLocked);
   }
 }
-
-// re-export desc to keep tree-shaking happy and avoid unused import warnings
-export { desc };

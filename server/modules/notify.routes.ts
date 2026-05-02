@@ -1,9 +1,6 @@
 import type { Express } from "express";
-import { eq } from "drizzle-orm";
 import { format } from "date-fns";
 import { storage } from "../storage";
-import { db } from "../db";
-import { lineNotifyLogs } from "@shared/schema";
 import {
   sendWeeklyScheduleNotifications,
   sendDailyTomorrowNotifications,
@@ -34,10 +31,7 @@ export function registerNotifyRoutes(app: Express): void {
       const date = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       try {
         const daySchedules = await storage.getSchedulesByDateRange(date, date);
-        const logs = await db
-          .select()
-          .from(lineNotifyLogs)
-          .where(eq(lineNotifyLogs.scheduleDate, date));
+        const logs = await storage.getNotifyLogsByDate(date);
 
         const logMap = new Map<string, (typeof logs)[number]>();
         for (const log of logs) {
@@ -175,9 +169,8 @@ export function registerNotifyRoutes(app: Express): void {
           if (pushRes.ok) {
             sentCount++;
             results.push({ coachName, success: true });
-            await db
-              .insert(lineNotifyLogs)
-              .values({
+            await storage
+              .insertNotifyLog({
                 coachName,
                 lineId: coach.lineId,
                 content: message,

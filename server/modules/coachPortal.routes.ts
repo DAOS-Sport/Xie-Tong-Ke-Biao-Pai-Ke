@@ -1,8 +1,5 @@
 import type { Express } from "express";
-import { eq } from "drizzle-orm";
 import { storage } from "../storage";
-import { db } from "../db";
-import { coachAvailability, coachVenuePreferences } from "@shared/schema";
 import { lineLoginTokens } from "./auth.routes";
 import { env } from "../config/env";
 
@@ -337,19 +334,11 @@ export function registerCoachPortalRoutes(app: Express): void {
       const { coachName } = req.query as { coachName: string };
       if (!coachName)
         return res.status(400).json({ message: "Missing coachName" });
-      const avail = await db
-        .select({ id: coachAvailability.id })
-        .from(coachAvailability)
-        .where(eq(coachAvailability.coachName, coachName))
-        .limit(1);
-      const prefs = await db
-        .select({ id: coachVenuePreferences.id })
-        .from(coachVenuePreferences)
-        .where(eq(coachVenuePreferences.coachName, coachName))
-        .limit(1);
+      const { availabilitySlots, venuePrefsCount } =
+        await storage.getCoachFillStatus(coachName);
       res.json({
-        hasAvailability: avail.length > 0,
-        hasVenuePrefs: prefs.length > 0,
+        hasAvailability: availabilitySlots > 0,
+        hasVenuePrefs: venuePrefsCount > 0,
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch fill status" });
