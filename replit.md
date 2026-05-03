@@ -85,3 +85,4 @@ Preferred communication style: Simple, everyday language.
 ## Development & Deployment
 -   **Environment**: Replit hosting platform
 -   **Code Quality**: TypeScript strict mode
+-   **Dependency Hygiene (Task #31)**: Removed 10 unused packages (`@hookform/resolvers`, `google-auth-library`, `memorystore`, `passport-local`, `react-icons`, `sql`, `tw-animate-css`, `zod-validation-error`, `@jridgewell/trace-mapping`, `@types/passport-local`). `npm audit fix` (non-breaking) applied; remaining advisories: `xlsx` (no upstream fix — kept because `coach-approval.tsx` exports coach lists via SheetJS; mitigation: input is internal admin data only) and `uuid`/`gaxios` transitive via `@google-cloud/storage` (would require breaking downgrade — deferred). `npx update-browserslist-db@latest` run.
