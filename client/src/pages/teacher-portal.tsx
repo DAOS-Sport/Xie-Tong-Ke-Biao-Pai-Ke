@@ -17,8 +17,29 @@ import { zhTW } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, RotateCcw, Users, User } from 'lucide-react';
 import type { Schedule, Teacher, TeacherFeedback, TimeSlot, Venue } from '@shared/schema';
 
+// Read TEACHER_PORTAL_TOKEN from URL once and persist for the session.
+// In production this token is required by /api/:schoolCode/feedbacks; admins
+// distribute the URL with `?token=...` to teachers.
+function useTeacherPortalToken() {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const t = url.searchParams.get('token');
+    if (t) {
+      sessionStorage.setItem('teacher_portal_token', t);
+      url.searchParams.delete('token');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
+  }, []);
+}
+
+function teacherPortalHeaders(): Record<string, string> {
+  const t = sessionStorage.getItem('teacher_portal_token');
+  return t ? { 'x-teacher-portal-token': t } : {};
+}
+
 // 使用者前台：老師協作回覆系統（新北高中）
 export default function TeacherPortal() {
+  useTeacherPortalToken();
   // 固定連接新北高中資料
   const schoolCode = 'demo';
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
@@ -89,7 +110,9 @@ export default function TeacherPortal() {
   const { data: allFeedbacks = [] } = useQuery<any[]>({
     queryKey: [`/api/${schoolCode}/feedbacks`, 'all'],
     queryFn: async () => {
-      const response = await fetch(`/api/${schoolCode}/feedbacks`);
+      const response = await fetch(`/api/${schoolCode}/feedbacks`, {
+        headers: teacherPortalHeaders(),
+      });
       return response.json();
     },
   });
@@ -119,9 +142,10 @@ export default function TeacherPortal() {
           
           const response = await fetch(`/api/${schoolCode}/feedbacks`, {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest' // 標識AJAX請求
+              'X-Requested-With': 'XMLHttpRequest', // 標識AJAX請求
+              ...teacherPortalHeaders(),
             },
             body: JSON.stringify(data),
             signal: controller.signal,

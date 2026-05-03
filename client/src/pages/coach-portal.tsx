@@ -28,6 +28,7 @@ function useLineLoginParams() {
     lineLogin?: string;
     userId?: string;
     token?: string;
+    coachToken?: string;
     error?: string;
   }>({});
 
@@ -36,6 +37,7 @@ function useLineLoginParams() {
     const lineLogin = url.searchParams.get("lineLogin");
     const userId = url.searchParams.get("userId");
     const token = url.searchParams.get("token");
+    const coachToken = url.searchParams.get("coachToken");
     const error = url.searchParams.get("error");
 
     if (lineLogin || error) {
@@ -43,6 +45,7 @@ function useLineLoginParams() {
         lineLogin: lineLogin || undefined,
         userId: userId || undefined,
         token: token || undefined,
+        coachToken: coachToken || undefined,
         error: error || undefined,
       });
       window.history.replaceState({}, "", "/coach-portal");
@@ -50,6 +53,15 @@ function useLineLoginParams() {
   }, []);
 
   return params;
+}
+
+// Helper: persist the user id + coach session token (returned by login /
+// linking endpoints) and hand the user back to the caller.
+function persistCoachLogin(user: CoachUser & { coachToken?: string }): void {
+  sessionStorage.setItem("coach_portal_id", user.id);
+  if (user.coachToken) {
+    sessionStorage.setItem("coach_portal_token", user.coachToken);
+  }
 }
 
 export default function CoachPortal() {
@@ -72,6 +84,9 @@ export default function CoachPortal() {
     if (lineParams.lineLogin === "existing" && lineParams.userId) {
       setSessionId(lineParams.userId);
       sessionStorage.setItem("coach_portal_id", lineParams.userId);
+      if (lineParams.coachToken) {
+        sessionStorage.setItem("coach_portal_token", lineParams.coachToken);
+      }
     }
   }, [lineParams]);
 
@@ -79,7 +94,16 @@ export default function CoachPortal() {
     queryKey: ["/api/coach-portal/me", sessionId],
     queryFn: async () => {
       if (!sessionId) throw new Error("No session");
-      const res = await fetch(`/api/coach-portal/me/${sessionId}`);
+      const coachToken = sessionStorage.getItem("coach_portal_token") || "";
+      const res = await fetch(`/api/coach-portal/me/${sessionId}`, {
+        headers: coachToken ? { "x-coach-token": coachToken } : {},
+      });
+      if (res.status === 403 || res.status === 401) {
+        // Session expired or never had a token — kick back to login.
+        sessionStorage.removeItem("coach_portal_id");
+        sessionStorage.removeItem("coach_portal_token");
+        throw new Error("Session expired");
+      }
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
@@ -95,6 +119,7 @@ export default function CoachPortal() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("coach_portal_id");
+    sessionStorage.removeItem("coach_portal_token");
     setSessionId(null);
     setCoachUser(null);
   };
@@ -117,7 +142,7 @@ export default function CoachPortal() {
         onSuccess={(user) => {
           setCoachUser(user);
           setSessionId(user.id);
-          sessionStorage.setItem("coach_portal_id", user.id);
+          persistCoachLogin(user);
         }}
       />
     );
@@ -137,7 +162,7 @@ export default function CoachPortal() {
     return <CoachSelectScreen onSuccess={(user) => {
       setCoachUser(user);
       setSessionId(user.id);
-      sessionStorage.setItem("coach_portal_id", user.id);
+      persistCoachLogin(user);
     }} lineError={lineParams.error} />;
   }
 

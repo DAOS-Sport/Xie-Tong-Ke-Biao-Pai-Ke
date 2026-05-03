@@ -2,6 +2,12 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { lineLoginTokens } from "./auth.routes";
 import { env } from "../config/env";
+import {
+  issueCoachSessionToken,
+  readCoachSessionToken,
+  verifyCoachSessionFor,
+} from "../shared/auth/coachPortalSession";
+import { verifyAdminPassword } from "../shared/auth/adminPassword";
 
 const CHEN_BO_RONG_LINE_ID = "U8fd0e4be4e44a1304f9fa2e9855f4559";
 
@@ -45,7 +51,8 @@ export function registerCoachPortalRoutes(app: Express): void {
         return res.status(404).json({ message: "找不到教練帳號" });
       }
       lineLoginTokens.delete(lineToken);
-      res.json(updated);
+      const coachToken = issueCoachSessionToken(updated.id, tokenData.lineId);
+      res.json({ ...updated, coachToken });
     } catch (error) {
       console.error("Error linking LINE to coach:", error);
       res.status(500).json({ message: "連結失敗" });
@@ -72,7 +79,11 @@ export function registerCoachPortalRoutes(app: Express): void {
       );
       if (existingByLine) {
         lineLoginTokens.delete(lineToken);
-        return res.json(existingByLine);
+        const coachToken = issueCoachSessionToken(
+          existingByLine.id,
+          tokenData.lineId
+        );
+        return res.json({ ...existingByLine, coachToken });
       }
 
       const allCoaches = await storage.getAllCoachUsers();
@@ -86,7 +97,11 @@ export function registerCoachPortalRoutes(app: Express): void {
           tokenData.lineId
         );
         lineLoginTokens.delete(lineToken);
-        return res.json(updated);
+        if (!updated) {
+          return res.status(404).json({ message: "找不到教練帳號" });
+        }
+        const coachToken = issueCoachSessionToken(updated.id, tokenData.lineId);
+        return res.json({ ...updated, coachToken });
       }
 
       // Not found in DB → notify 陳柏榮 via LINE push
@@ -144,7 +159,11 @@ export function registerCoachPortalRoutes(app: Express): void {
       const existingUser = await storage.getCoachUserByLineId(tokenData.lineId);
       if (existingUser) {
         lineLoginTokens.delete(lineToken);
-        return res.json(existingUser);
+        const coachToken = issueCoachSessionToken(
+          existingUser.id,
+          tokenData.lineId
+        );
+        return res.json({ ...existingUser, coachToken });
       }
 
       const coachUser = await storage.createCoachUser({
@@ -158,16 +177,32 @@ export function registerCoachPortalRoutes(app: Express): void {
       });
 
       lineLoginTokens.delete(lineToken);
-      res.json(coachUser);
+      const coachToken = issueCoachSessionToken(coachUser.id, tokenData.lineId);
+      res.json({ ...coachUser, coachToken });
     } catch (error) {
       console.error("Error registering coach user:", error);
       res.status(500).json({ message: "註冊失敗" });
     }
   });
 
+  // PII-bearing endpoint: gated by either a coach-portal session token bound
+  // to this identifier, or admin password. Returns 403 with a clear marker so
+  // the frontend can distinguish "session expired" from "user not found".
   app.get("/api/coach-portal/me/:identifier", async (req, res) => {
     try {
       const { identifier } = req.params;
+
+      const isAdmin = verifyAdminPassword(req);
+      if (!isAdmin) {
+        const token = readCoachSessionToken(req);
+        const session = verifyCoachSessionFor(token, identifier);
+        if (!session) {
+          return res
+            .status(403)
+            .json({ message: "請重新登入", code: "session_expired" });
+        }
+      }
+
       let user = await storage.getCoachUserByLineId(identifier);
       if (!user) {
         user = await storage.getCoachUserById(identifier);

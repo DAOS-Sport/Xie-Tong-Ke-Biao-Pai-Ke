@@ -7,6 +7,7 @@ import {
 import * as schoolRepo from "./school.repo";
 import { env } from "../config/env";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
+import { requireTeacherPortalAuth } from "../shared/auth/teacherPortal";
 
 /**
  * Defence-in-depth: schoolCode must pass BOTH the regex (no SQL-unsafe chars)
@@ -111,7 +112,7 @@ export function registerSchoolRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/:schoolCode/feedbacks", validateSchoolCode, async (req, res) => {
+  app.get("/api/:schoolCode/feedbacks", validateSchoolCode, requireTeacherPortalAuth, async (req, res) => {
     try {
       const { teacher, scheduleId } = req.query as {
         teacher?: string;
@@ -128,7 +129,7 @@ export function registerSchoolRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/:schoolCode/feedbacks", validateSchoolCode, async (req, res) => {
+  app.post("/api/:schoolCode/feedbacks", validateSchoolCode, requireTeacherPortalAuth, async (req, res) => {
     const isDeployment = env.isDeployment;
     const { schoolCode } = req.params;
 

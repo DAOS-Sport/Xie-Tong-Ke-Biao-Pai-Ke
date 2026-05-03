@@ -51,9 +51,11 @@ Preferred communication style: Simple, everyday language.
 -   **Weekly LINE Push (pg-boss queue)** — Task #23: Stabilized weekly push pipeline backed by pg-boss with run/recipient persistence (`weeklyPushRuns`, `weeklyPushRecipients`), Healthchecks.io watchdog, CSV reports persisted to Replit Object Storage at `${PRIVATE_OBJECT_DIR}/weekly-push-reports/<runId>.csv` (Task #27 — `report_path` stored as `objstore://...` URI; legacy `/tmp` paths still readable as a transition fallback; 90-day retention policy, cleanup is a manual/follow-up job), dry-run mode, idempotency on (pushType, week) for `queued|running|success`, and pg-boss native retries (`retryLimit:3, retryDelay:60, backoff`) for transient LINE failures. 5 admin endpoints under `/api/admin/weekly-push/*` all gated by `requireAdminPassword`. Three feature flags (`ENABLE_WEEKLY_PUSH_QUEUE`, `ENABLE_WEEKLY_PUSH_WORKER`, default OFF). Production cron only registers when `HEALTHCHECKS_WEEKLY_PUSH_URL` and `LINE_IT_GROUP_ID` are set; dev never auto-pushes. Legacy weekly node-cron is suppressed when the queue is enabled; daily 19:00 cron unchanged. Smoke: `npx tsx scripts/smoke-weekly-push.ts`.
 
 ## Security & Access Control
--   **Password Protection**: Admin functions are protected by an `ADMIN_PASSWORD` environment variable, with sensitive operations accessed via complex, password-protected URLs.
+-   **Password Protection**: Admin functions are protected by an `ADMIN_PASSWORD` environment variable, with sensitive operations accessed via complex, password-protected URLs. `apiRequest` / `getQueryFn` in `client/src/lib/queryClient.ts` auto-inject `x-admin-password` from `sessionStorage("admin-password")`.
 -   **Session Management**: Authorization stored in browser `sessionStorage`.
 -   **Default Access**: Coach portal is the public default landing page.
+-   **Coach Portal Session Tokens (Task #30)**: `/api/coach-portal/me/:identifier` is gated by a 30-day in-memory session token (`server/shared/auth/coachPortalSession.ts`) issued on successful LINE OAuth / link / register; sent as `x-coach-token` header. 403 with `code:"session_expired"` triggers frontend re-login.
+-   **Teacher Portal Token (Task #30)**: `/api/:schoolCode/feedbacks` (GET+POST) gated by `requireTeacherPortalAuth` — accepts admin password OR `TEACHER_PORTAL_TOKEN` env var (header `x-teacher-portal-token` or `?token=`). Dev: warn-and-pass when unset. Prod deployment: 503 if unset. Teachers receive tokenized URLs from admins.
 
 # External Dependencies
 

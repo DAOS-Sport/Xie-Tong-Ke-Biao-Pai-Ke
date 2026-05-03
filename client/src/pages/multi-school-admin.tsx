@@ -74,7 +74,10 @@ export default function MultiSchoolAdmin() {
   const { data: feedbacks = [] } = useQuery<any[]>({
     queryKey: [`/api/${selectedSchool}/feedbacks`, 'all'],
     queryFn: async () => {
-      const response = await fetch(`/api/${selectedSchool}/feedbacks`);
+      const adminPassword = (typeof window !== 'undefined' && sessionStorage.getItem('admin-password')) || '';
+      const response = await fetch(`/api/${selectedSchool}/feedbacks`, {
+        headers: adminPassword ? { 'x-admin-password': adminPassword } : {},
+      });
       if (!response.ok) {
         console.warn('獲取回覆狀態失敗:', response.status);
         return [];

@@ -201,18 +201,22 @@ export function registerScheduleRoutes(app: Express): void {
     }
   );
 
-  app.put("/api/schedules/:id", async (req, res) => {
-    try {
-      const { className, coachName } = req.body;
-      const schedule = await storage.updateSchedule(req.params.id, {
-        className,
-        coachName,
-      });
-      res.json(schedule);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update schedule" });
+  app.put(
+    "/api/schedules/:id",
+    requireAdminPassword,
+    async (req, res) => {
+      try {
+        const { className, coachName } = req.body;
+        const schedule = await storage.updateSchedule(req.params.id, {
+          className,
+          coachName,
+        });
+        res.json(schedule);
+      } catch (error) {
+        res.status(500).json({ message: "Failed to update schedule" });
+      }
     }
-  });
+  );
 
   app.patch(
     "/api/schedules/:id",

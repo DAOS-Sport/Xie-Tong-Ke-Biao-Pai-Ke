@@ -2,6 +2,7 @@ import type { Express, Request } from "express";
 import { storage } from "../storage";
 import { isAuthenticated } from "../replitAuth";
 import { env } from "../config/env";
+import { issueCoachSessionToken } from "../shared/auth/coachPortalSession";
 
 const LINE_AUTH_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
@@ -149,8 +150,14 @@ export function registerAuthRoutes(app: Express): void {
 
       const existingUser = await storage.getCoachUserByLineId(profile.userId);
       if (existingUser) {
+        // Issue a coach-portal session token bound to this user so subsequent
+        // calls to /api/coach-portal/me/:identifier can prove ownership.
+        const coachToken = issueCoachSessionToken(
+          existingUser.id,
+          profile.userId
+        );
         return res.redirect(
-          `/coach-portal?lineLogin=existing&userId=${existingUser.id}`
+          `/coach-portal?lineLogin=existing&userId=${existingUser.id}&coachToken=${coachToken}`
         );
       }
 

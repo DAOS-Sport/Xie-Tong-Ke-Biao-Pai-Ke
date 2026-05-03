@@ -7,14 +7,30 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Pulls the admin password out of sessionStorage, set by PasswordProtect
+ * after a successful /api/admin/verify-password handshake. We attach it on
+ * every request so admin-only endpoints (DELETE/PATCH/PUT on schedules etc.)
+ * accept calls made via apiRequest without each caller threading the header
+ * by hand.
+ */
+function getAdminAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const password = sessionStorage.getItem("admin-password");
+  return password ? { "x-admin-password": password } : {};
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = { ...getAdminAuthHeaders() };
+  if (data) headers["Content-Type"] = "application/json";
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -31,6 +47,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: getAdminAuthHeaders(),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

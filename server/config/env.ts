@@ -70,6 +70,9 @@ export const env = {
   // that doesn't exist yet. Add it back when a second format is implemented.
   weeklyPushCron: optional("WEEKLY_PUSH_CRON", "0 19 * * 0"),
   weeklyPushTimezone: optional("WEEKLY_PUSH_TIMEZONE", "Asia/Taipei"),
+  // Shared secret protecting the teacher portal feedback endpoints. Optional
+  // in dev (warns on first request); required in production deployments.
+  teacherPortalToken: process.env.TEACHER_PORTAL_TOKEN || null,
 };
 
 export type AppEnv = typeof env;
