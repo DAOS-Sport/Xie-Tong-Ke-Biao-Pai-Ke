@@ -28,32 +28,79 @@ interface RagicRecord {
   [key: string]: any;
 }
 
-async function fetchRagicRecords(apiUrl: string, limit = 500): Promise<RagicRecord[]> {
+/**
+ * Returns true when an error from Drizzle/Neon indicates a PostgreSQL
+ * unique-constraint violation (code 23505), regardless of how deeply the
+ * driver has nested the original PG error.
+ */
+function isUniqueViolation(err: any): boolean {
+  if (!err) return false;
+  // Direct PG code (node-postgres / some Drizzle paths)
+  if (err.code === "23505") return true;
+  // Neon serverless driver wraps the PG error under .cause
+  if (err.cause?.code === "23505") return true;
+  // Fallback: message text from either driver
+  const msg: string = err.message ?? "";
+  return msg.includes("unique") || msg.includes("duplicate key");
+}
+
+async function fetchRagicRecords(
+  apiUrl: string,
+  limit = 500,
+  { maxRetries = 2, retryDelayMs = 4_000 }: { maxRetries?: number; retryDelayMs?: number } = {},
+): Promise<RagicRecord[]> {
   const apiKey = process.env.RAGIC_API_KEY;
   if (!apiKey) {
     throw new Error("RAGIC_API_KEY is not configured");
   }
 
   const url = `${apiUrl}?api&APIKey=${apiKey}&limit=${limit}`;
-  // Task #32: Ragic exports can take a while when `limit` is in the
-  // hundreds, so allow up to 20s before aborting (vs the default 8s).
-  const response = await fetchWithTimeout(url, { timeoutMs: 20_000 });
 
-  if (!response.ok) {
-    throw new Error(
-      `Ragic API error: status=${response.status} code=${response.errorCode} ` +
-        `msg=${response.errorMessage ?? ""}`,
-    );
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      console.warn(`[Ragic] Retrying fetchRagicRecords (attempt ${attempt}/${maxRetries}) after ${retryDelayMs}ms…`);
+      await new Promise(res => setTimeout(res, retryDelayMs));
+    }
+
+    // Task #32: Ragic exports can take a while when `limit` is in the
+    // hundreds, so allow up to 20s before aborting (vs the default 8s).
+    const response = await fetchWithTimeout(url, { timeoutMs: 20_000 });
+
+    if (!response.ok) {
+      const msg = `Ragic API error: status=${response.status} code=${response.errorCode} msg=${response.errorMessage ?? ""}`;
+      if (attempt < maxRetries) {
+        console.warn(`[Ragic] ${msg} — will retry`);
+        continue;
+      }
+      throw new Error(msg);
+    }
+
+    // Empty body = Ragic returned 200 OK but no content (cold-start / rate limit).
+    // Treat as transient and retry.
+    if (!response.body || response.body.trim() === "") {
+      const msg = "Ragic API returned an empty response body";
+      if (attempt < maxRetries) {
+        console.warn(`[Ragic] ${msg} — will retry`);
+        continue;
+      }
+      throw new Error(msg);
+    }
+
+    try {
+      const data = JSON.parse(response.body) as Record<string, RagicRecord>;
+      return Object.values(data);
+    } catch (err) {
+      const msg = `Ragic API returned malformed JSON: ${err instanceof Error ? err.message : String(err)}`;
+      if (attempt < maxRetries) {
+        console.warn(`[Ragic] ${msg} — will retry`);
+        continue;
+      }
+      throw new Error(msg);
+    }
   }
 
-  try {
-    const data = JSON.parse(response.body) as Record<string, RagicRecord>;
-    return Object.values(data);
-  } catch (err) {
-    throw new Error(
-      `Ragic API returned malformed JSON: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
+  // TypeScript unreachable, but satisfies return type
+  throw new Error("fetchRagicRecords: exhausted retries");
 }
 
 const EXCLUDED_VENUES = new Set([
@@ -205,18 +252,25 @@ async function syncCoaches(): Promise<{ added: number; total: number; lineIdsSyn
           lineIdsSynced++;
           console.log(`[Ragic] Synced LINE ID for coach "${name}" (was empty)`);
         } catch (err: any) {
-          if (err?.message?.includes("unique") || err?.code === "23505") {
+          if (isUniqueViolation(err)) {
             console.warn(`[Ragic] Skipped LINE ID sync for coach "${name}": LINE ID already used by another coach`);
           } else {
             console.error(`[Ragic] Failed to sync LINE ID for coach "${name}":`, err?.message);
-            throw err;
           }
         }
       }
       if (employeeId && !existing.employeeId) {
-        await storage.updateCoachEmployeeId(existing.id, employeeId);
-        employeeIdsSynced++;
-        console.log(`[Ragic] Synced employee ID for coach "${name}": ${employeeId}`);
+        try {
+          await storage.updateCoachEmployeeId(existing.id, employeeId);
+          employeeIdsSynced++;
+          console.log(`[Ragic] Synced employee ID for coach "${name}": ${employeeId}`);
+        } catch (err: any) {
+          if (isUniqueViolation(err)) {
+            console.warn(`[Ragic] Skipped employee ID sync for coach "${name}": employee ID already used by another coach`);
+          } else {
+            console.error(`[Ragic] Failed to sync employee ID for coach "${name}":`, err?.message);
+          }
+        }
       }
     }
   }
