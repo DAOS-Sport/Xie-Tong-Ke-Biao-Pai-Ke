@@ -18,6 +18,7 @@ import {
   reportExists,
   streamReport,
 } from "../../infra/files/reportStorage";
+import { renderXlsx } from "./weeklyPush.report";
 
 const enqueueBodySchema = z.object({
   weekStartDate: z
@@ -113,15 +114,33 @@ export function registerWeeklyPushRoutes(app: Express): void {
     },
   );
 
-  // GET /api/admin/weekly-push/runs/:runId/report
+  // GET /api/admin/weekly-push/runs/:runId/report?format=csv|xlsx
   app.get(
     "/api/admin/weekly-push/runs/:runId/report",
     requireAdminPassword,
     async (req: Request, res: Response) => {
       const { runId } = req.params;
+      const fmt = req.query.format === "xlsx" ? "xlsx" : "csv";
       try {
         const run = await weeklyPushRepo.getRunById(runId);
         if (!run) return res.status(404).json({ message: "找不到週推播紀錄" });
+
+        if (fmt === "xlsx") {
+          // XLSX is generated on-demand from DB data (no extra storage needed)
+          const recipients = await weeklyPushRepo.listRecipientsByRun(runId);
+          const buf = await renderXlsx(run, recipients);
+          res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          );
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="weekly-push-${runId}.xlsx"`,
+          );
+          return res.end(buf);
+        }
+
+        // CSV — serve the stored file
         if (!run.reportPath || !(await reportExists(run.reportPath))) {
           return res
             .status(404)

@@ -6,7 +6,7 @@
  * Drizzle calls. Per the architecture rules from Task #22, routes
  * never touch the DB directly.
  */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   weeklyPushRuns,
@@ -160,6 +160,22 @@ export const weeklyPushRepo = {
    * Used by the orchestrator to detect "all recipients done" without
    * loading every row.
    */
+  /**
+   * Returns all runs older than `cutoff` that still have a `report_path`.
+   * Used by the 90-day cleanup job to find stale Object Storage objects.
+   */
+  async listRunsWithExpiredReports(cutoff: Date): Promise<WeeklyPushRun[]> {
+    return db
+      .select()
+      .from(weeklyPushRuns)
+      .where(
+        and(
+          isNotNull(weeklyPushRuns.reportPath),
+          lt(weeklyPushRuns.createdAt, sql`${cutoff.toISOString()}::timestamptz`),
+        ),
+      );
+  },
+
   async countRecipientStatuses(runId: string): Promise<{
     pending: number;
     success: number;

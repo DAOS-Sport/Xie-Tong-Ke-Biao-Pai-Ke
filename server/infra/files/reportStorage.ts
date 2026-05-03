@@ -206,6 +206,37 @@ export async function readReport(pathOrUri: string): Promise<Buffer> {
 }
 
 /**
+ * Deletes a report from Object Storage (or legacy /tmp). Safe to call on
+ * paths that no longer exist — errors are caught and logged as warnings.
+ * Returns true if the file was found and deleted, false if it was already
+ * gone or the path is unrecognised.
+ */
+export async function deleteReport(pathOrUri: string): Promise<boolean> {
+  if (isObjectStorageUri(pathOrUri)) {
+    try {
+      const { bucket, object } = resolveObjectPath(pathOrUri);
+      await objectStorageClient.bucket(bucket).file(object).delete({ ignoreNotFound: true });
+      return true;
+    } catch (err) {
+      console.warn("[reportStorage] deleteReport object storage error:", err);
+      return false;
+    }
+  }
+  if (isLegacyTmpPath(pathOrUri)) {
+    try {
+      await fs.unlink(pathOrUri);
+      return true;
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+      console.warn("[reportStorage] deleteReport legacy fs error:", err);
+      return false;
+    }
+  }
+  console.warn("[reportStorage] deleteReport: unrecognised path/URI", pathOrUri);
+  return false;
+}
+
+/**
  * Streams the report directly to the given Express response. Sets only the
  * Content-Type — callers are expected to set Content-Disposition / status.
  */

@@ -25,6 +25,7 @@ import {
 import { setupRagicSyncCron } from "./ragic";
 import { startWeeklyPushQueue } from "./infra/startup";
 import { featureFlags } from "./config/featureFlags";
+import { setupReportCleanupCron } from "./modules/weeklyPush/weeklyPush.cleanup";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 0. Fail fast on missing config (esp. ADMIN_PASSWORD in production)
@@ -62,6 +63,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 6. Weekly push queue + worker + cron (Task #23). All gated.
   await startWeeklyPushQueue();
+
+  // 7. Report cleanup cron — only when weekly push is enabled
+  if (featureFlags.enableWeeklyPushQueue) {
+    setupReportCleanupCron();
+  }
 
   return createServer(app);
 }
