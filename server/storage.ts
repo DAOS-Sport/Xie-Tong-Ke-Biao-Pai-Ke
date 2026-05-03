@@ -62,6 +62,11 @@ export interface IStorage {
     startDate: string,
     endDate: string
   ): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>;
+  getVacantSchedules(
+    venueId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]>;
   upsertSchedule(schedule: InsertScheduleType): Promise<Schedule>;
   updateSchedule(id: string, updateData: ScheduleUpdateFields): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
@@ -226,6 +231,8 @@ export class DatabaseStorage implements IStorage {
     this.scheduleRepo.getSchedulesByDate(date);
   getSchedulesByDateRange = (startDate: string, endDate: string) =>
     this.scheduleRepo.getSchedulesByDateRange(startDate, endDate);
+  getVacantSchedules = (venueId: string, startDate: string, endDate: string) =>
+    this.scheduleRepo.getVacantSchedules(venueId, startDate, endDate);
   upsertSchedule = (schedule: InsertScheduleType) =>
     this.scheduleRepo.upsertSchedule(schedule);
   getScheduleById = (id: string) => this.scheduleRepo.getScheduleById(id);

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Phone, User, Clock, MapPin, LogOut, BookOpen, Video, Calendar, CheckSquare, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { CoachUser, Schedule, Venue, TimeSlot, VenueInfo, CoachAvailability } from "@shared/schema";
@@ -567,6 +567,26 @@ function ApprovedDashboard({
       return newSet;
     });
   };
+  const [vacantVenueId, setVacantVenueId] = useState("");
+  const [vacantWeek, setVacantWeek] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+  const vacantWeekDays = getWeekDays(vacantWeek);
+  const vacantStartDate = format(vacantWeekDays[0], "yyyy-MM-dd");
+  const vacantEndDate = format(vacantWeekDays[6], "yyyy-MM-dd");
+
+  const { data: vacantSchedules = [], isLoading: vacantLoading } = useQuery<ScheduleWithDetails[]>({
+    queryKey: ["/api/schedules/vacant", vacantVenueId, vacantStartDate, vacantEndDate],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/schedules/vacant?venueId=${encodeURIComponent(vacantVenueId)}&startDate=${vacantStartDate}&endDate=${vacantEndDate}`
+      );
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!vacantVenueId,
+  });
+
   const [localAvailSet, setLocalAvailSet] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -873,6 +893,90 @@ function ApprovedDashboard({
             </CardContent>
           </Card>
         )}
+
+        {/* 缺課一覽 */}
+        <Card>
+          <CardHeader className="py-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                缺課一覽
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setVacantWeek(w => addWeeks(w, -1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[88px] text-center">
+                  {format(vacantWeekDays[0], "M/d", { locale: zhTW })} - {format(vacantWeekDays[6], "M/d", { locale: zhTW })}
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setVacantWeek(w => addWeeks(w, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="mt-2">
+              <select
+                className="text-sm border rounded-md px-2 py-1.5 w-full bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={vacantVenueId}
+                onChange={e => setVacantVenueId(e.target.value)}
+              >
+                <option value="">請選擇場館…</option>
+                {venues.map(v => (
+                  <option key={v.id} value={String(v.id)}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+          </CardHeader>
+          <CardContent className="py-2">
+            {!vacantVenueId ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-300" />
+                選擇場館後即可查看該週尚未指派教練的課次
+              </div>
+            ) : vacantLoading ? (
+              <div className="text-center py-6 text-muted-foreground text-sm">載入中…</div>
+            ) : vacantSchedules.length === 0 ? (
+              <div className="text-center py-6 text-green-600">
+                <CheckCircle2 className="h-7 w-7 mx-auto mb-2" />
+                <p className="text-sm font-medium">本週所有課次均已指派教練</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {vacantWeekDays.map(day => {
+                  const dayStr = format(day, "yyyy-MM-dd");
+                  const dayItems = vacantSchedules.filter(s => {
+                    const d = typeof s.date === "string" ? s.date : format(new Date(s.date), "yyyy-MM-dd");
+                    return d === dayStr;
+                  });
+                  if (!dayItems.length) return null;
+                  return (
+                    <div key={dayStr} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <div className="text-sm font-semibold text-amber-700 mb-2">
+                        {format(day, "M/d")} ({getWeekdayName(day)})
+                      </div>
+                      <div className="space-y-1.5">
+                        {dayItems.map(s => (
+                          <div key={s.id} className="flex items-center gap-2 text-sm">
+                            <span className="text-xs text-muted-foreground w-[88px] shrink-0">
+                              {s.timeSlot?.startTime}-{s.timeSlot?.endTime}
+                            </span>
+                            <span className="flex-1 font-medium truncate">{s.className}</span>
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400 shrink-0">
+                              待分配
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-muted-foreground text-center pt-1">
+                  共 {vacantSchedules.length} 堂課尚未指派教練
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* 場館偏好區塊 — 暫時隱藏，功能程式碼保留勿刪除 */}
         {false && <Card id="venue-prefs-section">

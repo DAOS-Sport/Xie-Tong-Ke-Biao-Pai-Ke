@@ -275,6 +275,24 @@ export function registerScheduleRoutes(app: Express): void {
     }
   );
 
+  // Vacant schedules — has className but no coachName, filtered by venue+week
+  app.get("/api/schedules/vacant", async (req, res) => {
+    try {
+      const { venueId, startDate, endDate } = req.query as {
+        venueId: string;
+        startDate: string;
+        endDate: string;
+      };
+      if (!venueId || !startDate || !endDate) {
+        return res.status(400).json({ message: "Missing parameters" });
+      }
+      const result = await storage.getVacantSchedules(venueId, startDate, endDate);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch vacant schedules" });
+    }
+  });
+
   // `/:date` MUST come last so Express tries every static path above first.
   // (Schedule date strings collide with names like "lock-status" otherwise.)
   app.get("/api/schedules/:date", async (req, res) => {

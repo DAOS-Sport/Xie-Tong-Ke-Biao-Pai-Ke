@@ -5,7 +5,7 @@
  * and derived statistics/conflict queries. The IStorage façade in
  * `server/storage.ts` delegates its schedule-shaped methods here.
  */
-import { and, between, eq, like, or, sql } from "drizzle-orm";
+import { and, between, eq, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   schedules,
@@ -76,6 +76,27 @@ export class ScheduleRepository {
       .innerJoin(venues, eq(schedules.venueId, venues.id))
       .innerJoin(timeSlots, eq(schedules.timeSlotId, timeSlots.id))
       .where(between(schedules.date, startDate, endDate));
+  }
+
+  async getVacantSchedules(
+    venueId: string,
+    startDate: string,
+    endDate: string
+  ): Promise<(Schedule & { venue: Venue; timeSlot: TimeSlot })[]> {
+    return await db
+      .select(scheduleSelect)
+      .from(schedules)
+      .innerJoin(venues, eq(schedules.venueId, venues.id))
+      .innerJoin(timeSlots, eq(schedules.timeSlotId, timeSlots.id))
+      .where(
+        and(
+          eq(schedules.venueId, venueId),
+          between(schedules.date, startDate, endDate),
+          isNotNull(schedules.className),
+          or(isNull(schedules.coachName), eq(schedules.coachName, ""))
+        )
+      )
+      .orderBy(schedules.date, timeSlots.order);
   }
 
   async upsertSchedule(schedule: InsertScheduleType): Promise<Schedule> {
