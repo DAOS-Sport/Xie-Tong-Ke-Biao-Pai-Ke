@@ -24,6 +24,13 @@ const optional = (key: string, fallback: string): string => {
   return process.env[key] || fallback;
 };
 
+const optionalPositiveInt = (key: string, fallback: number): number => {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 const PROD = isProduction();
 
 const resolveAdminPassword = (): string => {
@@ -70,6 +77,9 @@ export const env = {
   // that doesn't exist yet. Add it back when a second format is implemented.
   weeklyPushCron: optional("WEEKLY_PUSH_CRON", "0 19 * * 0"),
   weeklyPushTimezone: optional("WEEKLY_PUSH_TIMEZONE", "Asia/Taipei"),
+  // Per-call timeout (ms) applied to all outbound HTTP calls (LINE, Ragic, ...)
+  // by `server/shared/http/fetchWithTimeout.ts`. Default 8000ms. (Task #38)
+  outboundHttpTimeoutMs: optionalPositiveInt("OUTBOUND_HTTP_TIMEOUT_MS", 8_000),
   // Shared secret protecting the teacher portal feedback endpoints. Optional
   // in dev (warns on first request); required in production deployments.
   teacherPortalToken: process.env.TEACHER_PORTAL_TOKEN || null,

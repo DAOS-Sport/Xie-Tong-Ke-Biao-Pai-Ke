@@ -6,8 +6,9 @@
  * Express request handler or a pg-boss worker indefinitely if the
  * remote stalls. We previously had no upper bound — only a remote
  * TCP / TLS timeout. This helper enforces a per-call timeout
- * (default 8s, overridable via env `OUTBOUND_HTTP_TIMEOUT_MS` or
- * per-call `timeoutMs`) and returns a small structured result so
+ * (default 8s, overridable via env `OUTBOUND_HTTP_TIMEOUT_MS` —
+ * surfaced through `server/config/env.ts` — or per-call
+ * `timeoutMs`) and returns a small structured result so
  * callers can branch on `errorCode` instead of `try/catch`-ing a
  * grab-bag of failure shapes.
  *
@@ -21,11 +22,9 @@
  *                    limiting — callers may treat that one as transient).
  */
 
-const DEFAULT_TIMEOUT_MS = (() => {
-  const raw = process.env.OUTBOUND_HTTP_TIMEOUT_MS;
-  const parsed = raw ? parseInt(raw, 10) : NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 8_000;
-})();
+import { env } from "../../config/env";
+
+const DEFAULT_TIMEOUT_MS = env.outboundHttpTimeoutMs;
 
 export type HttpErrorCode = "timeout" | "network" | "http_4xx" | "http_5xx";
 
