@@ -1,4 +1,5 @@
 import type { Request } from "express";
+import { randomBytes } from "crypto";
 
 /**
  * Short-lived session tokens for the coach portal. Issued after a coach
@@ -23,13 +24,8 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const sessions = new Map<string, CoachSession>();
 
 function generateToken(): string {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < 48; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  // 36 random bytes -> 48-char base64url token, CSPRNG-backed.
+  return randomBytes(36).toString("base64url");
 }
 
 export function issueCoachSessionToken(
