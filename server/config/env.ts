@@ -73,6 +73,11 @@ export const env = {
   // Shared secret protecting the teacher portal feedback endpoints. Optional
   // in dev (warns on first request); required in production deployments.
   teacherPortalToken: process.env.TEACHER_PORTAL_TOKEN || null,
+  // LINE user id of the admin who should receive coach-portal login
+  // failure alerts (e.g. when an unknown name attempts to register).
+  // Optional — when unset the alert is downgraded to a console.warn so
+  // we never push to a stale hardcoded test account.
+  adminAlertLineUserId: process.env.ADMIN_ALERT_LINE_USER_ID || null,
 };
 
 export type AppEnv = typeof env;

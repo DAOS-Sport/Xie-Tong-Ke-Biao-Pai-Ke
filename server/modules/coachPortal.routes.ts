@@ -10,8 +10,6 @@ import {
 } from "../shared/auth/coachPortalSession";
 import { verifyAdminPassword } from "../shared/auth/adminPassword";
 
-const CHEN_BO_RONG_LINE_ID = "U8fd0e4be4e44a1304f9fa2e9855f4559";
-
 export function registerCoachPortalRoutes(app: Express): void {
   // Linkable coaches (already approved but no LINE binding yet)
   app.get("/api/coach-portal/linkable-coaches", async (_req, res) => {
@@ -106,9 +104,17 @@ export function registerCoachPortalRoutes(app: Express): void {
         return res.json({ ...updated, coachToken });
       }
 
-      // Not found in DB → notify 陳柏榮 via LINE push
+      // Not found in DB → notify the admin alert LINE user via push.
+      // Recipient is configured via ADMIN_ALERT_LINE_USER_ID; when unset
+      // we downgrade to a console.warn rather than push to a stale id.
       const channelAccessToken = env.lineChannelAccessToken;
-      if (channelAccessToken) {
+      const adminAlertId = env.adminAlertLineUserId;
+      if (!adminAlertId) {
+        console.warn(
+          `[coach-portal] Coach "${trimmedName}" not found and ADMIN_ALERT_LINE_USER_ID is not set — skipping LINE notification`,
+        );
+      }
+      if (channelAccessToken && adminAlertId) {
         // Task #32: timeout-bounded; never let a stalled LINE call hold
         // the registration response open.
         const notifyResult = await fetchWithTimeout(
@@ -120,7 +126,7 @@ export function registerCoachPortalRoutes(app: Express): void {
               Authorization: `Bearer ${channelAccessToken}`,
             },
             body: JSON.stringify({
-              to: CHEN_BO_RONG_LINE_ID,
+              to: adminAlertId,
               messages: [
                 {
                   type: "text",
@@ -132,7 +138,7 @@ export function registerCoachPortalRoutes(app: Express): void {
         );
         if (!notifyResult.ok) {
           console.error(
-            `[LINE] Failed to notify 陳柏榮: status=${notifyResult.status} ` +
+            `[LINE] Failed to notify admin alert user: status=${notifyResult.status} ` +
               `code=${notifyResult.errorCode} msg=${notifyResult.errorMessage ?? ""}`,
           );
         }

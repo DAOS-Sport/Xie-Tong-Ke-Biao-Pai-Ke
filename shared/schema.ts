@@ -72,7 +72,16 @@ export const schedules = pgTable("schedules", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  // Hot-path indexes — the schedule table is queried predominantly by
+  // date range (week views, daily push) and by coach name (coach
+  // portal, statistics, conflict detection across both teaching slots).
+  // Without these, sequential scans dominate as the table grows over
+  // the semester.
+  index("idx_schedules_date").on(table.date),
+  index("idx_schedules_coach_name").on(table.coachName),
+  index("idx_schedules_coach_name_2").on(table.coachName2),
+]);
 
 // 教練用戶表 - LINE 登入的教練帳號（前台系統）
 export const coachUsers = pgTable("coach_users", {
