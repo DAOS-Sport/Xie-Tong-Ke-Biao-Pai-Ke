@@ -81,6 +81,29 @@ async function sendLinePushMessage(lineId: string, message: string): Promise<boo
   return true;
 }
 
+/**
+ * App-level fast-path dedup check for weekly notifications.
+ * Checks if a 'weekly' record for this coach already exists for the given week start date.
+ * The weekly cron insert logs one row per scheduled day — checking the first day is sufficient.
+ */
+async function weeklyLogAlreadyExists(
+  coachName: string,
+  weekStartDate: string,
+): Promise<boolean> {
+  const existing = await db
+    .select({ id: lineNotifyLogs.id })
+    .from(lineNotifyLogs)
+    .where(
+      and(
+        eq(lineNotifyLogs.coachName, coachName),
+        eq(lineNotifyLogs.notifyType, 'weekly'),
+        eq(lineNotifyLogs.scheduleDate, weekStartDate),
+      ),
+    )
+    .limit(1);
+  return existing.length > 0;
+}
+
 async function sendWeeklyScheduleNotifications(): Promise<void> {
   console.log('[LINE Notify] Starting weekly schedule notifications...');
 
@@ -113,8 +136,15 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
     let failCount = 0;
 
     for (const coach of coachesWithLine) {
+      try {
       const coachName = (coach.linkedCoachName || coach.name)!;
       const lineId = coach.lineId!;
+
+      // 去重：同一週若已推播過，跳過（防止 cron + 手動觸發重複送出）
+      if (await weeklyLogAlreadyExists(coachName, startDate)) {
+        console.log(`[LINE Notify] Weekly: skip ${coachName} (already sent for week ${startDate})`);
+        continue;
+      }
 
       const mySchedules = weekSchedules.filter(
         s => s.coachName === coachName || s.coachName2 === coachName
@@ -181,6 +211,10 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
       } else {
         failCount++;
       }
+      } catch (coachErr) {
+        console.error(`[LINE Notify] Weekly: unexpected error for coach, skipping:`, coachErr);
+        failCount++;
+      }
     }
 
     console.log(`[LINE Notify] Done. Sent: ${sentCount}, Failed: ${failCount}`);
@@ -192,7 +226,9 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
 export function setupWeeklyNotificationCron(): void {
   cron.schedule('0 12 * * 0', () => {
     console.log('[LINE Notify] Cron triggered: Sunday 12:00 Asia/Taipei');
-    sendWeeklyScheduleNotifications();
+    sendWeeklyScheduleNotifications().catch(err =>
+      console.error('[LINE Notify] Weekly cron unhandled rejection:', err),
+    );
   }, { timezone: 'Asia/Taipei' });
 
   console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 12:00 Asia/Taipei)');
@@ -255,6 +291,7 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
 
     // ── 6. 對每位有課的教練，組訊息並推播
     for (const coachName of Array.from(scheduledCoachNames)) {
+      try {
       // 6a. 有無 LINE ID
       const coach = coachMap.get(coachName);
       if (!coach) {
@@ -323,6 +360,10 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
         console.error(`[LINE Notify] Daily: failed for ${coachName}, rolling back log`);
         await db.delete(lineNotifyLogs).where(eq(lineNotifyLogs.id, inserted[0].id))
           .catch(e => console.error('[LINE Notify] Failed to rollback log:', e));
+      }
+      } catch (coachErr) {
+        console.error(`[LINE Notify] Daily: unexpected error for ${coachName}, skipping:`, coachErr);
+        failCount++;
       }
     }
 
@@ -397,7 +438,9 @@ export async function sendFillReminderToCoaches(): Promise<{ sent: number }> {
 export function setupDailyNotificationCron(): void {
   cron.schedule('0 19 * * *', () => {
     console.log('[LINE Notify] Cron triggered: daily 19:00 Asia/Taipei');
-    sendDailyTomorrowNotifications();
+    sendDailyTomorrowNotifications().catch(err =>
+      console.error('[LINE Notify] Daily cron unhandled rejection:', err),
+    );
   }, { timezone: 'Asia/Taipei' });
 
   console.log('[LINE Notify] Daily notify cron scheduled (19:00 Asia/Taipei)');
