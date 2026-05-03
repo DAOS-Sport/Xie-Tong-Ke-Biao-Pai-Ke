@@ -21,7 +21,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import type { CoachUser, Venue, VenueInfo } from "@shared/schema";
-import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 
 // Read from sessionStorage on every call so we always pick up whatever
@@ -1508,9 +1507,5 @@ function NotificationSection() {
 }
 
 export default function CoachApproval() {
-  return (
-    <PasswordProtect>
-      <CoachApprovalContent />
-    </PasswordProtect>
-  );
+  return <CoachApprovalContent />;
 }

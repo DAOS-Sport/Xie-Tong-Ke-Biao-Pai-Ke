@@ -5,7 +5,6 @@ import { zhTW } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 
 const VENUE_COLORS: Record<string, string> = {
@@ -235,9 +234,5 @@ function StatisticsContent() {
 }
 
 export default function Statistics() {
-  return (
-    <PasswordProtect>
-      <StatisticsContent />
-    </PasswordProtect>
-  );
+  return <StatisticsContent />;
 }

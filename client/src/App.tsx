@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useRoute } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,20 +20,23 @@ import WeeklyPush from "@/pages/weekly-push";
 import SchoolView from "@/pages/school-view";
 import PasswordProtect from "@/components/password-protect";
 
-// Protected AdminSchedule component
-function ProtectedAdminSchedule() {
+// Single password gate for the entire admin area.
+// All /mgt-x9k7p2/* routes are rendered inside this component,
+// so the user is asked for the password exactly once per session.
+function AdminSection() {
+  const [matched] = useRoute("/mgt-x9k7p2/:rest*");
+  if (!matched) return null;
   return (
     <PasswordProtect>
-      <AdminSchedule />
-    </PasswordProtect>
-  );
-}
-
-// Protected Statistics component
-function ProtectedStatistics() {
-  return (
-    <PasswordProtect>
-      <Statistics />
+      <Switch>
+        <Route path="/mgt-x9k7p2/schedule" component={AdminSchedule} />
+        <Route path="/mgt-x9k7p2/class-edit" component={VenueScheduleEdit} />
+        <Route path="/mgt-x9k7p2/assign" component={CoachAssignment} />
+        <Route path="/mgt-x9k7p2/stats" component={Statistics} />
+        <Route path="/mgt-x9k7p2/approval" component={CoachApproval} />
+        <Route path="/mgt-x9k7p2/weekly-push" component={WeeklyPush} />
+        <Route component={NotFound} />
+      </Switch>
     </PasswordProtect>
   );
 }
@@ -59,13 +62,8 @@ function Router() {
       {/* Coach portal (front-end for coaches) */}
       <Route path="/coach-portal" component={CoachPortal} />
       
-      {/* Password protected admin functions (complex URLs) */}
-      <Route path="/mgt-x9k7p2/schedule" component={AdminSchedule} />
-      <Route path="/mgt-x9k7p2/class-edit" component={VenueScheduleEdit} />
-      <Route path="/mgt-x9k7p2/assign" component={CoachAssignment} />
-      <Route path="/mgt-x9k7p2/stats" component={Statistics} />
-      <Route path="/mgt-x9k7p2/approval" component={CoachApproval} />
-      <Route path="/mgt-x9k7p2/weekly-push" component={WeeklyPush} />
+      {/* Admin area — single password gate for all /mgt-x9k7p2/* routes */}
+      <Route path="/mgt-x9k7p2/:rest*" component={AdminSection} />
       
       {/* Auth pages */}
       <Route path="/home" component={Home} />

@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/table";
 import { Send, Eye, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import PasswordProtect from "@/components/password-protect";
 import AdminLayout from "@/components/admin-layout";
 import { RunDetailDialog } from "@/components/weekly-push/RunDetailDialog";
 import {
@@ -283,9 +282,5 @@ function WeeklyPushContent() {
 }
 
 export default function WeeklyPush() {
-  return (
-    <PasswordProtect>
-      <WeeklyPushContent />
-    </PasswordProtect>
-  );
+  return <WeeklyPushContent />;
 }

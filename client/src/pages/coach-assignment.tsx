@@ -14,7 +14,6 @@ import {
 import { ChevronLeft, ChevronRight, Check, Users, Zap, BarChart3, AlertTriangle, ChevronDown, X, Search } from "lucide-react";
 import { format, addWeeks, subWeeks, startOfWeek } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import PasswordProtect from "@/components/password-protect";
 import FloatingConflictAlert from "@/components/floating-conflict-alert";
 import AdminLayout from "@/components/admin-layout";
 import {
@@ -1011,9 +1010,5 @@ function CoachAssignmentContent() {
 }
 
 export default function CoachAssignment() {
-  return (
-    <PasswordProtect>
-      <CoachAssignmentContent />
-    </PasswordProtect>
-  );
+  return <CoachAssignmentContent />;
 }

@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import PasswordProtect from "@/components/password-protect";
 import FloatingConflictAlert from "@/components/floating-conflict-alert";
 import AdminLayout from "@/components/admin-layout";
 import type { Venue, TimeSlot, Schedule } from "@shared/schema";
@@ -486,9 +485,5 @@ function VenueScheduleEditContent() {
 }
 
 export default function VenueScheduleEdit() {
-  return (
-    <PasswordProtect>
-      <VenueScheduleEditContent />
-    </PasswordProtect>
-  );
+  return <VenueScheduleEditContent />;
 }

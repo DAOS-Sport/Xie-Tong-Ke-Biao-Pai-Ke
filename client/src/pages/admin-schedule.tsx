@@ -7,7 +7,6 @@ import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks } from "date-
 import { zhTW } from "date-fns/locale";
 import WeekScheduleGrid, { type WeekScheduleGridRef } from "@/components/week-schedule-grid";
 import FloatingConflictAlert from "@/components/floating-conflict-alert";
-import PasswordProtect from "@/components/password-protect";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -244,9 +243,7 @@ export default function AdminSchedule() {
             </div>
           </div>
 
-          <PasswordProtect>
-            <WeekScheduleGrid ref={gridRef} weekStart={currentWeek} />
-          </PasswordProtect>
+          <WeekScheduleGrid ref={gridRef} weekStart={currentWeek} />
         </div>
       </main>
     </div>
