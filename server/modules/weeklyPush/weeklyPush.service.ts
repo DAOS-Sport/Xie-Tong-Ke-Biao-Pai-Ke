@@ -15,6 +15,7 @@
 import { addDays, format, startOfWeek } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { storage } from "../../storage";
+import { env } from "../../config/env";
 import { getBoss } from "../../infra/queue/boss";
 import { queues } from "../../infra/queue/queues";
 import { weeklyPushRepo } from "./weeklyPush.repository";
@@ -103,6 +104,7 @@ export function buildCoachWeeklyMessage(
 
   msg += "\n---\n請教練務必於課前準時抵達場館,主動向授課老師致意,並請確實熟悉「教練守則」。\n\n";
   msg += "自本學期起,協同課程費用修正如下:\n• 單節課 250元\n• 兩節課合併 500元";
+  msg += `\n\n📌 課表如有異動請以系統為主：\n${env.publicOrigin}/coach-portal`;
   return msg;
 }
 

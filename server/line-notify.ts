@@ -6,6 +6,10 @@ import { db } from './db';
 import { lineNotifyLogs, coachUsers, coachAvailability, coachVenuePreferences, schedules, venues, timeSlots } from '@shared/schema';
 import { eq, and, between } from 'drizzle-orm';
 import { fetchWithTimeout } from './shared/http/fetchWithTimeout';
+import { env } from './config/env';
+
+// 教練前台連結 — 推播訊息結尾附上，提醒教練以系統公告為準
+const coachPortalUrl = (): string => `${env.publicOrigin}/coach-portal`;
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
@@ -158,6 +162,7 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
       }
 
       message += `\n---\n請教練務必於課前準時抵達場館，主動向授課老師致意，並請確實熟悉「教練守則」。\n\n自本學期起，協同課程費用修正如下：\n• 單節課 250元\n• 兩節課合併 500元`;
+      message += `\n\n📌 課表如有異動請以系統為主：\n${coachPortalUrl()}`;
 
       const success = await sendLinePushMessage(lineId, message);
       if (success) {
@@ -186,11 +191,11 @@ async function sendWeeklyScheduleNotifications(): Promise<void> {
 
 export function setupWeeklyNotificationCron(): void {
   cron.schedule('0 12 * * 0', () => {
-    console.log('[LINE Notify] Cron triggered: Sunday 20:00 TST (12:00 UTC)');
+    console.log('[LINE Notify] Cron triggered: Sunday 12:00 Asia/Taipei');
     sendWeeklyScheduleNotifications();
-  });
+  }, { timezone: 'Asia/Taipei' });
 
-  console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 20:00 TST = 12:00 UTC)');
+  console.log('[LINE Notify] Weekly notification cron scheduled (Sunday 12:00 Asia/Taipei)');
 }
 
 async function sendDailyTomorrowNotifications(): Promise<void> {
@@ -287,6 +292,7 @@ async function sendDailyTomorrowNotifications(): Promise<void> {
         message += ` [${role}]\n`;
       }
       message += `\n請務必準時抵達場館！`;
+      message += `\n\n📌 課表如有異動請以系統為主：\n${coachPortalUrl()}`;
 
       // 6d. 原子防重：先 INSERT log（ON CONFLICT DO NOTHING）搶到「鎖」才推
       //     若 returning 為空 → 同一秒被別的執行緒搶走，跳過
