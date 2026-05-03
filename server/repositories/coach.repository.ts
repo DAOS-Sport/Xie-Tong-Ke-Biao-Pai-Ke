@@ -3,7 +3,7 @@
  * weekly availability matrix, venue preferences and same-slot colleague
  * lookups. The IStorage façade in `server/storage.ts` delegates here.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   coachUsers,
@@ -121,23 +121,27 @@ export class CoachRepository {
   async getColleaguesForCoach(
     coachName: string,
     date: string,
-    venueId: string,
-    timeSlotId: string
+    venueIds: string[]
   ): Promise<{ name: string; phone: string | null }[]> {
-    const sameSlotSchedules = await db
-      .select({ coachName: schedules.coachName })
+    if (venueIds.length === 0) return [];
+
+    const sameVenueSchedules = await db
+      .select({ coachName: schedules.coachName, coachName2: schedules.coachName2 })
       .from(schedules)
       .where(
         and(
           eq(schedules.date, date),
-          eq(schedules.venueId, venueId),
-          eq(schedules.timeSlotId, timeSlotId)
+          inArray(schedules.venueId, venueIds)
         )
       );
 
-    const colleagueNames = sameSlotSchedules
-      .map((s) => s.coachName)
-      .filter((name): name is string => !!name && name !== coachName);
+    // Collect all coach names from both coach slots, excluding self
+    const colleagueNameSet = new Set<string>();
+    for (const s of sameVenueSchedules) {
+      if (s.coachName && s.coachName !== coachName) colleagueNameSet.add(s.coachName);
+      if (s.coachName2 && s.coachName2 !== coachName) colleagueNameSet.add(s.coachName2);
+    }
+    const colleagueNames = Array.from(colleagueNameSet);
 
     if (colleagueNames.length === 0) return [];
 

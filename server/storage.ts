@@ -130,8 +130,7 @@ export interface IStorage {
   getColleaguesForCoach(
     coachName: string,
     date: string,
-    venueId: string,
-    timeSlotId: string
+    venueIds: string[]
   ): Promise<{ name: string; phone: string | null }[]>;
 
   // System settings
@@ -285,10 +284,9 @@ export class DatabaseStorage implements IStorage {
   getColleaguesForCoach = (
     coachName: string,
     date: string,
-    venueId: string,
-    timeSlotId: string
+    venueIds: string[]
   ) =>
-    this.coachRepo.getColleaguesForCoach(coachName, date, venueId, timeSlotId);
+    this.coachRepo.getColleaguesForCoach(coachName, date, venueIds);
   getCoachAvailabilityByWeek = (weekStart: string) =>
     this.coachRepo.getCoachAvailabilityByWeek(weekStart);
   getCoachAvailabilityForCoach = (coachName: string, weekStart: string) =>

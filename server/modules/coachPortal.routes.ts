@@ -258,20 +258,19 @@ export function registerCoachPortalRoutes(app: Express): void {
 
   app.get("/api/coach-portal/colleagues", async (req, res) => {
     try {
-      const { coachName, date, venueId, timeSlotId } = req.query as {
+      const { coachName, date, venueIds: venueIdsStr } = req.query as {
         coachName: string;
         date: string;
-        venueId: string;
-        timeSlotId: string;
+        venueIds: string;
       };
-      if (!coachName || !date || !venueId || !timeSlotId) {
+      if (!coachName || !date || !venueIdsStr) {
         return res.status(400).json({ message: "缺少必要參數" });
       }
+      const venueIds = venueIdsStr.split(",").map((v) => v.trim()).filter(Boolean);
       const colleagues = await storage.getColleaguesForCoach(
         coachName,
         date,
-        venueId,
-        timeSlotId
+        venueIds
       );
       res.json(colleagues);
     } catch (error) {
