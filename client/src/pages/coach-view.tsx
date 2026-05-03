@@ -1,4 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
+import CoachHelpCard from "@/components/coach-help-card";
+import type { HelpSection } from "@/components/coach-help-card";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import { format, startOfWeek, addWeeks, subWeeks } from "date-fns";
@@ -172,6 +174,37 @@ export default function CoachView() {
           </div>
         </div>
       </div>
+
+      {/* 員工使用說明 */}
+      <div className="max-w-2xl mx-auto px-4 py-4">
+        <CoachHelpCard sections={coachViewHelp} />
+      </div>
     </AdminLayout>
   );
 }
+
+const coachViewHelp: HelpSection[] = [
+  {
+    title: "使用說明",
+    icon: "fa-user-clock",
+    steps: [
+      {
+        title: "查看個人週課表",
+        desc: "頁面上方下拉選單選擇教練姓名後，下方格子顯示該教練整週的所有課次，以場館顏色區分。",
+        tip: "預設會自動選取您自己的名字（需登入）。",
+      },
+      {
+        title: "切換週次",
+        desc: "點擊頁面標題列的左右箭頭即可切換上一週或下一週。",
+      },
+      {
+        title: "看懂課表格",
+        desc: "每個色塊代表一個課次，顯示場館名稱、課程名稱與上課時間。",
+        sub: [
+          "顏色對應場館（不同場館有不同底色）",
+          "若同一時段有多堂課，格子內會疊加顯示",
+        ],
+      },
+    ],
+  },
+];

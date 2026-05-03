@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import CoachHelpCard from "@/components/coach-help-card";
+import type { HelpSection } from "@/components/coach-help-card";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -176,6 +178,36 @@ export default function VenueSchedule() {
         )}
       </div>
       <FloatingConflictAlert weekStart={currentWeek} />
+
+      {/* 員工使用說明 */}
+      <div className="max-w-2xl mx-auto px-4 py-4">
+        <CoachHelpCard sections={venueScheduleHelp} />
+      </div>
     </AdminLayout>
   );
 }
+
+const venueScheduleHelp: HelpSection[] = [
+  {
+    title: "使用說明",
+    icon: "fa-building",
+    steps: [
+      {
+        title: "選擇場館",
+        desc: "頁面左上角下拉選單選擇要查看的場館，課表會立即更新為該場館的排課狀況。",
+      },
+      {
+        title: "切換週次",
+        desc: "點擊標題列的左右箭頭切換週次，查看不同週的場館課表。",
+      },
+      {
+        title: "看懂課表格",
+        desc: "表格橫軸為每天日期，縱軸為節次時間。每個格子顯示課程名稱與負責教練。",
+        sub: [
+          "藍色字為主教練，若有協同教練會以「-」連接顯示",
+          "空白格表示該時段無排課",
+        ],
+      },
+    ],
+  },
+];

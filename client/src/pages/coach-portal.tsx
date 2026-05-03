@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import CoachHelpCard from "@/components/coach-help-card";
+import type { HelpSection } from "@/components/coach-help-card";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { zhTW } from "date-fns/locale";
@@ -1053,7 +1055,77 @@ function ApprovedDashboard({
             )}
           </CardContent>
         </Card>
+
+        {/* 員工使用說明 */}
+        <CoachHelpCard sections={coachPortalHelp} />
       </main>
     </div>
   );
 }
+
+const coachPortalHelp: HelpSection[] = [
+  {
+    title: "查看課表",
+    icon: "fa-calendar",
+    steps: [
+      {
+        title: "查看本週課表",
+        desc: "登入後首頁「我的課表」卡片即顯示本週所有排課，以日期分組列出場館、時段與課程名稱。",
+        tip: "點選課表旁的日曆圖示，可將課程加入 Google 日曆。",
+      },
+      {
+        title: "切換週次",
+        desc: "點擊課表標題列左右箭頭，可往前或往後切換週次查看其他週的排課。",
+      },
+    ],
+  },
+  {
+    title: "可用時段",
+    icon: "fa-check-square",
+    steps: [
+      {
+        title: "填寫可用時段",
+        desc: "滾動到「可用時段」區塊，在 7×7 格子中點擊您可以上課的時段，格子變綠色代表已標記可用。",
+        sub: [
+          "橫軸為星期一到星期日",
+          "縱軸為第一節到第七節",
+          "藍色格子（🔒）代表已排課，不可修改",
+        ],
+        tip: "建議每個月初更新一次，讓排課更準確。",
+      },
+      {
+        title: "確認已儲存",
+        desc: "修改後系統會自動儲存，頁面上方「可用時段已填寫 ✓」標籤亮起代表儲存成功。",
+      },
+    ],
+  },
+  {
+    title: "場館偏好",
+    icon: "fa-map-marker-alt",
+    steps: [
+      {
+        title: "設定偏好場館",
+        desc: "在「可排課地點」區塊勾選您偏好教學的場館，系統自動排課時會優先安排於您偏好的場館。",
+      },
+    ],
+  },
+  {
+    title: "其他功能",
+    icon: "fa-info-circle",
+    steps: [
+      {
+        title: "查看今日同場館教練",
+        desc: "「今日同場館教練」區塊顯示今天與您在同一場館的其他教練姓名與聯絡電話，方便現場協調。",
+      },
+      {
+        title: "查看場館資訊",
+        desc: "「場館資訊」區塊列出各場館的介紹、教學影片連結與 Google 導航連結。",
+      },
+      {
+        title: "帳號審核中怎麼辦？",
+        desc: "首次登入後帳號需等待管理員審核。審核期間部分功能受限，通過後即可正常使用所有功能。",
+        warn: "若超過 2 個工作天仍未審核，請直接聯繫管理員確認。",
+      },
+    ],
+  },
+];

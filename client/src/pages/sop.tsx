@@ -20,7 +20,7 @@ interface Step {
   tip?: string;
 }
 
-const sections: Section[] = [
+const adminSections: Section[] = [
   {
     id: "schedule-phase1",
     title: "第一階段：建立課表 & 鎖定場次",
@@ -250,31 +250,106 @@ const sections: Section[] = [
       },
     ],
   },
+];
+
+const employeeSections: Section[] = [
   {
-    id: "coach-portal",
-    title: "教練前台使用說明",
-    icon: "fa-door-open",
+    id: "emp-coach-portal",
+    title: "教練前台（手機端）完整說明",
+    icon: "fa-mobile-alt",
+    badge: "教練適用",
+    badgeColor: "bg-green-100 text-green-700",
     steps: [
       {
-        title: "教練登入方式",
-        desc: "教練透過 LINE OAuth 登入教練前台，首次登入需填寫姓名、員工編號完成申請，待管理員審核後即可正常使用。",
+        title: "首次登入與申請帳號",
+        desc: "開啟教練前台網址，點擊「使用 LINE 帳號登入」，完成 LINE 授權後填寫姓名與員工編號送出申請。",
+        sub: [
+          "申請後需等管理員審核，通過前功能有限制",
+          "若超過 2 個工作天未審核，請聯繫管理員",
+        ],
       },
       {
-        title: "查看個人課表",
-        desc: "登入後首頁顯示教練本人當週及下週的課次，包含場館、時段、課程名稱。",
+        title: "查看本週課表",
+        desc: "登入後首頁「我的課表」卡片即顯示本週所有排課，以日期分組列出場館、時段與課程名稱。",
+        tip: "點選課表旁的日曆圖示，可將課程一鍵加入 Google 日曆。",
       },
       {
-        title: "設定可用時段",
-        desc: "點選「可用時段」分頁，填寫每週可上課的時段，供管理員排課參考。",
-        tip: "建議每月初更新一次可用時段，確保排課資訊準確。",
+        title: "切換週次",
+        desc: "點擊課表標題列左右箭頭可查看上週或下週排課。",
+      },
+      {
+        title: "填寫可用時段（重要）",
+        desc: "滾動到「可用時段」區塊，在格子中點擊您可以上課的時段，格子變綠色代表已標記。管理員依此安排課次。",
+        sub: [
+          "橫軸為星期一到日，縱軸為第一到七節",
+          "藍色格（🔒）= 已排課，不可修改",
+          "修改後系統自動儲存，頁面上方會顯示「✓ 可用時段已填寫」",
+        ],
+        tip: "建議每月初更新一次，確保排課準確。",
       },
       {
         title: "設定場館偏好",
-        desc: "點選「場館偏好」分頁，勾選偏好的教學場館，系統自動排課時會優先考量。",
+        desc: "在「可排課地點」區塊勾選偏好的教學場館。系統自動排課時會優先安排於偏好場館。",
       },
       {
-        title: "查看同事課表",
-        desc: "點選「同事課表」可查看所有教練的課表總覽，方便互相確認排課狀況。",
+        title: "查看今日同場館教練",
+        desc: "「今日同場館教練」區塊顯示今天在同一場館的其他教練姓名與聯絡電話，方便現場協調。",
+      },
+      {
+        title: "查看場館資訊",
+        desc: "「場館資訊」列出各場館介紹、教學影片連結與 Google Maps 導航，點擊即可開啟。",
+      },
+    ],
+  },
+  {
+    id: "emp-coach-view",
+    title: "教練視圖（週課表總覽）",
+    icon: "fa-user-clock",
+    badge: "教練適用",
+    badgeColor: "bg-green-100 text-green-700",
+    steps: [
+      {
+        title: "進入教練視圖",
+        desc: "從側邊欄點選「教練視圖」圖示，或直接前往 /coach。",
+      },
+      {
+        title: "選擇教練",
+        desc: "頁面上方下拉選單選擇教練姓名，下方格子即顯示該教練整週課次（以場館顏色區分）。",
+        tip: "已登入者預設自動選取自己的名字。",
+      },
+      {
+        title: "切換週次",
+        desc: "標題列左右箭頭切換上一週或下一週。",
+      },
+      {
+        title: "看懂課表色塊",
+        desc: "每個色塊代表一個課次，顯示場館名稱、課程名稱、上課時間。不同場館底色不同。",
+      },
+    ],
+  },
+  {
+    id: "emp-venue-schedule",
+    title: "場館課表顯示",
+    icon: "fa-building",
+    badge: "教練適用",
+    badgeColor: "bg-green-100 text-green-700",
+    steps: [
+      {
+        title: "選擇場館",
+        desc: "頁面左上角下拉選單選擇場館，課表立即更新為該場館的排課狀況。",
+      },
+      {
+        title: "切換週次",
+        desc: "標題列左右箭頭切換週次查看不同週課表。",
+      },
+      {
+        title: "看懂格子",
+        desc: "橫軸為每天日期，縱軸為節次時間。格子顯示課程名稱與負責教練（主教練/協同教練）。",
+        sub: [
+          "藍色字為主教練",
+          "若有協同教練，以「-」連接顯示",
+          "空白格 = 該時段無排課",
+        ],
       },
     ],
   },
@@ -285,16 +360,16 @@ const sections: Section[] = [
     steps: [
       {
         title: "教練收不到 LINE 推播",
-        desc: "請確認以下事項：",
+        desc: "請請管理員確認：",
         sub: [
-          "教練是否有正確的 LINE User ID（格式 U 開頭 33 碼）",
-          "教練是否已封鎖官方帳號（封鎖後無法發送）",
-          "週推播報表中該教練的狀態是否為「失敗」及錯誤原因",
+          "教練是否有正確的 LINE User ID（U 開頭 33 碼）",
+          "教練是否已封鎖 LINE 官方帳號（封鎖後無法發送）",
+          "週推播報表中該教練的發送狀態與錯誤原因",
         ],
       },
       {
         title: "課表鎖定後無法編輯課程名稱",
-        desc: "這是正常行為。第一階段鎖定後進入第二階段（教練指派）。若需修改課程名稱，請先在「學校課表編輯」頁面解鎖該週。",
+        desc: "這是正常行為。第一階段鎖定後即進入第二階段（教練指派）。若需修改課程名稱，請先在「學校課表編輯」頁面解鎖該週。",
       },
       {
         title: "教練指派時看不到某教練",
@@ -307,13 +382,13 @@ const sections: Section[] = [
       },
       {
         title: "Ragic 同步後教練資料沒更新",
-        desc: "確認 Ragic 上該教練的資料是否已正確填寫，以及是否在可同步的部門清單內。若確認無誤，可手動觸發一次同步後重新確認。",
+        desc: "確認 Ragic 上資料是否正確填寫，以及是否在可同步的部門清單內。確認後可手動觸發一次同步再確認。",
       },
       {
         title: "統計堂數與預期不符",
         desc: "請確認：",
         sub: [
-          "課表指派的教練欄位（主教練 vs 協同教練2）是否填在正確欄位",
+          "課表指派欄位（主教練 vs 協同教練2）是否填在正確欄位",
           "統計日期區間是否涵蓋目標週次",
           "若教練有改名，新舊名稱可能各自累計",
         ],
@@ -408,15 +483,30 @@ export default function Sop() {
         {/* Quick nav */}
         <Card className="bg-blue-50/60 border-blue-200">
           <CardContent className="px-5 py-4">
-            <p className="text-xs font-semibold text-blue-700 mb-3 uppercase tracking-wide">快速跳轉</p>
-            <div className="flex flex-wrap gap-2">
-              {sections.map((s) => (
+            <p className="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+              <i className="fas fa-user-shield text-blue-500"></i> 管理員操作
+            </p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {adminSections.map((s) => (
                 <button
                   key={s.id}
                   className="text-xs px-3 py-1.5 rounded-full bg-white border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors"
-                  onClick={() => {
-                    document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
+                  onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  <i className={`fas ${s.icon} mr-1.5`}></i>
+                  {s.title}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+              <i className="fas fa-user text-green-500"></i> 員工／教練操作
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {employeeSections.map((s) => (
+                <button
+                  key={s.id}
+                  className="text-xs px-3 py-1.5 rounded-full bg-white border border-green-200 text-green-700 hover:bg-green-100 transition-colors"
+                  onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 >
                   <i className={`fas ${s.icon} mr-1.5`}></i>
                   {s.title}
@@ -426,8 +516,31 @@ export default function Sop() {
           </CardContent>
         </Card>
 
-        {/* Sections */}
-        {sections.map((s) => (
+        {/* Admin sections */}
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="flex items-center gap-2 text-xs font-semibold text-blue-700 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+            <i className="fas fa-user-shield"></i>
+            管理員操作說明
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        {adminSections.map((s) => (
+          <div key={s.id} id={s.id}>
+            <SectionCard section={s} />
+          </div>
+        ))}
+
+        {/* Employee sections */}
+        <div className="flex items-center gap-3 pt-2">
+          <div className="h-px flex-1 bg-border" />
+          <span className="flex items-center gap-2 text-xs font-semibold text-green-700 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+            <i className="fas fa-user"></i>
+            員工／教練操作說明
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        {employeeSections.map((s) => (
           <div key={s.id} id={s.id}>
             <SectionCard section={s} />
           </div>
