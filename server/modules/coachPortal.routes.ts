@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { lineLoginTokens } from "./auth.routes";
 import { env } from "../config/env";
+import { fetchWithTimeout } from "../shared/http/fetchWithTimeout";
 import {
   issueCoachSessionToken,
   readCoachSessionToken,

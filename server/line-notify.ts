@@ -5,6 +5,7 @@ import { zhTW } from 'date-fns/locale';
 import { db } from './db';
 import { lineNotifyLogs, coachUsers, coachAvailability, coachVenuePreferences, schedules, venues, timeSlots } from '@shared/schema';
 import { eq, and, between } from 'drizzle-orm';
+import { fetchWithTimeout } from './shared/http/fetchWithTimeout';
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
@@ -52,29 +53,28 @@ async function sendLinePushMessage(lineId: string, message: string): Promise<boo
     return false;
   }
 
-  try {
-    const res = await fetch(LINE_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        to: lineId,
-        messages: [{ type: 'text', text: message }],
-      }),
-    });
+  // Task #32: enforce a hard timeout. Without this, a stalled LINE API
+  // call would block the daily/weekly cron handler indefinitely.
+  const result = await fetchWithTimeout(LINE_PUSH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      to: lineId,
+      messages: [{ type: 'text', text: message }],
+    }),
+  });
 
-    if (!res.ok) {
-      const errorBody = await res.text();
-      console.error(`LINE push failed for ${lineId}: ${res.status} ${errorBody}`);
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error(`LINE push error for ${lineId}:`, error);
+  if (!result.ok) {
+    console.error(
+      `LINE push failed for ${lineId}: status=${result.status} ` +
+        `code=${result.errorCode} msg=${result.errorMessage ?? ''}`,
+    );
     return false;
   }
+  return true;
 }
 
 async function sendWeeklyScheduleNotifications(): Promise<void> {

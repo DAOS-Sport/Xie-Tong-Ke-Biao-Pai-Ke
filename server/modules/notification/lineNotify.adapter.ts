@@ -9,6 +9,7 @@
  * boundary for testing and error mapping.
  */
 import { env } from "../../config/env";
+import { fetchWithTimeout } from "../../shared/http/fetchWithTimeout";
 
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 
@@ -23,6 +24,12 @@ export interface LinePushResult {
  * Sends a single text push message to a LINE user/group ID.
  * Never throws — callers branch on `ok` so the worker can record
  * structured failure info on the recipient row.
+ *
+ * Errors come from `fetchWithTimeout` and are pre-classified:
+ *   `timeout` | `network` | `http_4xx` | `http_5xx` | `no_token`.
+ * The weekly-push worker uses these to decide retry vs. final-fail
+ * (Task #32: 4xx other than 429 is treated as a hard error and is
+ * not retried, since LINE 4xx responses won't change on retry).
  */
 export async function sendTextMessage(
   to: string,
@@ -38,32 +45,22 @@ export async function sendTextMessage(
     };
   }
 
-  try {
-    const res = await fetch(LINE_PUSH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        to,
-        messages: [{ type: "text", text }],
-      }),
-    });
-    if (res.ok) return { ok: true, status: res.status, errorCode: null, errorMessage: null };
-    const body = await res.text().catch(() => "");
-    return {
-      ok: false,
-      status: res.status,
-      errorCode: `http_${res.status}`,
-      errorMessage: body.slice(0, 500),
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      status: 0,
-      errorCode: "transport_error",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    };
-  }
+  const result = await fetchWithTimeout(LINE_PUSH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      to,
+      messages: [{ type: "text", text }],
+    }),
+  });
+
+  return {
+    ok: result.ok,
+    status: result.status,
+    errorCode: result.errorCode,
+    errorMessage: result.errorMessage,
+  };
 }
