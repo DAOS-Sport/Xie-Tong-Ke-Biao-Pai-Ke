@@ -41,7 +41,8 @@ export function registerCoachPortalRoutes(app: Express): void {
       const existing = await storage.getCoachUserByLineId(tokenData.lineId);
       if (existing) {
         lineLoginTokens.delete(lineToken);
-        return res.json(existing);
+        const coachToken = issueCoachSessionToken(existing.id, tokenData.lineId);
+        return res.json({ ...existing, coachToken });
       }
       const updated = await storage.updateCoachUserLineId(
         coachUserId,
