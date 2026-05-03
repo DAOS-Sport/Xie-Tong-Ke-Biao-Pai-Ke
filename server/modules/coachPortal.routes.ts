@@ -109,24 +109,33 @@ export function registerCoachPortalRoutes(app: Express): void {
       // Not found in DB → notify 陳柏榮 via LINE push
       const channelAccessToken = env.lineChannelAccessToken;
       if (channelAccessToken) {
-        await fetch("https://api.line.me/v2/bot/message/push", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${channelAccessToken}`,
+        // Task #32: timeout-bounded; never let a stalled LINE call hold
+        // the registration response open.
+        const notifyResult = await fetchWithTimeout(
+          "https://api.line.me/v2/bot/message/push",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${channelAccessToken}`,
+            },
+            body: JSON.stringify({
+              to: CHEN_BO_RONG_LINE_ID,
+              messages: [
+                {
+                  type: "text",
+                  text: `【教練登入通知】\n教練「${trimmedName}」嘗試登入教練前台，但在 Ragic 資料庫中查無此名字。\n請確認該教練是否已建檔，或協助手動設定。`,
+                },
+              ],
+            }),
           },
-          body: JSON.stringify({
-            to: CHEN_BO_RONG_LINE_ID,
-            messages: [
-              {
-                type: "text",
-                text: `【教練登入通知】\n教練「${trimmedName}」嘗試登入教練前台，但在 Ragic 資料庫中查無此名字。\n請確認該教練是否已建檔，或協助手動設定。`,
-              },
-            ],
-          }),
-        }).catch((err) =>
-          console.error("[LINE] Failed to notify 陳柏榮:", err)
         );
+        if (!notifyResult.ok) {
+          console.error(
+            `[LINE] Failed to notify 陳柏榮: status=${notifyResult.status} ` +
+              `code=${notifyResult.errorCode} msg=${notifyResult.errorMessage ?? ""}`,
+          );
+        }
       }
 
       return res.status(404).json({

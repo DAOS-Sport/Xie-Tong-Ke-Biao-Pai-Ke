@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { storage } from "./storage";
+import { fetchWithTimeout } from "./shared/http/fetchWithTimeout";
 
 const RAGIC_DEPT_API_URL = "https://ap7.ragic.com/xinsheng/ragicforms4/7";
 const RAGIC_COACH_API_URL = "https://ap7.ragic.com/xinsheng/general-information/23";
@@ -34,14 +35,25 @@ async function fetchRagicRecords(apiUrl: string, limit = 500): Promise<RagicReco
   }
 
   const url = `${apiUrl}?api&APIKey=${apiKey}&limit=${limit}`;
-  const response = await fetch(url);
+  // Task #32: Ragic exports can take a while when `limit` is in the
+  // hundreds, so allow up to 20s before aborting (vs the default 8s).
+  const response = await fetchWithTimeout(url, { timeoutMs: 20_000 });
 
   if (!response.ok) {
-    throw new Error(`Ragic API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Ragic API error: status=${response.status} code=${response.errorCode} ` +
+        `msg=${response.errorMessage ?? ""}`,
+    );
   }
 
-  const data = await response.json() as Record<string, RagicRecord>;
-  return Object.values(data);
+  try {
+    const data = JSON.parse(response.body) as Record<string, RagicRecord>;
+    return Object.values(data);
+  } catch (err) {
+    throw new Error(
+      `Ragic API returned malformed JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 const EXCLUDED_VENUES = new Set([

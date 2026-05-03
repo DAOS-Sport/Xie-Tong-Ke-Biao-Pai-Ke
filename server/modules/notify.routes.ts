@@ -8,6 +8,7 @@ import {
 } from "../line-notify";
 import { requireAdminPassword } from "../shared/auth/adminPassword";
 import { env } from "../config/env";
+import { fetchWithTimeout } from "../shared/http/fetchWithTimeout";
 
 export function registerNotifyRoutes(app: Express): void {
   app.post(
@@ -151,7 +152,10 @@ export function registerNotifyRoutes(app: Express): void {
           }
           message += `\n請教練務必準時抵達場館！`;
 
-          const pushRes = await fetch(
+          // Task #32: timeout-bounded; manual re-push is iterating a
+          // potentially large coach list — one stalled call must not
+          // block the entire batch.
+          const pushRes = await fetchWithTimeout(
             "https://api.line.me/v2/bot/message/push",
             {
               method: "POST",

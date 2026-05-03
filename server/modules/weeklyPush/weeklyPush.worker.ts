@@ -312,7 +312,14 @@ async function handleRecipientJob(
       continue;
     }
 
-    if (isFinalAttempt) {
+    // Task #32: a LINE 4xx (other than 429 rate-limit) will not change
+    // on retry — invalid `to`, blocked user, expired token, etc. Treat
+    // it as a hard final failure regardless of attempt number to avoid
+    // burning the full retry budget on a guaranteed-failure call.
+    const isHardClientError =
+      result.errorCode === "http_4xx" && result.status !== 429;
+
+    if (isFinalAttempt || isHardClientError) {
       await weeklyPushRepo.updateRecipient(recipientId, {
         status: "failed",
         attemptCount: attemptNumber,

@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../replitAuth";
 import { env } from "../config/env";
 import { issueCoachSessionToken } from "../shared/auth/coachPortalSession";
+import { fetchWithTimeout, parseJsonBody } from "../shared/http/fetchWithTimeout";
 
 const LINE_AUTH_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
@@ -115,7 +116,9 @@ export function registerAuthRoutes(app: Express): void {
 
     try {
       const redirectUri = getLineRedirectUri();
-      const tokenRes = await fetch(LINE_TOKEN_URL, {
+      // Task #32: bound the LINE OAuth round-trip; otherwise a stalled
+      // LINE token endpoint would hang the user on the redirect callback.
+      const tokenRes = await fetchWithTimeout(LINE_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -128,25 +131,39 @@ export function registerAuthRoutes(app: Express): void {
       });
 
       if (!tokenRes.ok) {
-        const errData = await tokenRes.text();
-        console.error("LINE token exchange failed:", errData);
+        console.error(
+          `LINE token exchange failed: status=${tokenRes.status} ` +
+            `code=${tokenRes.errorCode} body=${tokenRes.body.slice(0, 500)}`,
+        );
         return res.redirect("/coach-portal?error=token_failed");
       }
 
-      const tokenData = (await tokenRes.json()) as { access_token: string };
-      const profileRes = await fetch(LINE_PROFILE_URL, {
+      const tokenData = parseJsonBody<{ access_token: string }>(tokenRes);
+      if (!tokenData?.access_token) {
+        console.error("LINE token exchange returned no access_token");
+        return res.redirect("/coach-portal?error=token_failed");
+      }
+      const profileRes = await fetchWithTimeout(LINE_PROFILE_URL, {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
 
       if (!profileRes.ok) {
+        console.error(
+          `LINE profile fetch failed: status=${profileRes.status} ` +
+            `code=${profileRes.errorCode}`,
+        );
         return res.redirect("/coach-portal?error=profile_failed");
       }
 
-      const profile = (await profileRes.json()) as {
+      const profile = parseJsonBody<{
         userId: string;
         displayName: string;
         pictureUrl?: string;
-      };
+      }>(profileRes);
+      if (!profile?.userId) {
+        console.error("LINE profile fetch returned malformed body");
+        return res.redirect("/coach-portal?error=profile_failed");
+      }
 
       const existingUser = await storage.getCoachUserByLineId(profile.userId);
       if (existingUser) {
