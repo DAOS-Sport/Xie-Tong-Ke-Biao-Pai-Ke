@@ -155,6 +155,8 @@ export async function initializeSchoolSchema(schoolCode: string) {
       ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach_name_2 VARCHAR;
       ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach1_is_teaching BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach2_is_teaching BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS coach_count INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE ${schemaName}.schedules ADD COLUMN IF NOT EXISTS is_class_locked BOOLEAN NOT NULL DEFAULT false;
     `));
     
     // 創建 teachers 表
