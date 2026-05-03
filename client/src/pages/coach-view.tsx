@@ -57,6 +57,10 @@ export default function CoachView() {
     const todays = schedules?.filter(s => s.date === dateStr) || [];
     if (!selectedCoach) return todays;
     return todays.filter(s => {
+      // coach2 (偕同) must also count — backend returns rows where the
+      // selected coach is coachName OR coachName2; the client must
+      // mirror that or 偕同 entries silently disappear from the view.
+      if (s.coachName2 && s.coachName2.trim() === selectedCoach) return true;
       if (!s.coachName) return false;
       if (s.coachName === selectedCoach) return true;
       const coaches = s.coachName.split('-').map(c => c.trim());
