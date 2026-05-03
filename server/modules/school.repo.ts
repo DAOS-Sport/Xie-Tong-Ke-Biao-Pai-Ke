@@ -12,17 +12,18 @@ import { sql, and, eq, gte, lte, type SQL } from "drizzle-orm";
 import { schedules, insertScheduleSchema } from "@shared/schema";
 import {
   getSchoolDb,
-  isValidSchoolCode,
-  getAvailableSchools,
+  assertSchoolCode,
+  schoolSchemaName,
 } from "../multi-school-db";
 
+/**
+ * Task #33 — local alias kept for source-diff readability. All SQL
+ * identifier construction goes through `sql.identifier(schoolSchemaName(code))`
+ * so the schema name is BOTH validated (regex + whitelist via
+ * assertSchoolCode) AND properly quoted by drizzle.
+ */
 function assertSchool(schoolCode: string): void {
-  if (!isValidSchoolCode(schoolCode)) {
-    throw new Error(`Invalid school code: ${schoolCode}`);
-  }
-  if (!getAvailableSchools().includes(schoolCode)) {
-    throw new Error(`Unknown school code: ${schoolCode}`);
-  }
+  assertSchoolCode(schoolCode);
 }
 
 export type SchoolTeacher = {
@@ -42,13 +43,12 @@ export async function listTeachers(
 ): Promise<SchoolTeacher[]> {
   assertSchool(schoolCode);
   const db = await getSchoolDb(schoolCode);
-  const result = await db.execute(
-    sql.raw(`
-      SELECT teacher_name, subject, created_at
-      FROM school_${schoolCode}.teachers
-      ORDER BY teacher_name
-    `)
-  );
+  const schemaIdent = sql.identifier(schoolSchemaName(schoolCode));
+  const result = await db.execute(sql`
+    SELECT teacher_name, subject, created_at
+    FROM ${schemaIdent}.teachers
+    ORDER BY teacher_name
+  `);
   return (result.rows as TeacherRow[]).map((row) => ({
     teacherName: row.teacher_name,
     subject: row.subject,
@@ -103,8 +103,9 @@ export async function listFeedbacks(
       ? sql` WHERE ${sql.join(conditions, sql` AND `)}`
       : sql``;
 
+  const schemaIdent = sql.identifier(schoolSchemaName(schoolCode));
   const result = await db.execute(sql`
-    SELECT * FROM ${sql.raw(`school_${schoolCode}.teacher_feedbacks`)}
+    SELECT * FROM ${schemaIdent}.teacher_feedbacks
     ${whereClause}
     ORDER BY updated_at DESC
   `);
@@ -127,8 +128,9 @@ export async function upsertFeedback(
 ): Promise<SchoolFeedback> {
   assertSchool(schoolCode);
   const db = await getSchoolDb(schoolCode);
+  const schemaIdent = sql.identifier(schoolSchemaName(schoolCode));
   const result = await db.execute(sql`
-    INSERT INTO ${sql.raw(`school_${schoolCode}.teacher_feedbacks`)}
+    INSERT INTO ${schemaIdent}.teacher_feedbacks
       (schedule_id, teacher_name, status, reschedule_date, reschedule_period, comment, updated_at)
     VALUES (
       ${data.scheduleId},
