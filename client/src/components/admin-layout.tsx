@@ -9,6 +9,7 @@ export type ActiveTab =
   | "stats"
   | "approval"
   | "weekly-push"
+  | "sop"
   | "coach-portal";
 
 interface NavItem {
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { key: "stats", label: "堂數統計", icon: "fa-chart-bar", path: "/mgt-x9k7p2/stats" },
   { key: "approval", label: "教練審核", icon: "fa-user-check", path: "/mgt-x9k7p2/approval" },
   { key: "weekly-push", label: "週推播", icon: "fa-paper-plane", path: "/mgt-x9k7p2/weekly-push" },
+  { key: "sop", label: "操作說明 SOP", icon: "fa-book-open", path: "/mgt-x9k7p2/sop" },
   { key: "coach-portal", label: "教練前台", icon: "fa-door-open", path: "/coach-portal", isGreen: true },
 ];
 

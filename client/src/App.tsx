@@ -17,6 +17,7 @@ import CoachPortal from "@/pages/coach-portal";
 import CoachApproval from "@/pages/coach-approval";
 import CoachAssignment from "@/pages/coach-assignment";
 import WeeklyPush from "@/pages/weekly-push";
+import Sop from "@/pages/sop";
 import SchoolView from "@/pages/school-view";
 import PasswordProtect from "@/components/password-protect";
 
@@ -35,6 +36,7 @@ function AdminSection() {
         <Route path="/mgt-x9k7p2/stats" component={Statistics} />
         <Route path="/mgt-x9k7p2/approval" component={CoachApproval} />
         <Route path="/mgt-x9k7p2/weekly-push" component={WeeklyPush} />
+        <Route path="/mgt-x9k7p2/sop" component={Sop} />
         <Route component={NotFound} />
       </Switch>
     </PasswordProtect>
