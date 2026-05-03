@@ -169,7 +169,7 @@ export function registerAuthRoutes(app: Express): void {
       if (existingUser) {
         // Issue a coach-portal session token bound to this user so subsequent
         // calls to /api/coach-portal/me/:identifier can prove ownership.
-        const coachToken = issueCoachSessionToken(
+        const coachToken = await issueCoachSessionToken(
           existingUser.id,
           profile.userId
         );

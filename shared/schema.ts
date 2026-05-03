@@ -237,6 +237,19 @@ export const lineNotifyLogs = pgTable("line_notify_logs", {
   uniqueIndex("uniq_daily_notify").on(table.coachName, table.notifyType, table.scheduleDate),
 ]);
 
+// 教練前台 session 持久化（伺服器重啟不需重新登入）
+export const coachPortalSessions = pgTable("coach_portal_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique("coach_portal_sessions_token_key"),
+  coachUserId: varchar("coach_user_id").notNull(),
+  lineId: varchar("line_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_coach_portal_sessions_coach_user_id").on(table.coachUserId),
+  index("idx_coach_portal_sessions_expires_at").on(table.expiresAt),
+]);
+
 export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   venue: one(venues, {
     fields: [schedules.venueId],

@@ -6,6 +6,7 @@ import { fetchWithTimeout } from "../shared/http/fetchWithTimeout";
 import {
   issueCoachSessionToken,
   readCoachSessionToken,
+  resolveCoachToken,
   verifyCoachSessionFor,
 } from "../shared/auth/coachPortalSession";
 import { verifyAdminPassword } from "../shared/auth/adminPassword";
@@ -40,7 +41,7 @@ export function registerCoachPortalRoutes(app: Express): void {
       const existing = await storage.getCoachUserByLineId(tokenData.lineId);
       if (existing) {
         lineLoginTokens.delete(lineToken);
-        const coachToken = issueCoachSessionToken(existing.id, tokenData.lineId);
+        const coachToken = await issueCoachSessionToken(existing.id, tokenData.lineId);
         return res.json({ ...existing, coachToken });
       }
       const updated = await storage.updateCoachUserLineId(
@@ -51,7 +52,7 @@ export function registerCoachPortalRoutes(app: Express): void {
         return res.status(404).json({ message: "找不到教練帳號" });
       }
       lineLoginTokens.delete(lineToken);
-      const coachToken = issueCoachSessionToken(updated.id, tokenData.lineId);
+      const coachToken = await issueCoachSessionToken(updated.id, tokenData.lineId);
       res.json({ ...updated, coachToken });
     } catch (error) {
       console.error("Error linking LINE to coach:", error);
@@ -79,7 +80,7 @@ export function registerCoachPortalRoutes(app: Express): void {
       );
       if (existingByLine) {
         lineLoginTokens.delete(lineToken);
-        const coachToken = issueCoachSessionToken(
+        const coachToken = await issueCoachSessionToken(
           existingByLine.id,
           tokenData.lineId
         );
@@ -100,7 +101,7 @@ export function registerCoachPortalRoutes(app: Express): void {
         if (!updated) {
           return res.status(404).json({ message: "找不到教練帳號" });
         }
-        const coachToken = issueCoachSessionToken(updated.id, tokenData.lineId);
+        const coachToken = await issueCoachSessionToken(updated.id, tokenData.lineId);
         return res.json({ ...updated, coachToken });
       }
 
@@ -176,7 +177,7 @@ export function registerCoachPortalRoutes(app: Express): void {
       const existingUser = await storage.getCoachUserByLineId(tokenData.lineId);
       if (existingUser) {
         lineLoginTokens.delete(lineToken);
-        const coachToken = issueCoachSessionToken(
+        const coachToken = await issueCoachSessionToken(
           existingUser.id,
           tokenData.lineId
         );
@@ -194,7 +195,7 @@ export function registerCoachPortalRoutes(app: Express): void {
       });
 
       lineLoginTokens.delete(lineToken);
-      const coachToken = issueCoachSessionToken(coachUser.id, tokenData.lineId);
+      const coachToken = await issueCoachSessionToken(coachUser.id, tokenData.lineId);
       res.json({ ...coachUser, coachToken });
     } catch (error) {
       console.error("Error registering coach user:", error);
@@ -212,7 +213,7 @@ export function registerCoachPortalRoutes(app: Express): void {
       const isAdmin = verifyAdminPassword(req);
       if (!isAdmin) {
         const token = readCoachSessionToken(req);
-        const session = verifyCoachSessionFor(token, identifier);
+        const session = await verifyCoachSessionFor(token, identifier);
         if (!session) {
           return res
             .status(403)
@@ -322,6 +323,18 @@ export function registerCoachPortalRoutes(app: Express): void {
           .status(400)
           .json({ message: "Missing coachName, weekStart, or slots" });
       }
+      // 確認寫入者只能修改自己的資料（管理員可繞過）
+      if (!verifyAdminPassword(req)) {
+        const session = await resolveCoachToken(req);
+        if (!session) {
+          return res.status(401).json({ message: "請先登入", code: "session_expired" });
+        }
+        const authUser = await storage.getCoachUserById(session.coachUserId);
+        const authName = authUser?.linkedCoachName ?? authUser?.name;
+        if (!authName || authName !== coachName) {
+          return res.status(403).json({ message: "無權限修改此教練資料" });
+        }
+      }
       const availableSlots = slots.filter((s) => s.available !== false);
       for (const slot of availableSlots) {
         if (
@@ -371,6 +384,18 @@ export function registerCoachPortalRoutes(app: Express): void {
         return res
           .status(400)
           .json({ message: "Missing coachName or venueNames" });
+      }
+      // 確認寫入者只能修改自己的資料（管理員可繞過）
+      if (!verifyAdminPassword(req)) {
+        const session = await resolveCoachToken(req);
+        if (!session) {
+          return res.status(401).json({ message: "請先登入", code: "session_expired" });
+        }
+        const authUser = await storage.getCoachUserById(session.coachUserId);
+        const authName = authUser?.linkedCoachName ?? authUser?.name;
+        if (!authName || authName !== coachName) {
+          return res.status(403).json({ message: "無權限修改此教練資料" });
+        }
       }
       await storage.setCoachVenuePreferences(coachName, venueNames);
       res.json({ success: true });

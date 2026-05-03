@@ -398,7 +398,7 @@ function ApprovedDashboard({
   setCurrentWeek: (fn: (d: Date) => Date) => void;
   onLogout: () => void;
 }) {
-  const coachName = user.name;
+  const coachName = user.linkedCoachName ?? user.name;
   const weekDays = getWeekDays(currentWeek);
   const startDate = format(weekDays[0], "yyyy-MM-dd");
   const endDate = format(weekDays[6], "yyyy-MM-dd");
