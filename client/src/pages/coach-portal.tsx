@@ -542,9 +542,13 @@ function ApprovedDashboard({
     if (venuePrefDebounceRef.current) clearTimeout(venuePrefDebounceRef.current);
     venuePrefDebounceRef.current = setTimeout(async () => {
       try {
+        const coachToken = sessionStorage.getItem("coach_portal_token") || "";
         const res = await fetch("/api/coach-portal/venue-preferences", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(coachToken ? { "x-coach-token": coachToken } : {}),
+          },
           body: JSON.stringify({ coachName, venueNames: Array.from(newSet) }),
         });
         if (!res.ok) throw new Error("Failed");
@@ -607,9 +611,13 @@ function ApprovedDashboard({
         }
       }
       try {
+        const coachToken = sessionStorage.getItem("coach_portal_token") || "";
         const res = await fetch("/api/coach-portal/availability", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(coachToken ? { "x-coach-token": coachToken } : {}),
+          },
           body: JSON.stringify({
             coachName,
             weekStart: format(availWeek, "yyyy-MM-dd"),
